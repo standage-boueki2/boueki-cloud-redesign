@@ -76,6 +76,13 @@
   html.rd #well .rw{flex-wrap:wrap;row-gap:6px}
   html.rd #well .th-t{flex-wrap:wrap;min-width:0}
   html.rd #lgv .lgtabs button{white-space:nowrap;font-size:14.5px}
+  html.rd #well .p{max-width:100%;white-space:normal;height:auto;line-height:1.5}
+  html.rd #well select{max-width:100%;min-width:0}
+  html.rd #well .v85doc-act{flex-wrap:wrap}
+  html.rd #well .v85doc-add{min-width:0;max-width:100%}
+  html.rd #well .v85doc-add[open]{flex:1 1 100%}
+  html.rd #well .v85doc-skipf{display:flex!important;flex-wrap:wrap;gap:6px;width:100%;max-width:100%;min-width:0}
+  html.rd #well .v85doc-skipf select{flex:1 1 100%;width:100%!important;min-width:0!important}
 
   /* ── 表は横にすべらせる ── */
   html.rd .rd-tbl{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
