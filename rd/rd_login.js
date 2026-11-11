@@ -70,7 +70,6 @@
     help.className = "k-lghelp rd-x";
     help.innerHTML = `<b>${I("help", 22)}はじめての方へ</b><a href="guide/" target="_blank" rel="noopener">${I("book", 18)}3分でわかるスタートガイド ${I("chevR", 16, 2.4)}</a><span class="k-hs">アカウントの発行・再有効化は、STANDAGE の担当までご連絡ください。</span>`;
     v.appendChild(help);
-    const rl = document.getElementById("rdlogin"); if (rl) c.prepend(rl);
   }
   const mo = new MutationObserver(() => { try { deco(); } catch (e) { console.error("[rd login]", e); } });
   const start = () => { mo.observe(document.body, { childList: true, subtree: true }); deco(); };

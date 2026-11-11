@@ -27,7 +27,7 @@
   const H = (o) => `<div class="k-h">${o.ic ? I(o.ic, 24) : ""}<h2${o.sz ? ` style="font-size:${o.sz}px"` : ""}>${esc(o.t)}</h2>${o.s ? `<span class="k-hs">${esc(o.s)}</span>` : ""}${o.r ? `<div class="k-hr">${o.r}</div>` : ""}</div>`;
   const card = (o) => `<section class="k-card ${o.cls || ""}"${o.id ? ` id="${o.id}"` : ""}${o.st ? ` style="${o.st}"` : ""}>${o.t ? H(o) : ""}${o.b || ""}</section>`;
   const tiles = (arr, n) => `<div class="k-tiles" style="--n:${n || arr.length}">${arr.map((t) => { const tag = t.go ? "button" : "div"; return `<${tag} ${t.go ? `type="button" ${act(t.go)}` : ""} class="k-tile ${t.cls || ""}"><span class="k-ti">${I(t.ic, 24)}</span><span style="min-width:0"><span class="k-tl">${esc(t.l)}</span><span class="k-tn">${t.n == null ? "—" : esc(t.n)}<small>${esc(t.u || "")}</small></span>${t.s ? `<span class="k-ts">${esc(t.s)}</span>` : ""}</span>${t.go ? `<span style="margin-left:auto;color:var(--k-bl)">${I("chevR", 18, 2.4)}</span>` : ""}</${tag}>`; }).join("")}</div>`;
-  const steps = (arr) => `<div class="k-steps">${arr.map((s, i) => `${i ? `<span class="k-arr">${I("chevR", 20, 2.4)}</span>` : ""}<button type="button" class="k-step ${s.st || ""}" ${s.go ? act(s.go) : ""}><span class="k-sn">${s.st === "done" ? I("check", 15, 3) : i + 1}</span>${s.ic ? `<span class="k-si">${I(s.ic, 26)}</span>` : ""}<span style="min-width:0"><b>${esc(s.t)}</b>${s.s ? `<small>${esc(s.s)}</small>` : ""}</span></button>`).join("")}</div>`;
+  const steps = (arr) => `<div class="k-steps">${arr.map((s, i) => { const tag = s.go ? "button" : "div"; return `${i ? `<span class="k-arr">${I("chevR", 20, 2.4)}</span>` : ""}<${tag} ${s.go ? `type="button" ${act(s.go)}` : 'aria-current="step"'} class="k-step ${s.st || ""}${s.go ? "" : " k-nogo"}"><span class="k-sn">${s.st === "done" ? I("check", 15, 3) : i + 1}</span>${s.ic ? `<span class="k-si">${I(s.ic, 26)}</span>` : ""}<span style="min-width:0"><b>${esc(s.t)}</b>${s.s ? `<small>${esc(s.s)}</small>` : ""}</span></${tag}>`; }).join("")}</div>`;
   const put = (w, html) => { const h = $("[data-rdhero]", w); const box = document.createElement("div"); box.className = "rd-x rd-p2"; box.innerHTML = html; if (h) h.after(box); else w.prepend(box); return box; };
   const fold = (w, nodes, title, ic) => { nodes = nodes.filter(Boolean); if (!nodes.length) return null; const d = document.createElement("details"); d.className = "rd-old"; d.innerHTML = `<summary>${I(ic || "list", 20)}<span>${esc(title)}</span></summary><div class="rd-oldin"></div>`; nodes[0].before(d); const inn = $(".rd-oldin", d); nodes.forEach((n) => inn.appendChild(n)); return d; };
   const img64 = (a) => (a && a.b64 ? `data:${a.mime || "image/jpeg"};base64,${a.b64}` : "");
@@ -101,7 +101,7 @@
           <p style="margin:10px 0 8px;font-size:13.5px;color:var(--k-ink2);font-weight:600">やり取りから、商品・市場・バイヤーの理解が深まり、提案の精度が高まります。</p>
           <button type="button" class="k-link" ${act(() => flash($(".grow", w) || $("#sec-0", w)))}>成長の内訳と育て方を見る ${I("arr", 15)}</button>` }) : ""}
       </div>`);
-    $("#k-ask", box).addEventListener("submit", (e) => { e.preventDefault(); ask($("#k-askq", box).value); $("#k-askq", box).value = ""; });
+    $("#k-ask", box).addEventListener("submit", (e) => { e.preventDefault(); const q = $("#k-askq", box); if (!q.value.trim()) { q.focus(); q.placeholder = "ここに質問を書いてから押してください（下の「よくある質問」を押しても聞けます）"; q.closest("form").classList.add("k-need"); setTimeout(() => q.closest("form").classList.remove("k-need"), 1600); return; } ask(q.value); q.value = ""; });
   };
 
   /* ───── 受信箱（inbox） ───── */
@@ -195,26 +195,51 @@
   RD.page.cty = (w) => {
     const rec = recCty().slice(0, 3), ch = chosenCty();
     const ai = byText(w, /おまかせ/);
-    const ctyIn = (c) => orig(w, "input[type=checkbox]").find((x) => { const l = x.closest("label") || x.parentElement; return l && (l.textContent || "").indexOf(c) >= 0; });
-    const confirmBtn = () => byText(w, /確定/);
-    const sel = (c) => { const x = ctyIn(c); if (x) { x.click(); setTimeout(() => RD.after(true), 60); } else flash(RD.secBy(w, /分析結果と推奨/) || $("#sec-2", w)); };
-    const st = [{ t: "商品を登録", ic: "box", st: T().item ? "done" : "", go: () => goKey("item") }, { t: "販売先国の選定", ic: "globe", st: "on" }, { t: "規制確認", ic: "shield", go: () => goKey("ops:reg") }, { t: "提案準備", ic: "send", go: () => goKey("deck") }];
-    const isSel = (c) => ch.indexOf(c) >= 0 || !!(ctyIn(c) && ctyIn(c).checked);
-    const selList = rec.map((r) => r.c).filter(isSel).concat(ch.filter((c) => !rec.some((r) => r.c === c)));
+    const boxes = () => orig(w, "input[data-ctypick]");
+    const box = (c) => boxes().find((x) => x.dataset.ctypick === c);
+    const picked = () => (ch.length ? ch.slice() : boxes().filter((x) => x.checked).map((x) => x.dataset.ctypick));
+    const tst = (m) => { try { toast(m); } catch (e) { alert(m); } }; // eslint-disable-line no-undef
+    // 選ぶ・外す（最大3か国）。確定済みなら「選び直す」で開いてからチェックをそろえる
+    const setPick = (next) => {
+      const apply = () => { boxes().forEach((x) => { if (!x.disabled) x.checked = next.indexOf(x.dataset.ctypick) >= 0; }); RD.after(true); };
+      if (chosenCty().length) {
+        try { ctyUnconfirm(); } catch (e) { const u = byText(w, /選び直す/); if (u) u.click(); } // eslint-disable-line no-undef
+        setTimeout(apply, 0);
+      } else apply();
+    };
+    const toggle = (c) => {
+      const cur = picked();
+      const b = box(c);
+      if (b && b.dataset.v83ban) { tst(`「${c}」は開拓しない国です（会社の方針）。選べません`); return; }
+      if (cur.indexOf(c) >= 0) { setPick(cur.filter((x) => x !== c)); return; }
+      if (cur.length >= 3) { tst("販売先国は3か国まで選べます。先に、選択中の国のどれかを外してください（選択中の札の × か、カードの「選択中」を押すと外れます）"); flash($("#k-ctysel", w)); return; }
+      setPick(cur.concat([c]));
+    };
+    const confirmIt = () => {
+      if (!picked().length) { tst("国を1〜3か国選んでください"); return; }
+      const b = $$("button", w).find((x) => !x.closest(".rd-x") && /ctyConfirm/.test(x.getAttribute("data-onclick") || ""));
+      if (b) b.click(); else { try { ctyConfirm(); } catch (e) { console.error(e); } } // eslint-disable-line no-undef
+    };
+    const st = [{ t: "商品を登録", ic: "box", st: T().item ? "done" : "", go: () => goKey("item") }, { t: "販売先国の選定", ic: "globe", st: ch.length ? "done" : "on" }, { t: "規制確認", ic: "shield", st: ch.length ? "on" : "", go: () => goKey("ops:reg") }, { t: "提案準備", ic: "send", go: () => goKey("deck") }];
+    const pk = picked();
+    const isSel = (c) => pk.indexOf(c) >= 0;
+    const selList = pk;
     put(w, `<section class="k-card" style="margin-bottom:16px;padding:12px 16px">${steps(st)}</section>
       ${rec.length ? `<div class="k-grid" style="grid-template-columns:minmax(0,1.75fr) minmax(0,1fr)">
         ${card({ ic: "spark", t: "AIが有望な販売先国を提案！", r: `<span class="k-tag or">${I("spark", 13)}貴社の商品との相性で自動ランキング</span>`, cls: "warm", b: `<div class="k-tiles" style="--n:${rec.length}">${rec.map((r, i) => { const s = r.sc || {}; const on = isSel(r.c); return `<div class="k-card" style="padding:16px;${i === 0 ? "border:2px solid var(--k-or);" : ""}position:relative">${i === 0 ? '<span class="k-tag orf" style="position:absolute;right:12px;top:-12px">最もおすすめ</span>' : ""}
-            <span class="k-tag ${i === 0 ? "orf" : "gy"}" style="font-size:13px">${i + 1}位</span><div style="display:flex;align-items:center;gap:8px;margin-top:8px;min-width:0">${flag(r.c, 24)}<b style="font-size:20px;font-weight:900;line-height:1.3">${esc(r.c)}</b></div>
+            <span class="k-tag ${i === 0 ? "orf" : "gy"}" style="font-size:13px">${i + 1}位</span><div style="display:flex;align-items:center;gap:8px;margin-top:8px;min-width:0">${flag(r.c, 24)}<b style="font-size:20px;font-weight:900;line-height:1.3">${esc(r.c)}</b>${ch.indexOf(r.c) >= 0 ? '<span class="k-tag gr">確定</span>' : ""}</div>
             <div style="margin:10px 0 8px;font-size:40px;font-weight:900;color:#E06A06;line-height:1">${esc(Math.round(s.total || 0))}<small style="font-size:16px;color:var(--k-ink3)">/100</small></div>
             <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px">${AX.map((a) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;padding:6px 10px;border-radius:10px;background:#F4F8FD;white-space:nowrap" title="${a[1]}：${esc(lvTxt(a[0], s[a[0]]))}"><small style="font-size:12.5px;font-weight:800;color:var(--k-ink2)">${a[1]}</small><b style="font-size:14px;color:${(s[a[0]] || 0) >= 80 ? "var(--k-gr)" : (s[a[0]] || 0) >= 60 ? "var(--k-am)" : "var(--k-rd)"}">${esc(Math.round(s[a[0]] || 0))}</b></div>`).join("")}</div>
             ${r.why ? `<p style="margin:0 0 10px;font-size:12.5px;font-weight:600;color:#2A3B54;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden" title="${esc(r.why)}">${esc(r.why)}</p>` : ""}
-            <button type="button" class="k-btn ${on ? "" : "white"} wide" ${act(() => sel(r.c))}>${I(on ? "check" : "plus", 18, 2.6)}${on ? "選択中" : "選択する"}</button></div>`; }).join("")}</div>` })}
+            <button type="button" class="k-btn ${on ? "" : "white"} wide" data-rdcty="${esc(r.c)}" title="${on ? "押すと外します" : "押すと選びます（3か国まで）"}" ${act(() => toggle(r.c))}>${I(on ? "check" : "plus", 18, 2.6)}${on ? "選択中（押すと外す）" : "選択する"}</button></div>`; }).join("")}</div>` })}
         ${card({ ic: "chart", t: "主要指標の比較", b: radar(rec) + `<table class="rd-tbl" style="margin-top:10px"><thead><tr><th>国</th><th style="text-align:right">総合スコア</th></tr></thead><tbody>${rec.map((r) => `<tr><td>${flag(r.c, 16)} <b>${esc(r.c)}</b></td><td style="text-align:right"><b style="font-size:22px;color:#E06A06">${esc(Math.round((r.sc || {}).total || 0))}</b></td></tr>`).join("")}</tbody></table>` })}
       </div>
-      <section class="k-card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px">
-        <span class="k-ck">${I("check", 22, 3)}</span><b style="font-size:16px">選択中の販売先国</b><b style="font-size:30px;color:#E06A06;font-weight:900">${selList.length}</b><b>か国</b>
-        <div class="k-chips">${selList.map((c) => `<span class="k-chip">${flag(c, 16)}${esc(c)}</span>`).join("") || '<span class="k-hs">まだ選んでいません（1〜3か国）</span>'}</div>
-        <button type="button" class="k-btn big" style="margin-left:auto" ${act(() => { if (ch.length) goKey("ops:reg"); else { const b = confirmBtn(); if (b) flash(b.closest(".c") || b); else flash($("#sec-2", w)); } })}>${I("chevR", 20, 2.6)}${ch.length ? "選んだ国で次へ（規制確認）" : "選んだ国を確定する"}</button>
+      <section class="k-card" id="k-ctysel" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px">
+        <span class="k-ck">${I("check", 22, 3)}</span><b style="font-size:16px">${ch.length ? "確定した販売先国" : "選択中の販売先国"}</b><b style="font-size:30px;color:#E06A06;font-weight:900">${selList.length}</b><b>/ 3 か国</b>
+        <div class="k-chips">${selList.map((c) => `<span class="k-chip">${flag(c, 16)}${esc(c)}<button type="button" class="k-chipx" aria-label="${esc(c)}を外す" title="外す" ${act(() => toggle(c))}>${I("x", 14, 2.6)}</button></span>`).join("") || '<span class="k-hs">まだ選んでいません（カードの「選択する」で1〜3か国）</span>'}</div>
+        ${ch.length
+          ? `<span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="k-btn white" ${act(() => setPick(ch.slice()))}>${I("edit", 18)}選び直す</button><button type="button" class="k-btn big" ${act(() => goKey("ops:reg"))}>${I("chevR", 20, 2.6)}確定した国で次へ（規制確認）</button></span>`
+          : `<button type="button" class="k-btn big" style="margin-left:auto" ${selList.length ? "" : "disabled"} ${act(confirmIt)}>${I("check", 20, 2.6)}${selList.length ? `この${selList.length}か国で確定する` : "国を選ぶと確定できます"}</button>`}
       </section>` : card({ ic: "spark", t: "AIが有望な販売先国を提案します", cls: "warm", b: `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap"><p style="margin:0;flex:1;min-width:260px;font-size:15px;font-weight:700;color:#2A3B54;line-height:1.8">まだ分析していません。AI商社マンが、規制・市場・競合・拠点のデータから<b style="color:#E06A06">おすすめの3か国</b>を選びます。</p>${ai ? `<button type="button" class="k-btn big" ${act(() => ai.click())}>${I("spark", 20)}AI商社マンにおまかせ（1クリック）</button>` : ""}</div>` })}`);
   };
 
@@ -297,7 +322,9 @@
 
   /* ───── ドキュメント（docs） ───── */
   RD.page.docs = (w) => {
-    const up = byText(w, /^アップロード/), ln = byText(w, /リンクを登録/), rq = byText(w, /提出を依頼/);
+    // 今の版の「アップロード」は <label> の中の隠れたファイル選択（#d30up）＝そのファイル選択を開く（11/11 の総点検で、押しても反応しなかった）
+    const upIn = $("#d30up", w) || orig(w, "input[type=file]")[0];
+    const up = upIn ? { click: () => upIn.click() } : byText(w, /アップロード/, "button, a, label"), ln = byText(w, /リンクを登録/), rq = byText(w, /提出を依頼/);
     const wrap = $("#d30wrap", w);
     const vis = {};
     if (wrap) { const ths = $$("th", wrap).map((x) => (x.textContent || "").trim()); const ci = ths.findIndex((x) => /公開範囲/.test(x)); if (ci >= 0) $$("tbody tr", wrap).forEach((tr) => { const td = tr.children[ci]; const v = td ? (td.textContent || "").replace(/\s+/g, "").trim() : ""; if (v) vis[v] = (vis[v] || 0) + 1; }); }

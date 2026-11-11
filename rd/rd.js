@@ -172,7 +172,7 @@
 
   /* ───── いまの場所と移動 ───── */
   function curKey() {
-    if (isFwd()) return G("fwdCur") || "finbox";
+    if (isFwd()) { const c = G("fwdCur") || "finbox"; return c === "finbox" && RD.fhome ? "fhome" : c; }
     const p = G("cur") || "dash";
     if (p === "ops") return "ops:" + (G("opsTab") || "reg");
     if (p === "dash") return "dash:" + (RD.dashMode || "home");
@@ -184,12 +184,14 @@
     const [p, sub] = String(k).split(":");
     if (p === "ops" && sub) { try { opsTab = sub; } catch (e) { /* 無い版 */ } } // eslint-disable-line no-undef
     if (p === "dash") RD.dashMode = sub || "home";
-    RD._keep = 1;
-    try { if (G("cur") === p && typeof render === "function") render(); else go(p); } finally { RD._keep = 0; }
+    RD._want = k; // 見張りが受け取る（自分のメニューからの移動）
+    if (G("cur") === p && typeof render === "function") render(); else go(p); // eslint-disable-line no-undef
     try { window.scrollTo(0, 0); const st = $(".stage"); if (st) st.scrollTop = 0; } catch (e) { /* 無視 */ }
   }
   function fGo(p) {
-    try { fwdCur = p; } catch (e) { return; } // eslint-disable-line no-undef
+    RD._want = p;
+    RD.fhome = p === "fhome";
+    try { fwdCur = p === "fhome" ? "finbox" : p; } catch (e) { return; } // eslint-disable-line no-undef
     try { fwdNav(); } catch (e) { /* 無視 */ }
     try { fwdRender(); } catch (e) { console.error(e); }
     try { window.scrollTo(0, 0); } catch (e) { /* 無視 */ }
@@ -236,7 +238,7 @@
     const isOn = (x) => x === k || (x.indexOf(":") < 0 && k.indexOf(":") < 0 && x === kp);
     const grp = (G2) => {
       const on = G2.items.some((it) => isOn(it[0]));
-      const closed = !!fold[G2.g] && !on;
+      const closed = !!fold[G2.g]; // いま居るグループもたためる（押しても変わらない、をなくす）
       return `<div class="rd-grp ${on ? "on" : ""}"><button type="button" class="rd-gh" data-rdfold="${esc(G2.g)}" aria-expanded="${!closed}"><span>${esc(G2.g)}</span>${I("chev", 14, 2.4)}</button>
         ${closed ? "" : G2.items.filter((it) => !it[4] || isOn(it[0])).map((it) => `<button type="button" class="rd-ni" data-rdk="${esc(it[0])}" aria-current="${isOn(it[0])}">${I(it[2], 19)}<span>${esc(it[1])}</span>${bdg(it[3])}</button>`).join("")}</div>`;
     };
@@ -412,7 +414,7 @@
       let n = 0;
       const tm = setInterval(() => { n++; if (document.getElementById("chat") || n > 30) { clearInterval(tm); try { askFree(q); } catch (e) { console.error("[rd] askFree", e); } } }, 100); // eslint-disable-line no-undef
     };
-    $("#rdask", box).addEventListener("submit", (e) => { e.preventDefault(); ask($("#rdaskq", box).value); });
+    $("#rdask", box).addEventListener("submit", (e) => { e.preventDefault(); const q = $("#rdaskq", box); if (!q.value.trim()) { q.focus(); q.placeholder = "ここに質問を書いてから押してください（例：香港での販売規制を調べて）"; q.classList.add("k-need"); setTimeout(() => q.classList.remove("k-need"), 1600); return; } ask(q.value); });
     $$("[data-rdchip]", box).forEach((b) => b.addEventListener("click", () => ask(chips[+b.dataset.rdchip][2])));
   }
   function reportShipper(w) {
@@ -898,7 +900,7 @@
         $$(":scope > .rd-x", w).forEach((n) => { if (!n.matches("[data-rdhero]")) n.parentNode.removeChild(n); }); // 前に足した部品を外してから足し直す（元の部品は .rd-x の外）
       }
       if (isFwd()) {
-        if (k === "fhome") { /* homeFwd は fwdRender の包みで描く */ }
+        if (k === "fhome") { /* homeFwd は見張り（onWell）が描く */ }
         else {
           const h = HERO[k] || [k, ""];
           putHero(w, h[0], h[1]);
@@ -941,67 +943,38 @@
   RD.goKey = goKey;
   RD.curKey = curKey;
 
-  /* ───── 今のアプリの関数を包む（中身はそのまま呼ぶ） ───── */
-  function wrapAll() {
-    if (RD._wrapped) return;
-    if (typeof window.render !== "function" && typeof G("render") !== "function") return;
-    RD._wrapped = 1;
-    const r0 = G("render");
-    render = function () { const r = r0.apply(this, arguments); after(); return r; }; // eslint-disable-line no-global-assign, no-undef
-    const g0 = G("go");
-    if (typeof g0 === "function") go = function (id) { if (id === "dash" && !RD._keep) RD.dashMode = "home"; return g0.apply(this, arguments); }; // eslint-disable-line no-global-assign, no-undef
-    const f0 = G("fwdRender");
-    if (typeof f0 === "function") {
-      fwdRender = function () { // eslint-disable-line no-global-assign, no-undef
-        if (!RD._fland) { RD._fland = 1; try { if (fwdCur === "finbox") fwdCur = "fhome"; } catch (e) { /* 無視 */ } } // eslint-disable-line no-undef
-        let home = false;
-        try { home = fwdCur === "fhome"; } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
-        if (home) {
-          try { fwdCur = "finbox"; } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
-          let r;
-          try { r = f0.apply(this, arguments); } finally { try { fwdCur = "fhome"; } catch (e) { /* 無視 */ } } // eslint-disable-line no-undef
-          try { const w = $("#well"); if (w) homeFwd(w); } catch (e) { console.error("[rd]", e); }
-          after();
-          return r;
+  /* ───── 見張り：今のアプリの関数は差し替えず、#well・#nav の描き直しを見て仕上げる（No.360・11/11） ───── */
+  function onWell() {
+    if (RD._busy) return;
+    RD._busy = 1;
+    try {
+      if (locked()) { buildSide(); buildBar(); return; }
+      const want = RD._want; RD._want = null;
+      if (isFwd()) {
+        const c = G("fwdCur") || "finbox";
+        if (!want) {
+          if (RD._lastFwd === undefined) RD.fhome = c === "finbox"; // ログインの直後の着地はホーム
+          else if (c !== RD._lastFwd) RD.fhome = false;              // アプリが自分で別の画面へ移った
         }
-        const r = f0.apply(this, arguments); after(); return r;
-      };
-    }
-    const n0 = G("fwdNav");
-    if (typeof n0 === "function") fwdNav = function () { const r = n0.apply(this, arguments); try { buildSide(); } catch (e) { /* 無視 */ } return r; }; // eslint-disable-line no-global-assign, no-undef
+        RD._lastFwd = c;
+        const w = $("#well");
+        if (w && curKey() === "fhome" && !$(".rd-fhome-top", w)) { try { homeFwd(w); } catch (e) { console.error("[rd]", e); } }
+      } else {
+        const c = G("cur");
+        if (!want && c === "dash" && RD._lastCur !== "dash") RD.dashMode = "home"; // アプリが自分でダッシュボードへ＝ホーム
+        RD._lastCur = c;
+      }
+      RD.after();
+    } catch (e) { console.error("[rd]", e); } finally { RD._busy = 0; }
   }
-  wrapAll();
-
-  // 画面が描き直されて見出しが消えたら、もう一度仕上げる（受信箱の数の更新など、render を通らない描き直しに備える）
-  let tmr = 0;
-  const mo = new MutationObserver(() => {
-    clearTimeout(tmr);
-    tmr = setTimeout(() => {
-      const w = $("#well");
-      if (!w || locked()) { buildSide(); buildBar(); return; }
-      if (!$("[data-rdhero]", w) || (isFwd() && curKey() === "fhome" && !$(".rd-fhome-top", w) && !$(".rd-tiles", w))) {
-        if (isFwd() && curKey() === "fhome") { try { fwdRender(); } catch (e) { /* 無視 */ } } // eslint-disable-line no-undef
-        else after();
-      } else { buildSide(); clampLong(w); }
-    }, 120);
-  });
-  /* プレビューのログインの手助け：手元（127.0.0.1）の模擬サーバーの架空デモアカウントで入る */
-  function loginHelper() {
-    if ($("#rdlogin")) return;
-    const go = $("#lg-go");
-    if (!go || !/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) return;
-    const box = document.createElement("div");
-    box.id = "rdlogin";
-    box.innerHTML = `<b>刷新版プレビュー（手元だけ）：どちらかを押すと入れます</b>本番のサーバー・お客様のデータには一切つながりません（手元の模擬サーバーの架空のデモデータです）。<button type="button" data-c="TRIAL-2026">荷主（お客様）の画面で入る</button><button type="button" class="b2" data-c="FWD-2026">物流会社の画面で入る</button>`;
-    box.addEventListener("click", (e) => { const b = e.target.closest("[data-c]"); if (!b) return; const c = $("#lg-code"), n = $("#lg-name"); if (c) c.value = b.dataset.c; if (n) n.value = ""; go.click(); });
-    go.closest("form, div") ? go.closest("form, div").before(box) : go.before(box);
-  }
+  RD.onWell = onWell;
+  const mo = new MutationObserver(onWell);
+  const moNav = new MutationObserver(() => { try { buildSide(); } catch (e) { /* 無視 */ } });
   function start() {
-    loginHelper();
     const w = $("#well");
     if (w) mo.observe(w, { childList: true });
     const n = $("#nav");
-    if (n) mo.observe(n, { childList: true, subtree: true, characterData: true });
+    if (n) moNav.observe(n, { childList: true, subtree: true, characterData: true });
     buildSide(); buildBar();
     after();
     const bd = document.createElement("div");
@@ -1013,5 +986,5 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
   // ログインの直後など、遅れて描かれる分
   let tries = 0;
-  const iv = setInterval(() => { tries++; wrapAll(); if (!locked()) { after(); } else { loginHelper(); } if (tries > 40) clearInterval(iv); }, 500);
+  const iv = setInterval(() => { tries++; if (!locked()) onWell(); if (tries > 40) clearInterval(iv); }, 500);
 })();

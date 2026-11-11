@@ -29,7 +29,7 @@
       document.addEventListener("click", () => { dd.classList.remove("on"); co.setAttribute("aria-expanded", "false"); });
       document.addEventListener("keydown", (e) => { if (e.key === "Escape") dd.classList.remove("on"); });
     }
-    PUT.forEach(([sel, z]) => { const x = document.querySelector(sel); const t = dd.querySelector(`[data-z="${z}"]`); if (x && t && x.parentElement !== t) t.appendChild(x); if (x) { x.classList.remove("hm"); if (sel === "#psw" || sel === "#pfind") x.hidden = false; } });
+    PUT.forEach(([sel, z]) => { const x = document.querySelector(sel); const t = dd.querySelector(`[data-z="${z}"]`); if (x && t && x.parentElement !== t) t.appendChild(x); if (x) { x.classList.remove("hm"); /* hidden はアプリの決めのまま（No.361） */ } });
     // 区切りが空なら見出しごと隠す（物流会社・管理者は商品の切り替えが無い）
     dd.querySelectorAll(".k-ddr").forEach((r) => { const h = r.previousElementSibling; const has = r.children.length > 0; r.style.display = has ? "" : "none"; if (h && h.tagName === "H4") h.style.display = has ? "" : "none"; });
     const S = RD.G("SES") || {};
