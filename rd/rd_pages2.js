@@ -212,7 +212,18 @@
       const b = box(c);
       if (b && b.dataset.v83ban) { tst(`「${c}」は開拓しない国です（会社の方針）。選べません`); return; }
       if (cur.indexOf(c) >= 0) { setPick(cur.filter((x) => x !== c)); return; }
-      if (cur.length >= 3) { tst("販売先国は3か国まで選べます。先に、選択中の国のどれかを外してください（選択中の札の × か、カードの「選択中」を押すと外れます）"); flash($("#k-ctysel", w)); return; }
+      if (cur.length >= 3) {
+        tst("販売先国は3か国まで選べます。先に、選択中の国のどれかを外してください（選択中の札の × か、カードの「選択中」を押すと外れます）");
+        const sel = $("#k-ctysel", w);
+        if (sel) { // トーストを見落としても分かるように、選択中の欄の中にも出す
+          let n = $(".k-ctymsg", sel);
+          if (!n) { n = document.createElement("p"); n.className = "k-ctymsg"; n.setAttribute("role", "alert"); sel.appendChild(n); }
+          n.textContent = `「${c}」を選ぶには、先に選択中の国のどれかを × で外してください（販売先国は3か国まで）`;
+          try { sel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) { /* 古いブラウザ */ }
+          flash(sel);
+        }
+        return;
+      }
       setPick(cur.concat([c]));
     };
     const confirmIt = () => {

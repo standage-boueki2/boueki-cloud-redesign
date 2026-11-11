@@ -55,3 +55,6 @@ html.rd .k-chipx:hover{background:var(--k-rd-soft);color:var(--k-rd)}
 html.rd .k-need, html.rd .rd-ask:has(.k-need){box-shadow:0 0 0 3px rgba(242,108,11,.35)!important;border-color:var(--k-or)!important}
 /* 左下の札・右下の「AIに聞く」に、ページのいちばん下が隠れないよう余白（No.363 の続き） */
 html.rd .stage{padding-bottom:96px!important}
+
+/* 4か国目を押したときの案内（選択中の欄の中） */
+html.rd .k-ctymsg{flex-basis:100%;margin:0;padding:10px 14px;border-radius:10px;background:#FFF4E5;border:1px solid #F8C98A;color:#8A4300;font-weight:800;font-size:14px;line-height:1.6}
