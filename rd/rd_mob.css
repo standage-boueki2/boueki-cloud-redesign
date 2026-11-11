@@ -1,0 +1,123 @@
+/* 貿易クラウドAI商社マン デザイン刷新：スマホ版（2026-11-11 大森さん「スマホで開くと、すごく見づらい」）
+   幅 820px 以下（今のアプリがスマホの形に切り替わる幅と同じ）で、
+   ・上の帯を1段に収める（検索は伸び縮み・言語は短く・文字の大きさ／会社はアイコンだけ）
+   ・見出しを小さく（港の絵を外し、ロボットを小さく、題 24px）
+   ・画面ごとの横並び（2〜3列）を縦1列に。数のタイルは2列のまま
+   ・押す所を大きく（高さ 36px 以上）、表は横にすべらせる
+   ・ログイン画面は、入力欄がすぐ見えるように説明を短く
+   部品は消さない（並べ方・大きさだけ）。PC の見た目は変えない */
+
+@media (max-width:820px){
+  /* ── 上の帯：1段 ── */
+  html.rd .bar.k-bar2{padding:8px 10px!important;gap:6px!important;min-height:58px}
+  html.rd .bar.k-bar2 #ham{flex:none;width:40px;height:40px}
+  html.rd .bar.k-bar2 #uxsearch{flex:1 1 auto!important;min-width:0!important;max-width:none!important;height:40px!important;padding:0 10px!important;margin-left:0!important;overflow:hidden;white-space:nowrap;font-size:13px}
+  html.rd .bar.k-bar2 #uxsearch kbd{display:none}
+  html.rd .bar.k-bar2 #uxsearch::after{content:"検索";color:var(--k-ink3);font-weight:700;font-size:13.5px;margin-left:6px}
+  html.rd .bar.k-bar2 #lang{flex:none;width:68px!important;height:40px!important;padding:0 4px!important;font-size:12.5px}
+  html.rd .bar.k-bar2 .k-dens{width:40px;height:40px;padding:0!important;justify-content:center}
+  html.rd .bar.k-bar2 .k-dens .k-dl{display:none}
+  html.rd .bar.k-bar2 .k-dens .k-aa{width:30px;height:30px;font-size:13px}
+  html.rd .bar.k-bar2 #bell{flex:none;width:40px!important;height:40px!important}
+  html.rd .bar.k-bar2 .k-co{flex:none;width:40px;height:40px;padding:0!important;justify-content:center;gap:0}
+  html.rd .bar.k-bar2 .k-co > span,html.rd .bar.k-bar2 .k-co > svg:last-child{display:none}
+  html.rd .bar.k-bar2 .k-dd{position:fixed!important;left:8px!important;right:8px!important;top:62px!important;width:auto!important;max-height:calc(100vh - 140px);overflow:auto}
+
+  /* ── 本文の余白・見出し ── */
+  html.rd .stage{padding:0 12px 104px!important}
+  html.rd .rd-hero{flex-wrap:wrap;align-items:flex-start;min-height:0!important;gap:8px 10px;margin:0 0 12px!important;padding-top:2px}
+  html.rd .rd-hero .rd-port{display:none!important}
+  html.rd .rd-hero .rd-bot{width:52px!important;margin-top:4px}
+  html.rd .rd-hero .rd-ht{flex:1 1 0;min-width:0}
+  html.rd .rd-hero h1{font-size:24px!important;line-height:1.3!important;margin:0 0 4px!important;letter-spacing:0!important}
+  html.rd .rd-hero p{font-size:14px!important;line-height:1.6!important}
+  html.rd .rd-hero p.k-termhint{font-size:12px!important}
+  html.rd .rd-hero .k-lvchip{position:static!important;flex:1 1 100%;width:100%;margin:0!important;justify-content:flex-start}
+  html.rd .rd-hero .k-crumb,html.rd .rd-hero .k-crumbs{font-size:11.5px!important}
+  html.rd .k-card,html.rd .rd-card{padding:16px!important;border-radius:16px!important}
+  html.rd .k-h{flex-wrap:wrap;row-gap:4px}
+  html.rd .k-h h2,html.rd .rd-ch h2{font-size:18px!important}
+  html.rd .k-h .k-hs{font-size:12.5px}
+  html.rd .k-h .k-hr{margin-left:0!important;flex-basis:100%;flex-wrap:wrap}
+
+  /* ── 横並び（2〜3列）を縦1列に ── */
+  html.rd .k-grid,html.rd .rd-grid,html.rd .rd-3col,
+  html.rd .rd-x [style*="grid-template-columns:minmax"],
+  html.rd .rd-x [style*="grid-template-columns: minmax"],
+  html.rd .rd-x [style*="grid-template-columns:200px"],
+  html.rd .rd-x [style*="grid-template-columns:150px"],
+  html.rd .rd-x [style*="grid-template-columns:auto 1fr minmax"],
+  html.rd .rd-x [style*="grid-template-columns:repeat(3,minmax"],
+  html.rd .rd-x [style*="grid-template-columns:repeat(4,minmax"]{grid-template-columns:minmax(0,1fr)!important}
+  html.rd .rd-x [style*="grid-template-columns:150px"] > img{display:none}
+  html.rd .k-tiles:has(> .k-card),html.rd .k-tiles:has(> .k-step),html.rd .k-tiles:has(> button.k-step){grid-template-columns:minmax(0,1fr)!important}
+  html.rd .k-step.big{flex-direction:row!important;align-items:center;text-align:left;gap:12px;padding:12px 14px!important;min-height:0!important}
+  html.rd .k-step.big .k-si svg{width:28px;height:28px}
+  html.rd .k-ctyord{grid-template-columns:minmax(0,1fr)}
+  /* 2列の小さな数（市場性・規制など）はそのまま */
+  html.rd .rd-x [style*="border-left:1px solid var(--rd-line);padding-left:20px"]{flex-wrap:wrap;border-left:0!important;padding-left:0!important;border-top:1px solid var(--rd-line);padding-top:12px}
+
+  /* ── このページの内容：横にすべらせる1行 ── */
+  html.rd #uxsec{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -12px 12px!important;padding:0 12px 2px!important}
+  html.rd #uxsec::-webkit-scrollbar{display:none}
+  html.rd #uxsec > *{flex:none;white-space:nowrap}
+  html.rd #uxsec .uxsc{min-height:36px;display:inline-flex;align-items:center}
+
+  /* ── 押す所を大きく ── */
+  html.rd .k-link,html.rd .rd-more,html.rd button.rd-more{min-height:36px;display:inline-flex;align-items:center}
+  html.rd .k-btn,html.rd .rd-btn{min-height:44px}
+  html.rd .k-btn.k-mini{min-height:38px}
+  html.rd .k-chipx{width:30px!important;height:30px!important}
+  html.rd .k-chip{min-height:36px}
+  html.rd #well .btn{min-height:40px}
+  html.rd .k-termhint .k-link{min-height:0}
+
+  /* ── 行の中の部品は折り返す（はみ出さない） ── */
+  html.rd #well .rw{flex-wrap:wrap;row-gap:6px}
+  html.rd #well .th-t{flex-wrap:wrap;min-width:0}
+  html.rd #lgv .lgtabs button{white-space:nowrap;font-size:14.5px}
+
+  /* ── 表は横にすべらせる ── */
+  html.rd .rd-tbl{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+  html.rd #well .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* ── AIに相談の入力欄：送るボタンを下の段に ── */
+  html.rd .rd-ask{flex-wrap:wrap}
+  html.rd #k-ask input{min-width:0;flex:1 1 100%;height:48px;font-size:16px}
+  html.rd #k-ask button[type=submit]{flex:1 1 100%;height:46px;justify-content:center;border-radius:12px}
+  html.rd #rdask input{font-size:16px}
+
+  /* ── 下に固定の部品（下のタブと重ならないように） ── */
+  #rdbadge{left:8px!important;right:auto!important;top:auto!important;bottom:calc(70px + env(safe-area-inset-bottom))!important;max-width:calc(100vw - 16px);font-size:10px!important;padding:3px 9px!important;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #rdbadge a{display:none}
+  html.rd #aiThink{right:10px!important;left:10px!important;width:auto!important;bottom:calc(100px + env(safe-area-inset-bottom))!important}
+  html.rd #aiThink.k-mini{left:auto!important}
+  #k-densm{left:8px;right:8px!important;width:auto}
+  #k-tp{max-width:calc(100vw - 24px)}
+
+  /* ── ログイン画面：入力欄をすぐ見せる ── */
+  html.rd #lgv .k-lgtop{padding:0!important;gap:8px!important}
+  html.rd #lgv .k-lglogo2{height:40px!important;width:auto!important}
+  html.rd #lgv .k-lgcatch{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px!important}
+  html.rd #lgv .k-lgbot{width:56px!important;flex:none}
+  html.rd #lgv .k-lgcatch h1{font-size:20px!important;line-height:1.4!important;margin:0 0 4px!important}
+  html.rd #lgv .k-lgcatch p{font-size:13px!important;line-height:1.6!important;margin:0 0 6px!important}
+  html.rd #lgv .k-lgcatch .k-chips{gap:6px}
+  html.rd #lgv .k-lgcatch .k-chip{font-size:12px;min-height:30px;padding:4px 10px}
+  html.rd #lgv .k-lghelp{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
+  html.rd #lgv .k-lghelp > b{border:0;padding:0;font-size:15px}
+  html.rd #lgv input,html.rd #lgv select{font-size:16px!important;min-height:46px}
+  html.rd #lgv button{min-height:46px}
+  #k-lgwait .k-lgwc{flex-direction:column;align-items:center;text-align:left;padding:18px}
+  #k-lgwait .k-lgwbot{width:64px}
+  #k-lgwait h2{font-size:19px}
+}
+
+@media (max-width:600px){
+  /* ご利用までの3ステップ（説明だけ）はスマホでは出さない＝入力欄を上に */
+  html.rd #lgv .k-lgsteps{display:none!important}
+  html.rd #lgv .k-lgcatch .k-chips{display:none}
+  html.rd .rd-hero .rd-bot{width:44px!important}
+  html.rd .rd-hero h1{font-size:22px!important}
+  html.rd .k-tiles:not(:has(> .k-card)):not(:has(> .k-step)){grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+}

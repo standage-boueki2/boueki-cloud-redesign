@@ -117,7 +117,7 @@
     { g: "商談・案件", ic: "brief", items: [["db", "AIバイヤー開拓・拠点", "users"], ["deck", "外国語 営業資料", "slides"], ["deal", "商談・バイヤー", "brief"], ["msg", "やりとり", "msg", "msg"], ["memo", "会議メモ・議事録", "doc", "", 1], ["rqp", "依頼ページ", "doc", "", 1], ["tcd", "商社デスク（STANDAGE）", "bldg", "", 1]] },
     { g: "調査・規制", ic: "shield", items: [["cty", "販売先国の選定", "globe"], ["ops:reg", "規制を調べる", "shield"]] },
     { g: "物流・出荷", ic: "ship", items: [["ops:doc", "書類をつくる", "doc"], ["ops:ship", "出荷を進める", "ship"], ["ops:ord", "受注・請求・入金", "coins"], ["ops:file", "この案件の書類", "folder"], ["ship", "出荷を進める（前の画面）", "ship", "", 1]] },
-    { g: "資産（ナレッジ）", ic: "db", items: [["item", "商品情報", "box"], ["up", "商品情報を登録", "upload"], ["docs", "ドキュメント", "folder"], ["legal", "契約書関連", "doc"], ["gloss", "用語集", "book", "", 1], ["srcs", "取り込んだ情報", "list", "", 1]] },
+    { g: "資産（ナレッジ）", ic: "db", items: [["item", "商品情報", "box"], ["up", "商品情報を登録", "upload"], ["docs", "ドキュメント", "folder"], ["legal", "契約書関連", "doc"], ["gloss", "用語集（貿易のことば）", "book"],["srcs", "取り込んだ情報", "list", "", 1]] },
     { g: "分析・レポート", ic: "chart", items: [["dash:rep", "分析・レポート", "chart"], ["task", "タスク・進行", "list"]] },
     { g: "設定", ic: "gear", items: [["team", "メンバー・権限・セキュリティ", "users", "team"], ["trash", "ゴミ箱", "trash"]] },
   ];

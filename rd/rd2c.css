@@ -8,7 +8,7 @@ html.rd .rd-hero .rd-ht{max-width:calc(58% - 130px)}
 
 /* 上の帯：検索・言語・通知・会社の4つにそろえる（会社・商品の切り替え・ログアウトなどは会社名のボタンの中） */
 html.rd .bar.k-bar2{display:flex;align-items:center;flex-wrap:nowrap!important;gap:10px;min-height:68px;padding:12px 24px!important}
-html.rd .bar.k-bar2 > :not(#ham):not(#uxsearch):not(#lang):not(#bell):not(.k-co):not(.k-dd):not(.k-sp){display:none!important}
+html.rd .bar.k-bar2 > :not(#ham):not(#uxsearch):not(#lang):not(#bell):not(.k-co):not(.k-dd):not(.k-sp):not(.k-dens){display:none!important}
 html.rd .bar.k-bar2 #uxsearch{display:inline-flex!important;flex:1;max-width:460px;min-width:220px;height:46px;border-radius:999px;margin-left:auto}
 html.rd .bar.k-bar2 #lang{display:inline-block!important;width:auto;height:46px}
 html.rd .bar.k-bar2 #bell{display:inline-flex!important;width:46px;height:46px}

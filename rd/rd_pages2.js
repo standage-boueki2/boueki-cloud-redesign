@@ -61,7 +61,7 @@
     let L = null;
     try { L = typeof aiLevel === "function" ? aiLevel() : null; } catch (e) { L = null; } // eslint-disable-line no-undef
     const ph = (t.assets && t.assets.ph && t.assets.ph[0]) || null;
-    const cs = chosenCty(), rc = recCty().map((x) => x.c);
+    const S0 = t.ctySel || {}, cs = chosenCty(), rc = Array.isArray(S0.top) && S0.top.length ? S0.top.slice() : recCty().map((x) => x.c); // 候補は AI のおすすめの順（UAT 11/11）
     const ctys = (cs.length ? cs : rc.length ? rc : t.targets || []).slice(0, 3);
     const ask = (q) => { q = String(q || "").trim(); if (!q) return; try { askFree(q); } catch (e) { console.error(e); } setTimeout(() => { const c = document.getElementById("chat"); if (c) c.scrollIntoView({ behavior: "smooth", block: "center" }); }, 150); }; // eslint-disable-line no-undef
     const item = t.item || "この商品", c0 = ctys[0] || "販売先の国";
@@ -69,7 +69,7 @@
       ["shield", "現地の規制・認証を調べる", `${c0}に「${item}」を輸出するときの規制・認証と必要な書類を教えて`],
       ["users", "有望なバイヤーを探す", `「${item}」に合う${c0}のバイヤーの探し方と、最初の連絡の文面を考えて`],
       ["coins", "最適な価格を相談する", `「${item}」の${c0}向けの輸出価格（FOB）の考え方と、見積の出し方を教えて`],
-      ["box", "輸出の進め方を相談する", `「${item}」の輸出を始めるとき、次に何をすればよいか順番に教えて`],
+      ["box", "輸出の進め方を相談する", `「${item}」の輸出について、貴社のいまの準備状況（済んだこと・残り）を踏まえて、結論・次にやること・手順の順で教えて`],
     ];
     const can = [
       ["research", "市場・規制を調査", "需要・競合・現地の規制・認証を調べます", "cty"],
@@ -193,7 +193,18 @@
     return `<svg viewBox="0 0 300 270" width="100%" style="max-width:320px;display:block;margin:auto" role="img" aria-label="主要指標の比較">${g}</svg><div class="k-chips" style="justify-content:center;margin-top:4px">${rows.map((r, j) => `<span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:800"><i style="width:12px;height:12px;border-radius:3px;background:${col[j]}"></i>${esc(r.c)}</span>`).join("")}</div>`;
   }
   RD.page.cty = (w) => {
-    const rec = recCty().slice(0, 3), ch = chosenCty();
+    // UAT（11/11）：カードの3か国は「AI商社マンのおすすめ」（ctySel.top）。総合点の順（ctySel.rec）と違うときは、その理由の欄を出す（今の版の v54ctyOrderBox と同じ中身）
+    const S0 = T().ctySel || {}, all = recCty(), N = all.length, byAI = !!S0.ai;
+    const topC = (Array.isArray(S0.top) ? S0.top : []).filter((c) => all.some((r) => r.c === c));
+    const rec = (topC.length ? topC.map((c) => all.find((r) => r.c === c)) : all).slice(0, 3), ch = chosenCty();
+    const rankOf = (c) => all.findIndex((r) => r.c === c) + 1;
+    let O = null;
+    try { O = byAI && typeof v54ctyOrderInfo === "function" ? v54ctyOrderInfo(S0) : null; } catch (e) { O = null; } // eslint-disable-line no-undef
+    const whyOf = (r) => { try { return typeof v54ctyReason === "function" ? v54ctyReason(S0, r) : r.why || ""; } catch (e) { return r.why || ""; } }; // eslint-disable-line no-undef
+    let W = null;
+    try { W = typeof CTY_W !== "undefined" && CTY_W ? CTY_W : null; } catch (e) { W = null; } // eslint-disable-line no-undef
+    W = W || { mkt: 35, reg: 25, comp: 20, base: 20 };
+    const oNote = String((S0.ai && S0.ai.orderNote) || "").trim();
     const ai = byText(w, /おまかせ/);
     const boxes = () => orig(w, "input[data-ctypick]");
     const box = (c) => boxes().find((x) => x.dataset.ctypick === c);
@@ -237,14 +248,25 @@
     const selList = pk;
     put(w, `<section class="k-card" style="margin-bottom:16px;padding:12px 16px">${steps(st)}</section>
       ${rec.length ? `<div class="k-grid" style="grid-template-columns:minmax(0,1.75fr) minmax(0,1fr)">
-        ${card({ ic: "spark", t: "AIが有望な販売先国を提案！", r: `<span class="k-tag or">${I("spark", 13)}貴社の商品との相性で自動ランキング</span>`, cls: "warm", b: `<div class="k-tiles" style="--n:${rec.length}">${rec.map((r, i) => { const s = r.sc || {}; const on = isSel(r.c); return `<div class="k-card" style="padding:16px;${i === 0 ? "border:2px solid var(--k-or);" : ""}position:relative">${i === 0 ? '<span class="k-tag orf" style="position:absolute;right:12px;top:-12px">最もおすすめ</span>' : ""}
-            <span class="k-tag ${i === 0 ? "orf" : "gy"}" style="font-size:13px">${i + 1}位</span><div style="display:flex;align-items:center;gap:8px;margin-top:8px;min-width:0">${flag(r.c, 24)}<b style="font-size:20px;font-weight:900;line-height:1.3">${esc(r.c)}</b>${ch.indexOf(r.c) >= 0 ? '<span class="k-tag gr">確定</span>' : ""}</div>
-            <div style="margin:10px 0 8px;font-size:40px;font-weight:900;color:#E06A06;line-height:1">${esc(Math.round(s.total || 0))}<small style="font-size:16px;color:var(--k-ink3)">/100</small></div>
+        ${card({ ic: "spark", t: byAI ? "AI商社マンのおすすめ 3か国" : "総合点の上位 3か国", r: `<span class="k-tag or">${I("spark", 13)}${byAI ? "総合点に、商品の特性を加えて選びました" : "総合点の高い順（AI商社マンの判断の前）"}</span>${O ? `<button type="button" class="k-link" style="margin-left:8px" ${act(() => flash($("#k-ctyorder", w)))}>総合点の順とちがう理由 ${I("arr", 14)}</button>` : ""}`, cls: "warm", b: `<div class="k-tiles" style="--n:${rec.length}">${rec.map((r, i) => { const s = r.sc || {}; const on = isSel(r.c); return `<div class="k-card" style="padding:16px;${i === 0 ? "border:2px solid var(--k-or);" : ""}position:relative">${i === 0 ? `<span class="k-tag orf" style="position:absolute;right:12px;top:-12px">${byAI ? "最もおすすめ" : "総合点が最も高い"}</span>` : ""}
+            <span class="k-tag ${i === 0 ? "orf" : "gy"}" style="font-size:13px">${byAI ? `おすすめ ${i + 1}` : `総合 ${rankOf(r.c)}位`}</span><div style="display:flex;align-items:center;gap:8px;margin-top:8px;min-width:0">${flag(r.c, 24)}<b style="font-size:20px;font-weight:900;line-height:1.3">${esc(r.c)}</b>${ch.indexOf(r.c) >= 0 ? '<span class="k-tag gr">確定</span>' : ""}</div>
+            <div style="margin:10px 0 2px;font-size:40px;font-weight:900;color:#E06A06;line-height:1">${esc(Math.round(s.total || 0))}<small style="font-size:16px;color:var(--k-ink3)">/100</small></div>
+            <div class="k-ctyrank">総合点の順位：<b>${N}か国中 ${rankOf(r.c)}位</b></div>
             <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px">${AX.map((a) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;padding:6px 10px;border-radius:10px;background:#F4F8FD;white-space:nowrap" title="${a[1]}：${esc(lvTxt(a[0], s[a[0]]))}"><small style="font-size:12.5px;font-weight:800;color:var(--k-ink2)">${a[1]}</small><b style="font-size:14px;color:${(s[a[0]] || 0) >= 80 ? "var(--k-gr)" : (s[a[0]] || 0) >= 60 ? "var(--k-am)" : "var(--k-rd)"}">${esc(Math.round(s[a[0]] || 0))}</b></div>`).join("")}</div>
             ${r.why ? `<p style="margin:0 0 10px;font-size:12.5px;font-weight:600;color:#2A3B54;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden" title="${esc(r.why)}">${esc(r.why)}</p>` : ""}
             <button type="button" class="k-btn ${on ? "" : "white"} wide" data-rdcty="${esc(r.c)}" title="${on ? "押すと外します" : "押すと選びます（3か国まで）"}" ${act(() => toggle(r.c))}>${I(on ? "check" : "plus", 18, 2.6)}${on ? "選択中（押すと外す）" : "選択する"}</button></div>`; }).join("")}</div>` })}
-        ${card({ ic: "chart", t: "主要指標の比較", b: radar(rec) + `<table class="rd-tbl" style="margin-top:10px"><thead><tr><th>国</th><th style="text-align:right">総合スコア</th></tr></thead><tbody>${rec.map((r) => `<tr><td>${flag(r.c, 16)} <b>${esc(r.c)}</b></td><td style="text-align:right"><b style="font-size:22px;color:#E06A06">${esc(Math.round((r.sc || {}).total || 0))}</b></td></tr>`).join("")}</tbody></table>` })}
+        ${card({ ic: "chart", t: "主要指標の比較", b: radar(rec) + `<table class="rd-tbl" style="margin-top:10px"><thead><tr><th>国</th><th style="text-align:right">総合スコア</th><th style="text-align:right">総合点の順位</th></tr></thead><tbody>${rec.map((r) => `<tr><td>${flag(r.c, 16)} <b>${esc(r.c)}</b></td><td style="text-align:right"><b style="font-size:22px;color:#E06A06">${esc(Math.round((r.sc || {}).total || 0))}</b></td><td style="text-align:right;font-weight:800">${N}か国中 ${rankOf(r.c)}位</td></tr>`).join("")}</tbody></table><p class="rd-note" style="margin-top:8px">点数は0〜100点の目安（高いほど有利）。配点は市場性${esc(W.mkt)}・規制${esc(W.reg)}・競合${esc(W.comp)}・拠点${esc(W.base)}。${byAI ? "おすすめは、AI商社マンが点数に加えて商品の特性で決めています。" : ""}</p>` })}
       </div>
+      ${O ? `<section class="k-card" id="k-ctyorder" style="margin-bottom:18px;border-left:5px solid var(--k-or)">
+        ${H({ ic: "bulb", t: "総合点の順と、おすすめがちがう理由", s: "（数字とおすすめが食い違って見えるときの説明）" })}
+        <p class="k-ctyex">総合点は、4つの観点の点数を配点（市場性${esc(W.mkt)}・規制${esc(W.reg)}・競合${esc(W.comp)}・拠点${esc(W.base)}）で足し合わせた目安です。おすすめの3か国は、AI商社マンがこの点数に加えて、商品の特性（成分・価格帯・強み・認証・賞味期限など）に照らして選んでいます。</p>
+        ${oNote ? `<p class="k-ctyex"><b>AI商社マンの説明：</b>${esc(oNote)}</p>` : ""}
+        <div class="k-ctyord">
+          ${O.lower.length ? `<div><h4>${I("check", 16, 3)}総合点は低めでも、おすすめに入れた国</h4>${O.lower.map((r) => `<div class="k-ctyrow">${flag(r.c, 20)}<b>${esc(r.c)}</b><span class="k-tag gy">総合 ${esc(Math.round(r.sc.total))}点・${rankOf(r.c)}位</span><p>${esc(whyOf(r))}</p></div>`).join("")}</div>` : ""}
+          ${O.higher.length ? `<div><h4>${I("alert", 16, 2.4)}総合点は高くても、おすすめに入れなかった国</h4>${O.higher.map((r) => { const on = isSel(r.c); return `<div class="k-ctyrow">${flag(r.c, 20)}<b>${esc(r.c)}</b><span class="k-tag gy">総合 ${esc(Math.round(r.sc.total))}点・${rankOf(r.c)}位</span>${ch.indexOf(r.c) >= 0 ? '<span class="k-tag gr">確定</span>' : ""}<button type="button" class="k-btn ${on ? "" : "white"} k-mini" data-rdcty="${esc(r.c)}" title="${on ? "押すと外します" : "押すと選びます（3か国まで）"}" ${act(() => toggle(r.c))}>${I(on ? "check" : "plus", 14, 2.6)}${on ? "選択中（外す）" : "選択する"}</button><p>${esc(whyOf(r))}</p></div>`; }).join("")}</div>` : ""}
+        </div>
+        <p class="rd-note">おすすめに入れなかった国も選べます（販売先国は3か国まで）。すべての国の点数は、このページの下の表にあります。</p>
+      </section>` : ""}
       <section class="k-card" id="k-ctysel" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px">
         <span class="k-ck">${I("check", 22, 3)}</span><b style="font-size:16px">${ch.length ? "確定した販売先国" : "選択中の販売先国"}</b><b style="font-size:30px;color:#E06A06;font-weight:900">${selList.length}</b><b>/ 3 か国</b>
         <div class="k-chips">${selList.map((c) => `<span class="k-chip">${flag(c, 16)}${esc(c)}<button type="button" class="k-chipx" aria-label="${esc(c)}を外す" title="外す" ${act(() => toggle(c))}>${I("x", 14, 2.6)}</button></span>`).join("") || '<span class="k-hs">まだ選んでいません（カードの「選択する」で1〜3か国）</span>'}</div>
