@@ -98,7 +98,9 @@
   /* ── ログイン画面：入力欄をすぐ見せる ── */
   html.rd #lgv .k-lgtop{padding:0!important;gap:8px!important}
   html.rd #lgv .k-lglogo2{height:40px!important;width:auto!important}
-  html.rd #lgv .k-lgcatch{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px!important}
+  html.rd #lgv .k-lgtop{align-items:stretch!important;width:100%!important}
+  html.rd #lgv .k-lgcatch{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px!important;max-width:none!important;width:100%!important}
+  html.rd #lgv .k-lgcatch > div{flex:1 1 auto;min-width:0}
   html.rd #lgv .k-lgbot{width:56px!important;flex:none}
   html.rd #lgv .k-lgcatch h1{font-size:20px!important;line-height:1.4!important;margin:0 0 4px!important}
   html.rd #lgv .k-lgcatch p{font-size:13px!important;line-height:1.6!important;margin:0 0 6px!important}
