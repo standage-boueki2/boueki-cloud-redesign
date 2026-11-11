@@ -30,7 +30,8 @@
   }
   function modeChip() {
     const side = $(".side");
-    if (!side || $("#rdside .k-modechip", side)) return; // 荷主・物流会社は左のメニューの中に出している
+    if (!side) return;
+    if ($("#rdside .k-modechip", side)) { $$(".k-modechip", side).forEach((x) => { if (!x.closest("#rdside")) x.remove(); }); return; } // 荷主・物流会社は左のメニューの中に出している
     let m = $(".k-modechip", side);
     if (!m) { m = document.createElement("div"); m.className = "k-modechip"; }
     const anchor = $("#rdside .rd-logo", side) || $(":scope > .logo", side);
@@ -66,7 +67,7 @@
     if (sb) {
       const st = [
         { t: "情報を確認", s: `完成度 ${pct}%`, ic: "list", st: allReq ? "done" : "on", go: () => flash($(".rd-p2 .k-items", w)) },
-        { t: "AIが資料を生成", s: "言語と相手の国を選ぶ", ic: "spark", st: saved.length ? "done" : allReq ? "on" : "", go: () => flash($("#sec-3", w)) },
+        { t: "AIが資料を生成", s: "言語と相手の国を選ぶ", ic: "spark", st: saved.length ? "done" : allReq ? "on" : "", go: () => flash(RD.secBy(w, /営業資料を作る/) || $("#sec-3", w)) },
         { t: "完成版をチェック", s: saved.length ? `保存 ${saved.reduce((a, b) => a + b.n, 0)}件` : "作ったあと", ic: "eye", st: saved.length ? "on" : "", go: () => flash($("#k-deckdone", w) || d14) },
         { t: "バイヤーに提案", s: "AIバイヤー開拓へ", ic: "send", go: () => goKey("db") },
       ];
@@ -102,7 +103,8 @@
     const R = Array.isArray(F.rates) ? F.rates : [], Q = Array.isArray(F.reqs) ? F.reqs : [];
     const cos = new Set(R.map((r) => r && r.co).filter(Boolean)).size;
     const last = Q.slice().sort((a, b) => ((b.d || "") > (a.d || "") ? 1 : -1))[0];
-    const chat = $("#sec-0", w);
+    const fc = document.getElementById("fwdchat");
+    const chat = (fc && fc.closest(".c")) || $("#sec-0", w);
     if (!chat) return;
     const qs = $$(".qb .q[data-fq]", chat);
     const ask = (q) => { const ta = document.getElementById("fwdq"), go = document.getElementById("fwdqgo"); if (ta && go) { ta.value = q; go.click(); } };

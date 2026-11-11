@@ -306,12 +306,16 @@
   }
 
   /* ───── 荷主のホーム ───── */
+  // 節は見出しの文字で探す（本番のサーバーではデモの帯などで節の番号 sec-N がずれる）
+  function secBy(w, re) { return $$("[id^=sec-], .c", w).find((c) => { const h = $("h3", c); return h && !c.closest(".rd-x") && re.test(h.textContent || ""); }) || null; }
+  RD.secBy = (w, re) => secBy(w, re);
   function readDash(w) {
     const D = { wait: [], setup: [], funnel: [], byc: [] };
-    $$("#sec-0 .v38wt", w).forEach((b) => D.wait.push({ k: b.getAttribute("data-v38wf"), n: num($(".v38wn", b) && $(".v38wn", b).textContent), l: ($(".v38wl", b) || {}).textContent || "", s: ($(".v38ws", b) || {}).textContent || "", el: b }));
+    $$(".v38wait .v38wt", w).forEach((b) => D.wait.push({ k: b.getAttribute("data-v38wf"), n: num($(".v38wn", b) && $(".v38wn", b).textContent), l: ($(".v38wl", b) || {}).textContent || "", s: ($(".v38ws", b) || {}).textContent || "", el: b }));
     $$("#ux32setup .ux32steps > li", w).forEach((li) => D.setup.push({ t: (($(".ux32st b", li) || {}).textContent || "").trim(), done: li.classList.contains("done"), next: li.classList.contains("next"), why: (($(".v68why", li) || {}).textContent || "").trim() }));
-    $$("#sec-4 .ddr", w).forEach((r) => D.funnel.push({ l: (r.children[0] && r.children[0].textContent.trim()) || "", n: num(r.children[1] && r.children[1].textContent), el: r }));
-    $$("#sec-5 .ddr", w).forEach((r) => D.byc.push({ l: (r.children[0] && r.children[0].textContent.trim()) || "", n: num(r.children[2] && r.children[2].textContent), el: r }));
+    const fun = secBy(w, /どこまで進んだか/), byc = secBy(w, /どの国で手応え/);
+    $$(".ddr", fun || document.createElement("div")).forEach((r) => D.funnel.push({ l: (r.children[0] && r.children[0].textContent.trim()) || "", n: num(r.children[1] && r.children[1].textContent), el: r }));
+    $$(".ddr", byc || document.createElement("div")).forEach((r) => D.byc.push({ l: (r.children[0] && r.children[0].textContent.trim()) || "", n: num(r.children[2] && r.children[2].textContent), el: r }));
     const sp = $("#ux32setup .v84m-ng", w); D.setupTxt = sp ? sp.textContent.trim() : "";
     return D;
   }

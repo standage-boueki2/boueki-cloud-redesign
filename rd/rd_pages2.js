@@ -197,7 +197,7 @@
     const ai = byText(w, /おまかせ/);
     const ctyIn = (c) => orig(w, "input[type=checkbox]").find((x) => { const l = x.closest("label") || x.parentElement; return l && (l.textContent || "").indexOf(c) >= 0; });
     const confirmBtn = () => byText(w, /確定/);
-    const sel = (c) => { const x = ctyIn(c); if (x) { x.click(); setTimeout(() => RD.after(true), 60); } else flash($("#sec-2", w)); };
+    const sel = (c) => { const x = ctyIn(c); if (x) { x.click(); setTimeout(() => RD.after(true), 60); } else flash(RD.secBy(w, /分析結果と推奨/) || $("#sec-2", w)); };
     const st = [{ t: "商品を登録", ic: "box", st: T().item ? "done" : "", go: () => goKey("item") }, { t: "販売先国の選定", ic: "globe", st: "on" }, { t: "規制確認", ic: "shield", go: () => goKey("ops:reg") }, { t: "提案準備", ic: "send", go: () => goKey("deck") }];
     const isSel = (c) => ch.indexOf(c) >= 0 || !!(ctyIn(c) && ctyIn(c).checked);
     const selList = rec.map((r) => r.c).filter(isSel).concat(ch.filter((c) => !rec.some((r) => r.c === c)));
@@ -220,7 +220,7 @@
 
   /* ───── 外国語の営業資料（deck）：準備の状況・項目・生成 ───── */
   RD.page.deck = (w) => {
-    const s0 = $("#sec-0", w), s3 = $("#sec-3", w);
+    const s0 = RD.secBy(w, /納品レベルチェック/) || $("#sec-0", w), s3 = RD.secBy(w, /営業資料を作る/) || $("#sec-3", w);
     if (!s0) return;
     // 今の画面の「納品レベルチェック」の項目と数をそのまま使う（数を合わせる）
     const items = $$(".dk3-gi", s0).map((g) => { const b = $("b", g); const n = b ? b.textContent.trim() : ""; return { el: g, n: n.replace(/（推奨）$/, ""), rec: /（推奨）$/.test(n) || g.classList.contains("rec"), ok: g.classList.contains("ok"), how: (($(".nn", g) || {}).textContent || "").trim() }; }).filter((x) => x.n);
@@ -234,7 +234,7 @@
     const pct = allN ? Math.round((okN / allN) * 100) : 0, allReq = reqOk >= reqN;
     const nx = (($(".v84m-nx b", s0) || {}).textContent || "").trim();
     const aiFill = () => { const b = document.getElementById("dk3wiz"); if (b) b.click(); else flash(s0); };
-    const siteFill = () => clickText(w, /公式サイト/) || flash($("#sec-1", w));
+    const siteFill = () => clickText(w, /公式サイト/) || flash(RD.secBy(w, /ロゴ・商品写真/) || $("#sec-1", w));
     const fix = (x) => { if (x.el.matches("[data-dk3fix]")) x.el.click(); else { const d = $("details.rd-old", w); if (d) d.open = true; flash(x.el); } };
     const it = (x) => `<div class="k-it"><span style="color:${x.ok ? "var(--k-gr)" : x.rec ? "var(--k-bl)" : "#D25F00"}">${I(x.ok ? "check" : x.rec ? "plus" : "alert", 20, 2.6)}</span><span style="min-width:0"><b>${esc(x.n)}</b>${!x.ok && x.how ? `<small>${esc(x.how)}</small>` : ""}</span><span class="k-st ${x.ok ? "ok" : "ng"}">${x.ok ? "入力済み" : "未入力"}</span>${x.ok ? "<span></span>" : `<button type="button" class="k-btn ghost k-mini" ${act(() => fix(x))}>${I("edit", 14)}入力する</button>`}</div>`;
     put(w, `<section class="k-card" style="margin-bottom:16px;padding:12px 16px">${steps([{ t: "情報の充実度をチェック", s: "（この画面の上）", ic: "list", st: "on" }, { t: "不足情報を補う", ic: "edit", st: okN >= allN ? "done" : "", go: aiFill }, { t: "外国語の営業資料を生成", ic: "slides", go: () => flash(s3) }])}</section>
