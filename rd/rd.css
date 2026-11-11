@@ -1,0 +1,431 @@
+/* 貿易クラウドAI商社マン デザイン刷新プレビュー（手元だけ・2026-11-10）
+   今のアプリ（21.85.1）の上に重ねる見た目の層。html.rd のときだけ効く。元のコードは変えない */
+
+html.rd{
+  --rd-bg:#F3F7FC; --rd-bg2:#EAF2FB; --rd-card:#FFFFFF; --rd-line:#E3EAF3; --rd-line2:#EEF3F9;
+  --rd-ink:#14233A; --rd-ink2:#4A5A72; --rd-ink3:#8593A8;
+  --rd-or:#F7931E; --rd-or2:#FF7A1A; --rd-or-soft:#FFF3E6; --rd-or-line:#FBC88E;
+  --rd-bl:#1F6FD1; --rd-bl-deep:#0E3A75; --rd-bl-soft:#EAF3FE; --rd-bl-line:#C9DDF6;
+  --rd-good:#18A058; --rd-good-soft:#E7F7EE; --rd-warn:#E58A00; --rd-warn-soft:#FFF4E0; --rd-crit:#E5484D; --rd-crit-soft:#FDECEC;
+  --rd-r:16px; --rd-r2:12px; --rd-sh:0 2px 10px rgba(20,60,120,.07),0 1px 2px rgba(20,60,120,.05); --rd-sh2:0 10px 28px rgba(20,60,120,.12);
+  /* 今のアプリの色の変数も、刷新版の色に寄せる（全画面に効く） */
+  --canvas:var(--rd-bg); --surface:#fff; --surface-2:#F8FBFE; --sunk:#F1F5FA; --chrome:#fff;
+  --line:var(--rd-line); --line-2:var(--rd-line2); --ink:var(--rd-ink); --ink-2:var(--rd-ink2); --ink-3:var(--rd-ink3);
+  --or:var(--rd-or); --or-soft:var(--rd-or-soft); --bl:var(--rd-bl); --bl-soft:var(--rd-bl-soft); --bl-deep:var(--rd-bl-deep);
+  --r:10px; --r2:14px; --sh:var(--rd-sh); --sh-2:var(--rd-sh2);
+  color-scheme:light;
+}
+html.rd body{background:linear-gradient(180deg,#F5F9FE 0%,#EEF4FB 100%) fixed;color:var(--rd-ink);
+  font-family:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;}
+
+/* ───────── 左のメニュー ───────── */
+html.rd .side{background:#FBFDFF;border-right:1px solid var(--rd-line);width:248px;min-width:248px;box-shadow:none}
+html.rd.rd-nav .side .logo{display:none}
+html.rd.rd-nav #nav{display:none!important}
+html.rd.rd-nav .side > #sft{display:none}
+#rdside{display:none}
+html.rd.rd-nav #rdside{display:flex;flex-direction:column;height:100%;padding:18px 14px 14px;gap:6px;overflow-y:auto}
+#rdside .rd-logo{display:block;padding:2px 6px 14px;cursor:pointer;border:0;background:none;text-align:left}
+#rdside .rd-logo img{display:block;width:176px;height:auto}
+#rdside .rd-mode{display:flex;align-items:center;gap:8px;margin:0 2px 10px;padding:9px 12px;border:1px solid var(--rd-line);border-radius:12px;background:#fff;font-weight:700;font-size:13.5px;color:var(--rd-ink)}
+#rdside .rd-mode svg{color:var(--rd-bl)}
+#rdside nav{display:flex;flex-direction:column;gap:3px}
+#rdside .rd-ni{display:flex;align-items:center;gap:12px;width:100%;padding:11px 14px;border:0;border-radius:12px;background:none;color:var(--rd-ink);font-size:15px;font-weight:700;letter-spacing:.02em;cursor:pointer;text-align:left;font-family:inherit}
+#rdside .rd-ni svg{flex:none;color:#33445C}
+#rdside .rd-ni:hover{background:#F1F6FC}
+#rdside .rd-ni[aria-current="true"]{background:var(--rd-or-soft);color:#1B2A40}
+#rdside .rd-ni[aria-current="true"] svg{color:var(--rd-or2)}
+#rdside .rd-ni .rd-bdg{margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--rd-crit);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+#rdside .rd-sub{display:flex;flex-direction:column;gap:1px;margin:2px 0 6px 26px;padding-left:12px;border-left:2px solid #F3E2CC}
+#rdside .rd-si{display:flex;align-items:center;gap:8px;padding:7px 10px;border:0;border-radius:9px;background:none;color:var(--rd-ink2);font-size:13.5px;font-weight:600;cursor:pointer;text-align:left;font-family:inherit}
+#rdside .rd-si:hover{background:#F4F8FD;color:var(--rd-ink)}
+#rdside .rd-si[aria-current="true"]{color:var(--rd-or2);background:#FFF8F0}
+#rdside .rd-si .rd-bdg{margin-left:auto;min-width:18px;height:18px;padding:0 6px;border-radius:9px;background:var(--rd-crit);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+#rdside .rd-sep{height:1px;background:var(--rd-line);margin:10px 8px}
+#rdside .rd-sp{flex:1;min-height:10px}
+#rdside .rd-start{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #FBD9B0;border-radius:16px;background:linear-gradient(135deg,#FFF6EA,#FFF0DE);cursor:pointer;text-align:left;font-family:inherit}
+#rdside .rd-start img{width:58px;height:auto;border-radius:10px;flex:none;-webkit-mask-image:radial-gradient(circle at 50% 45%,#000 60%,transparent 72%);mask-image:radial-gradient(circle at 50% 45%,#000 60%,transparent 72%)}
+#rdside .rd-start b{display:block;font-size:13.5px;line-height:1.5;color:var(--rd-ink)}
+#rdside .rd-start .rd-go{display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--rd-or2);color:#fff;align-items:center;justify-content:center;vertical-align:-3px;margin-left:4px}
+#rdside .rd-copy{font-size:10.5px;color:var(--rd-ink3);padding:8px 6px 0;line-height:1.5}
+
+/* ───────── 上の帯 ───────── */
+html.rd .bar{background:transparent;border-bottom:0;box-shadow:none;min-height:64px;padding:10px 24px;gap:10px}
+html.rd .rd-bar-search{flex:1;max-width:420px;margin-left:auto;display:flex;align-items:center;gap:10px;height:44px;padding:0 18px;border:1px solid var(--rd-line);border-radius:22px;background:#fff;color:var(--rd-ink3);font-size:14px;cursor:pointer;box-shadow:var(--rd-sh);font-family:inherit}
+html.rd .rd-bar-search:hover{border-color:var(--rd-bl-line)}
+html.rd .rd-ibtn{width:44px;height:44px;border-radius:50%;border:1px solid var(--rd-line);background:#fff;display:inline-flex;align-items:center;justify-content:center;color:#33445C;cursor:pointer;box-shadow:var(--rd-sh);position:relative;font-family:inherit}
+html.rd .rd-ibtn:hover{border-color:var(--rd-bl-line)}
+html.rd .rd-co{display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 16px;border:1px solid var(--rd-line);border-radius:22px;background:#fff;box-shadow:var(--rd-sh);font-weight:700;font-size:14px;color:var(--rd-ink);cursor:pointer;max-width:300px;font-family:inherit}
+html.rd .rd-co span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.rd .rd-pop{position:absolute;right:24px;top:62px;z-index:60;width:330px;background:#fff;border:1px solid var(--rd-line);border-radius:16px;box-shadow:var(--rd-sh2);padding:14px;display:none}
+html.rd .rd-pop.on{display:block}
+html.rd .rd-pop h4{margin:0 0 8px;font-size:13px;color:var(--rd-ink3);font-weight:700}
+html.rd .rd-pop .rd-poprow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+html.rd .rd-pop .rd-poprow:last-child{margin-bottom:0}
+html.rd .bar .rd-hidden-tools{display:none}
+
+/* ───────── 画面の見出し（ヒーロー） ───────── */
+html.rd .stage{padding:0 24px 40px}
+html.rd .well{max-width:1360px}
+html.rd .rd-hero{display:flex;align-items:center;gap:18px;position:relative;min-height:132px;margin:0 0 18px;padding:6px 0 0;overflow:hidden}
+html.rd .rd-hero .rd-bot{width:118px;height:auto;flex:none;-webkit-mask-image:radial-gradient(ellipse 62% 62% at 50% 52%,#000 72%,transparent 100%);mask-image:radial-gradient(ellipse 62% 62% at 50% 52%,#000 72%,transparent 100%);position:relative;z-index:1}
+html.rd .rd-hero .rd-ht{position:relative;z-index:1;min-width:0}
+html.rd .rd-hero h1{margin:0 0 6px;font-size:34px;line-height:1.25;font-weight:900;letter-spacing:.02em;color:#121F33}
+html.rd .rd-hero p{margin:0;font-size:16px;font-weight:600;color:#2C3B52;line-height:1.6}
+html.rd .rd-hero .rd-port{position:absolute;right:-24px;top:0;height:132px;width:auto;z-index:0;opacity:.95;-webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 26%);mask-image:linear-gradient(90deg,transparent 0%,#000 26%)}
+html.rd .rd-hero .rd-hcta{margin-left:auto;position:relative;z-index:1}
+@media (max-width:1200px){html.rd .rd-hero .rd-port{opacity:.35}}
+
+/* 今のページの見出しの段：題（h1）と「レイヤー○」の札は隠し、ボタンだけを細い帯に */
+html.rd .well > .ph{background:transparent;border:0;box-shadow:none;padding:0;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:0}
+html.rd .well > .ph h1, html.rd .well > .ph h2, html.rd .well > .ph .v40hd > .rw, html.rd .well > .ph > div > .rw:first-child .lt{display:none}
+html.rd .well > .ph > div:first-child:empty{display:none}
+html.rd .well > .ph .v40hd{display:contents}
+html.rd .well > .ph > p, html.rd .well > .ph .v40hd ~ p{font-size:13px;color:var(--rd-ink2)}
+
+/* ───────── 全画面に効く見た目（カード・ボタン・表・入力） ───────── */
+html.rd .well .c, html.rd .well .g2 > div, html.rd .well .g4 > div, html.rd .well .g3 > div{border-radius:var(--rd-r);border:1px solid var(--rd-line);box-shadow:var(--rd-sh);background:#fff}
+html.rd .well .c{padding:20px 22px;margin-bottom:16px}
+html.rd .well h3{font-size:18px;font-weight:800;letter-spacing:.02em;color:#14233A}
+html.rd .well .nn, html.rd .well .v33mute{font-size:13px;line-height:1.7;color:var(--rd-ink2)}
+html.rd .well .btn{border-radius:999px;padding:8px 16px;font-weight:700;font-size:13.5px;border:1px solid var(--rd-line);background:#fff;color:var(--rd-ink);box-shadow:0 1px 2px rgba(20,60,120,.05)}
+html.rd .well .btn:hover{border-color:var(--rd-bl-line);background:#F7FBFF}
+html.rd .well .btn.p, html.rd .well .btn.pri, html.rd .well .btn.or, html.rd .well .btn.primary{background:linear-gradient(180deg,#FF9A2E,#F57C0F);border-color:#F57C0F;color:#fff;box-shadow:0 4px 12px rgba(245,124,15,.28)}
+html.rd .well input.sel, html.rd .well select.sel, html.rd .well textarea{border-radius:10px;border-color:var(--rd-line)}
+html.rd .well table{border-collapse:separate;border-spacing:0}
+html.rd .well th{background:#F4F8FD;color:#2C3B52;font-weight:700}
+html.rd .v40gb{border-radius:999px!important}
+
+/* ───────── 刷新版の部品（ホーム・まとめ） ───────── */
+html:not(.rd) .rd-x{display:none!important}
+html.rd .rd-grid{display:grid;gap:18px}
+html.rd .rd-card{background:#fff;border:1px solid var(--rd-line);border-radius:20px;box-shadow:var(--rd-sh);padding:20px 22px;min-width:0}
+html.rd .rd-card.rd-warm{background:linear-gradient(180deg,#FFF9F2,#FFFFFF 70%);border-color:#F8DDBA}
+html.rd .rd-ch{display:flex;align-items:center;gap:10px;margin:0 0 14px;flex-wrap:wrap}
+html.rd .rd-ch h2{margin:0;font-size:22px;font-weight:900;letter-spacing:.02em;color:#14233A}
+html.rd .rd-ch .rd-chs{font-size:14px;color:var(--rd-ink2);font-weight:600}
+html.rd .rd-ch .rd-more{margin-left:auto;font-size:14px;font-weight:700;color:var(--rd-bl);background:none;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+html.rd .rd-ck{width:32px;height:32px;border-radius:50%;background:var(--rd-or);color:#fff;display:inline-flex;align-items:center;justify-content:center;flex:none}
+html.rd .rd-ic{color:var(--rd-bl);flex:none}
+
+/* まずやること（3つのステップ） */
+html.rd .rd-steps{display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr;align-items:stretch}
+html.rd .rd-steps .rd-arr{display:flex;align-items:center;justify-content:center;color:#6B7B93}
+html.rd .rd-step{position:relative;border:1px solid var(--rd-line);border-radius:18px;background:#fff;padding:18px 14px 16px;text-align:center;cursor:pointer;transition:transform .12s,box-shadow .12s;font-family:inherit;color:inherit}
+html.rd .rd-step:hover{transform:translateY(-2px);box-shadow:var(--rd-sh2)}
+html.rd .rd-step .rd-no{position:absolute;left:12px;top:12px;width:30px;height:30px;border-radius:50%;background:var(--rd-or);color:#fff;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center}
+html.rd .rd-step.done .rd-no{background:var(--rd-good)}
+html.rd .rd-step .rd-sic{height:56px;display:flex;align-items:center;justify-content:center;color:var(--rd-bl)}
+html.rd .rd-step.now{border:2px solid var(--rd-or);background:linear-gradient(180deg,#FFF7EC,#FFF)}
+html.rd .rd-step.now .rd-sic{color:var(--rd-or2)}
+html.rd .rd-step b{display:block;font-size:19px;font-weight:900;margin:8px 0 4px;color:#14233A}
+html.rd .rd-step small{display:block;font-size:13px;color:var(--rd-ink2);font-weight:600}
+html.rd .rd-step .rd-stt{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:800}
+html.rd .rd-stt.ok{background:var(--rd-good-soft);color:var(--rd-good)}
+html.rd .rd-stt.next{background:linear-gradient(180deg,#FF9A2E,#F57C0F);color:#fff}
+html.rd .rd-stt.wait{background:#F1F4F8;color:var(--rd-ink3)}
+html.rd .rd-why{margin:12px 2px 0;font-size:13px;color:var(--rd-ink2);line-height:1.6}
+html.rd .rd-why b{color:var(--rd-or2)}
+
+/* 大きな数字のタイル */
+html.rd .rd-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+html.rd .rd-kpi{padding:6px 12px;text-align:center;border-left:1px solid var(--rd-line);cursor:pointer;background:none;border-top:0;border-right:0;border-bottom:0;font-family:inherit;color:inherit}
+html.rd .rd-kpi:first-child{border-left:0}
+html.rd .rd-kpi .rd-kl{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:800;color:#22324A}
+html.rd .rd-kpi .rd-kn{font-size:40px;font-weight:900;color:#14233A;line-height:1.2;margin:8px 0 4px;font-feature-settings:"tnum"}
+html.rd .rd-kpi .rd-kn small{font-size:17px;font-weight:800;margin-left:3px}
+html.rd .rd-kpi .rd-ks{font-size:12.5px;color:var(--rd-ink3);font-weight:600}
+html.rd .rd-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+html.rd .rd-tile{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid var(--rd-line);border-radius:16px;background:#fff;cursor:pointer;text-align:left;font-family:inherit;color:inherit;min-width:0}
+html.rd .rd-tile:hover{box-shadow:var(--rd-sh2)}
+html.rd .rd-tile .rd-ti{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;background:var(--rd-bl-soft);color:var(--rd-bl)}
+html.rd .rd-tile.or .rd-ti{background:var(--rd-or-soft);color:var(--rd-or2)}
+html.rd .rd-tile.gr .rd-ti{background:var(--rd-good-soft);color:var(--rd-good)}
+html.rd .rd-tile.rd .rd-ti{background:var(--rd-crit-soft);color:var(--rd-crit)}
+html.rd .rd-tile b{display:block;font-size:15px;font-weight:800;color:#22324A}
+html.rd .rd-tile .rd-tn{font-size:32px;font-weight:900;color:#14233A;line-height:1.15;font-feature-settings:"tnum"}
+html.rd .rd-tile .rd-tn small{font-size:15px;font-weight:800;margin-left:3px}
+html.rd .rd-tile .rd-ts{font-size:12.5px;color:var(--rd-ink3);font-weight:600}
+html.rd .rd-tile.hot{border:2px solid var(--rd-or);background:linear-gradient(180deg,#FFF6EC,#fff)}
+
+/* 流れ（パイプライン） */
+html.rd .rd-flow{display:flex;gap:0;align-items:stretch}
+html.rd .rd-fs{flex:1;position:relative;min-width:0;padding:14px 10px 14px 26px;background:#EEF4FC;color:#22324A;text-align:center;cursor:pointer;border:0;font-family:inherit;clip-path:polygon(0 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,0 100%,18px 50%)}
+html.rd .rd-fs:first-child{clip-path:polygon(0 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,0 100%);border-radius:14px 0 0 14px;padding-left:14px}
+html.rd .rd-fs:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,18px 50%);border-radius:0 14px 14px 0}
+html.rd .rd-fs + .rd-fs{margin-left:-8px}
+html.rd .rd-fs:hover{background:#E2ECF9}
+html.rd .rd-fs.on{background:linear-gradient(180deg,#FFF1DF,#FFE3C2);color:#B85A00}
+html.rd .rd-fs .rd-fl{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:800;white-space:nowrap}
+html.rd .rd-fs .rd-fn{font-size:28px;font-weight:900;margin-top:4px;font-feature-settings:"tnum"}
+html.rd .rd-fs .rd-fn small{font-size:14px;margin-left:3px}
+
+/* 最新の動き・一覧 */
+html.rd .rd-list{display:flex;flex-direction:column;gap:8px}
+html.rd .rd-li{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--rd-line2);border-radius:12px;background:#FBFDFF;cursor:pointer;text-align:left;font-family:inherit;color:inherit;width:100%}
+html.rd .rd-li:hover{background:#F2F7FD}
+html.rd .rd-li .rd-lt{flex:1;min-width:0;font-size:14.5px;font-weight:700;color:#22324A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.rd .rd-li .rd-lm{font-size:12.5px;color:var(--rd-ink3);white-space:nowrap}
+html.rd .rd-tag{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
+html.rd .rd-tag.or{background:var(--rd-or2);color:#fff}
+html.rd .rd-tag.gr{background:var(--rd-good-soft);color:var(--rd-good)}
+html.rd .rd-tag.bl{background:var(--rd-bl-soft);color:var(--rd-bl)}
+html.rd .rd-tag.rd{background:var(--rd-crit-soft);color:var(--rd-crit)}
+html.rd .rd-tag.gy{background:#F1F4F8;color:var(--rd-ink3)}
+html.rd .rd-empty{padding:18px;border:1px dashed var(--rd-line);border-radius:12px;color:var(--rd-ink3);font-size:14px;text-align:center}
+
+/* AI商社マンに相談する */
+html.rd .rd-ask{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 18px;border:1px solid var(--rd-bl-line);border-radius:14px;background:#fff}
+html.rd .rd-ask input{flex:1;min-width:0;border:0;outline:0;font-size:15px;font-family:inherit;padding:10px 0;background:transparent;color:var(--rd-ink)}
+html.rd .rd-ask button{width:44px;height:44px;border-radius:12px;border:0;background:linear-gradient(180deg,#FF9A2E,#F57C0F);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none}
+html.rd .rd-chips{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+html.rd .rd-chip{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--rd-line);border-radius:14px;background:#fff;cursor:pointer;font-size:14px;font-weight:800;color:#22324A;text-align:left;font-family:inherit;line-height:1.35}
+html.rd .rd-chip:hover{box-shadow:var(--rd-sh2)}
+html.rd .rd-chip svg{flex:none}
+html.rd .rd-askhd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+html.rd .rd-askhd img{width:52px;height:auto;-webkit-mask-image:radial-gradient(circle at 50% 50%,#000 58%,transparent 72%);mask-image:radial-gradient(circle at 50% 50%,#000 58%,transparent 72%)}
+html.rd .rd-askhd h2{margin:0;font-size:22px;font-weight:900;color:#14233A}
+
+/* 今日やること（物流会社） */
+html.rd .rd-todo{display:flex;flex-direction:column;gap:10px}
+html.rd .rd-td{display:grid;grid-template-columns:48px 1fr auto auto;gap:14px;align-items:center;padding:12px 14px;border:1px solid var(--rd-line);border-radius:14px;background:#fff}
+html.rd .rd-td .rd-tdi{width:44px;height:44px;border-radius:50%;background:var(--rd-or-soft);color:var(--rd-or2);display:flex;align-items:center;justify-content:center}
+html.rd .rd-td b{display:block;font-size:16px;font-weight:900;color:#14233A}
+html.rd .rd-td small{font-size:13px;color:var(--rd-ink2);font-weight:600}
+html.rd .rd-td .rd-cnt{min-width:60px;text-align:center;padding:6px 10px;border-radius:999px;background:var(--rd-crit-soft);color:var(--rd-crit);font-weight:900;font-size:15px}
+html.rd .rd-td .rd-cnt.z{background:#F1F4F8;color:var(--rd-ink3)}
+html.rd .rd-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:12px;border:1px solid var(--rd-or2);background:linear-gradient(180deg,#FF9A2E,#F57C0F);color:#fff;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;font-family:inherit;box-shadow:0 4px 12px rgba(245,124,15,.25)}
+html.rd .rd-btn.ghost{background:#fff;color:var(--rd-or2);box-shadow:none}
+html.rd .rd-btn.done{background:#EEF1F5;border-color:#E1E6EE;color:var(--rd-ink3);box-shadow:none}
+html.rd .rd-btn.big{padding:15px 34px;font-size:18px;border-radius:999px}
+html.rd .rd-quick{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+html.rd .rd-q{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:18px 10px;border:1px solid var(--rd-line);border-radius:16px;background:#fff;cursor:pointer;font-size:15px;font-weight:800;color:#14233A;text-align:center;font-family:inherit;line-height:1.4}
+html.rd .rd-q svg{color:var(--rd-bl-deep)}
+html.rd .rd-q:hover{box-shadow:var(--rd-sh2)}
+html.rd .rd-six{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+html.rd .rd-sx{position:relative;padding:16px 14px;border:1px solid var(--rd-line);border-radius:16px;background:#fff;cursor:pointer;text-align:left;font-family:inherit;color:inherit}
+html.rd .rd-sx:not(:last-child)::after{content:"›";position:absolute;right:-13px;top:50%;transform:translateY(-50%);font-size:22px;color:#33445C;font-weight:700}
+html.rd .rd-sx .rd-sxi{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--rd-bl-soft);color:var(--rd-bl);margin-bottom:10px}
+html.rd .rd-sx b{display:block;font-size:16px;font-weight:900;color:#14233A}
+html.rd .rd-sx small{display:block;font-size:12.5px;color:var(--rd-ink2);font-weight:600;margin-top:4px;line-height:1.5}
+html.rd .rd-sx .rd-sxn{display:block;margin-top:8px;font-size:13px;font-weight:800;color:var(--rd-bl)}
+html.rd .rd-sx.on{border:2px solid var(--rd-or);background:linear-gradient(180deg,#FFF6EC,#fff)}
+html.rd .rd-sx.on .rd-sxi{background:var(--rd-or-soft);color:var(--rd-or2)}
+html.rd .rd-sx.on b{color:#C25F00}
+html.rd .rd-sx .rd-badge{position:absolute;right:10px;top:-11px;padding:3px 10px;border-radius:999px;background:var(--rd-or2);color:#fff;font-size:12px;font-weight:800}
+
+/* 手順の帯（商品登録 → 国選定 → 規制確認 → 提案準備 など） */
+html.rd .rd-stepbar{display:flex;align-items:center;gap:6px;padding:10px;border:1px solid var(--rd-line);border-radius:18px;background:#fff;box-shadow:var(--rd-sh);margin-bottom:18px}
+html.rd .rd-sb{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 10px;border-radius:14px;border:1px solid transparent;background:none;font-size:16px;font-weight:800;color:#22324A;cursor:pointer;font-family:inherit;white-space:nowrap}
+html.rd .rd-sb .rd-sbn{width:26px;height:26px;border-radius:50%;background:#5E6E86;color:#fff;font-size:14px;display:inline-flex;align-items:center;justify-content:center}
+html.rd .rd-sb.done .rd-sbn{background:var(--rd-bl)}
+html.rd .rd-sb.on{background:linear-gradient(180deg,#FFF3E4,#FFE8CC);border-color:var(--rd-or-line);color:#C25F00}
+html.rd .rd-sb.on .rd-sbn{background:var(--rd-or2)}
+html.rd .rd-sb:hover:not(.on){background:#F4F8FD}
+html.rd .rd-sbar{color:#6B7B93;font-weight:700}
+
+/* 充足度の輪 */
+html.rd .rd-ring{--p:0;width:116px;height:116px;border-radius:50%;background:conic-gradient(var(--rd-or2) calc(var(--p)*1%),#FDEBD6 0);display:flex;align-items:center;justify-content:center;flex:none}
+html.rd .rd-ring span{width:84px;height:84px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#14233A}
+html.rd .rd-ring span small{font-size:15px}
+html.rd .rd-kv{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:14px}
+html.rd .rd-kv dt{background:#F1F5FA;border-radius:8px;padding:5px 10px;font-weight:800;color:#2C3B52}
+html.rd .rd-kv dd{margin:0;padding:5px 2px;border-bottom:1px solid var(--rd-line2);font-weight:700;color:#14233A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.rd .rd-kv dd.miss{color:var(--rd-ink3);font-weight:600}
+html.rd .rd-drop{border:2px dashed #9CC2EE;border-radius:16px;background:#F7FBFF;padding:22px 14px;text-align:center;cursor:pointer}
+html.rd .rd-drop:hover{background:#EEF6FF}
+html.rd .rd-drop b{display:block;font-size:19px;font-weight:900;margin:8px 0 10px;color:#14233A;line-height:1.5}
+html.rd .rd-fmt{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:12px}
+html.rd .rd-fmt span{padding:4px 10px;border:1px solid var(--rd-line);border-radius:8px;background:#fff;font-size:12.5px;font-weight:700}
+html.rd .rd-ckl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:700}
+html.rd .rd-ckl li{display:flex;align-items:center;gap:8px}
+html.rd .rd-ckl .ok{color:var(--rd-good)} html.rd .rd-ckl .ng{color:var(--rd-warn)}
+
+/* 今の版の詳しい表示（たたんで残す） */
+html.rd details.rd-old{margin-top:22px;border:1px solid var(--rd-line);border-radius:18px;background:rgba(255,255,255,.65)}
+html.rd details.rd-old > summary{list-style:none;cursor:pointer;padding:14px 20px;font-size:15px;font-weight:800;color:#2C3B52;display:flex;align-items:center;gap:10px}
+html.rd details.rd-old > summary::-webkit-details-marker{display:none}
+html.rd details.rd-old > summary::after{content:"＋ 開く";margin-left:auto;font-size:13px;color:var(--rd-bl)}
+html.rd details.rd-old[open] > summary::after{content:"－ たたむ"}
+html.rd details.rd-old > .rd-oldin{padding:0 18px 18px}
+html.rd .rd-note{font-size:12.5px;color:var(--rd-ink3);margin-top:10px;line-height:1.6}
+
+/* 表（刷新版のまとめ用） */
+html.rd .rd-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+html.rd .rd-tbl th{background:#EEF4FC;color:#22324A;font-weight:800;padding:10px 12px;text-align:left;font-size:13px}
+html.rd .rd-tbl th:first-child{border-radius:10px 0 0 10px} html.rd .rd-tbl th:last-child{border-radius:0 10px 10px 0}
+html.rd .rd-tbl td{padding:11px 12px;border-bottom:1px solid var(--rd-line2);font-weight:600;color:#14233A}
+html.rd .rd-tbl tr.rdc{cursor:pointer} html.rd .rd-tbl tr.rdc:hover td{background:#F6FAFF}
+
+/* 右下の「AI商社マンに聞く」ボタン */
+html.rd #askfab{border-radius:999px!important;box-shadow:0 8px 22px rgba(31,111,209,.35)!important}
+
+/* プレビューの札 */
+#rdbadge{position:fixed;left:12px;bottom:12px;z-index:9999;padding:6px 12px;border-radius:999px;background:#14233A;color:#fff;font:700 12px/1.4 "Noto Sans JP",sans-serif;opacity:.88;pointer-events:auto;cursor:pointer}
+#rdbadge a{color:#FFD08A;margin-left:8px}
+
+@media (max-width:1100px){
+  html.rd .rd-tiles{grid-template-columns:repeat(2,1fr)}
+  html.rd .rd-six{grid-template-columns:repeat(3,1fr)}
+  html.rd .rd-sx:nth-child(3n)::after{display:none}
+  html.rd .rd-chips{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:820px){
+  html.rd .side{width:auto;min-width:0}
+  html.rd .rd-hero h1{font-size:26px}
+  html.rd .rd-hero .rd-port{display:none}
+  html.rd .rd-hero .rd-bot{width:84px}
+  html.rd .rd-steps{grid-template-columns:1fr}
+  html.rd .rd-steps .rd-arr{transform:rotate(90deg);height:22px}
+  html.rd .rd-kpis{grid-template-columns:1fr}
+  html.rd .rd-kpi{border-left:0;border-top:1px solid var(--rd-line)}
+  html.rd .rd-flow{flex-direction:column;gap:6px}
+  html.rd .rd-fs,html.rd .rd-fs:first-child,html.rd .rd-fs:last-child{clip-path:none;border-radius:12px;margin-left:0!important;padding-left:12px}
+  html.rd .rd-tiles{grid-template-columns:1fr}
+  html.rd .rd-six{grid-template-columns:1fr 1fr}
+  html.rd .rd-sx::after{display:none}
+  html.rd .rd-quick{grid-template-columns:1fr}
+  html.rd .rd-td{grid-template-columns:40px 1fr;}
+  html.rd .rd-stepbar{flex-wrap:wrap}
+  html.rd .rd-sbar{display:none}
+  html.rd .rd-home-top, html.rd .rd-home-mid, html.rd .rd-fhome-top{grid-template-columns:1fr!important}
+  html.rd .rd-bar-search{display:none}
+}
+
+/* ───── 2回目の直し（11/10） ───── */
+/* 見出しの説明が港の絵に重ならないように */
+html.rd .rd-hero .rd-ht{max-width:min(60%,780px)}
+/* AI相談の4つのボタンは 2×2 */
+html.rd .rd-home .rd-chips{grid-template-columns:repeat(2,1fr)}
+/* 書類・出荷のタブ（規制を調べる→書類をつくる→出荷を進める→受注・請求・入金）を手順の帯の見た目に */
+html.rd .optabs{background:#fff;border:1px solid var(--rd-line);border-radius:18px;padding:10px;box-shadow:var(--rd-sh);gap:8px;margin-bottom:18px}
+html.rd .optab{border:1px solid transparent;border-radius:14px;padding:12px 14px;background:none;min-width:170px}
+html.rd .optab:hover{border-color:var(--rd-bl-line);background:#F7FBFF}
+html.rd .optab.on{background:linear-gradient(180deg,#FFF3E4,#FFE8CC);border-color:var(--rd-or-line);box-shadow:none}
+html.rd .optab b{font-size:15px;font-weight:800}
+html.rd .optab small{font-size:11.5px}
+html.rd .optab i{width:28px;height:28px;font-size:13px}
+html.rd .optab.on i{background:var(--rd-or2);color:#fff}
+html.rd .optab.sub{flex:0 0 auto;min-width:0;border-left:1px dashed var(--rd-line);border-radius:0 14px 14px 0}
+/* スマホ：縦に長くならないよう、手順・数字・流れを小さく横に */
+@media (max-width:820px){
+  html.rd .stage{padding:0 12px 90px}
+  html.rd .rd-hero{min-height:0;gap:10px;margin-bottom:12px}
+  html.rd .rd-card{padding:16px;border-radius:16px}
+  html.rd .rd-ch h2{font-size:19px}
+  html.rd .rd-steps{gap:8px}
+  html.rd .rd-steps .rd-arr{display:none}
+  html.rd .rd-step{display:flex;align-items:center;gap:12px;text-align:left;padding:12px 12px 12px 14px}
+  html.rd .rd-step .rd-no{position:static;flex:none}
+  html.rd .rd-step .rd-sic{height:auto}
+  html.rd .rd-step .rd-sic svg{width:30px;height:30px}
+  html.rd .rd-step b{margin:0 0 2px;font-size:16px}
+  html.rd .rd-step small{font-size:12px}
+  html.rd .rd-step .rd-stt{margin:0 0 0 auto;flex:none}
+  html.rd .rd-kpis{grid-template-columns:repeat(3,1fr)}
+  html.rd .rd-kpi{border-top:0;border-left:1px solid var(--rd-line);padding:4px 6px}
+  html.rd .rd-kpi:first-child{border-left:0}
+  html.rd .rd-kpi .rd-kl{font-size:12.5px;flex-direction:column;gap:2px}
+  html.rd .rd-kpi .rd-kn{font-size:28px}
+  html.rd .rd-kpi .rd-ks{display:none}
+  html.rd .rd-flow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  html.rd .rd-fs{padding:10px 6px!important}
+  html.rd .rd-fs .rd-fl{font-size:12px;white-space:normal}
+  html.rd .rd-fs .rd-fn{font-size:22px}
+  html.rd .rd-tiles{grid-template-columns:repeat(2,1fr)!important;gap:10px}
+  html.rd .rd-tile{flex-direction:column;align-items:flex-start;gap:8px;padding:12px}
+  html.rd .rd-tile .rd-ti{width:40px;height:40px}
+  html.rd .rd-tile .rd-tn{font-size:26px}
+  html.rd .rd-six{grid-template-columns:repeat(2,1fr);gap:10px}
+  html.rd .rd-td{grid-template-columns:40px 1fr auto;gap:10px}
+  html.rd .rd-td .rd-btn{grid-column:1/-1}
+  html.rd .rd-quick{grid-template-columns:repeat(3,1fr);gap:8px}
+  html.rd .rd-q{padding:12px 6px;font-size:13px}
+  #rdbadge{bottom:auto;top:8px;left:auto;right:8px;font-size:10.5px;padding:4px 10px}
+  #rdbadge a{display:none}
+}
+@media (max-width:820px){
+  html.rd .rd-step{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;column-gap:10px;row-gap:0;align-items:center}
+  html.rd .rd-step .rd-no{grid-column:1;grid-row:1/3}
+  html.rd .rd-step .rd-sic{grid-column:2;grid-row:1/3}
+  html.rd .rd-step b{grid-column:3;grid-row:1}
+  html.rd .rd-step small{grid-column:3;grid-row:2}
+  html.rd .rd-step .rd-stt{grid-column:4;grid-row:1/3}
+  #rdbadge{top:auto;right:auto;left:8px;bottom:64px}
+}
+/* プレビューのログインの手助け（手元の模擬サーバーの架空デモアカウントだけ） */
+#rdlogin{margin:14px 0 4px;padding:14px;border:2px dashed #F7931E;border-radius:14px;background:#FFF8EF;font:600 13px/1.6 "Noto Sans JP",sans-serif;color:#14233A}
+#rdlogin b{display:block;font-size:14px;margin-bottom:8px}
+#rdlogin button{display:block;width:100%;margin-top:8px;padding:11px 14px;border-radius:12px;border:0;background:linear-gradient(180deg,#FF9A2E,#F57C0F);color:#fff;font:800 14.5px "Noto Sans JP",sans-serif;cursor:pointer}
+#rdlogin button.b2{background:#1F6FD1}
+/* 中くらいの幅（ノートPC・ブラウザを半分にしたとき）：上段を上下に並べる */
+@media (max-width:1280px){
+  html.rd .rd-home-top, html.rd .rd-home-mid, html.rd .rd-fhome-top{grid-template-columns:1fr!important}
+  html.rd .rd-3col{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+  html.rd .rd-3col > :last-child{grid-column:1/-1}
+}
+@media (max-width:900px){
+  html.rd .rd-3col{grid-template-columns:1fr!important}
+}
+
+
+/* ───── 3回目の直し（11/10 大森さん「全ての機能を欠かしてはいけない」）───── */
+/* 左のメニュー：今の版の全画面をグループの下に全部並べる（グループはたためる・既定は開く） */
+#rdside nav{gap:2px}
+#rdside .rd-grp{display:flex;flex-direction:column;gap:1px;margin-bottom:6px}
+#rdside .rd-gh{display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 10px 4px 12px;border:0;background:none;color:#7A889C;font:800 12px/1.4 "Noto Sans JP",sans-serif;letter-spacing:.06em;cursor:pointer;text-align:left}
+#rdside .rd-gh svg{transition:transform .15s;color:#9AA6B6}
+#rdside .rd-gh[aria-expanded="false"] svg{transform:rotate(-90deg)}
+#rdside .rd-grp.on .rd-gh{color:#C25F00}
+#rdside .rd-ni{padding:8px 12px;font-size:14px;gap:10px;border-radius:10px}
+#rdside .rd-ni svg{width:19px;height:19px}
+#rdside .rd-ni[aria-current="true"]{background:var(--rd-or-soft);color:#C25F00}
+#rdside .rd-start{margin-top:8px}
+#rdside .rd-sftw #sft{display:block;padding:10px 6px 0;font-size:11px;line-height:1.6;color:var(--rd-ink3);border:0;background:none}
+html.rd.rd-nav .side{overflow-y:auto}
+
+/* 上の帯：今の版の部品をそのまま、刷新版の見た目で（丸い・高さをそろえる） */
+html.rd .bar{flex-wrap:wrap;row-gap:8px;align-items:center}
+html.rd .bar .ib{width:40px;height:40px;border-radius:50%;border:1px solid var(--rd-line);background:#fff;box-shadow:var(--rd-sh);display:inline-flex;align-items:center;justify-content:center}
+html.rd .bar .tgl{height:40px;border-radius:999px;border:1px solid var(--rd-line);background:#fff;box-shadow:var(--rd-sh);padding:0 14px;font-weight:700}
+html.rd .bar .sel{height:40px;border-radius:999px;border:1px solid var(--rd-line);background:#fff;padding:0 12px;box-shadow:var(--rd-sh)}
+html.rd .bar #uxsearch{height:42px;min-width:260px;border-radius:999px;border:1px solid var(--rd-line);background:#fff;box-shadow:var(--rd-sh);padding:0 16px;display:inline-flex;align-items:center;gap:8px;color:var(--rd-ink3)}
+html.rd .bar #tenant{border:1px solid var(--rd-line);border-radius:999px;background:#fff;box-shadow:var(--rd-sh);padding:4px 14px 4px 6px}
+html.rd .bar #v56upldNewco{height:40px;border-radius:999px;border:1px solid var(--rd-or-line);background:#FFF7EC;color:#C25F00;font-weight:800;padding:0 14px}
+html.rd .bar #lgpill{border-radius:999px}
+html.rd .bar #usrchip{border-radius:999px}
+
+/* 案内帯（AI商社マンの成長レベル・AIバイヤー開拓のボタン）：細い白い帯に */
+html.rd #guide{margin:0 24px 10px;padding:8px 14px;border:1px solid var(--rd-line);border-radius:14px;background:#fff;box-shadow:var(--rd-sh);display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
+html.rd #guide[hidden]{display:none}
+html.rd #guide .btn{border-radius:999px}
+html.rd #guide #gai{background:linear-gradient(135deg,#1F6FD1,#3D8BEA);color:#fff;border:0;font-weight:800}
+
+/* ページの目次（このページの内容）：丸いボタンの列に */
+html.rd #uxsec{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px;padding:0;background:none;border:0;position:static}
+html.rd #uxsec .uxsl{font-size:12.5px;font-weight:800;color:var(--rd-ink3);margin-right:4px}
+html.rd #uxsec .uxsc{border:1px solid var(--rd-line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;color:#2C3B52;cursor:pointer}
+html.rd #uxsec .uxsc:hover{border-color:var(--rd-bl-line);color:var(--rd-bl)}
+
+/* 見積受信箱の「全体の状況」6つの数（押すとその一覧）：刷新版のタイルの見た目に */
+html.rd .v70fov{padding:18px 20px}
+html.rd .v70fov-g{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+html.rd .v70fov-i{display:flex!important;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 16px!important;border:1px solid var(--rd-line)!important;border-radius:16px!important;background:#fff!important;box-shadow:var(--rd-sh);text-align:left;min-height:96px}
+html.rd .v70fov-i b{font-size:32px!important;font-weight:900;color:#14233A;line-height:1.1}
+html.rd .v70fov-i span{font-size:13.5px!important;font-weight:800;color:#2C3B52}
+html.rd .v70fov-i.warn{border:2px solid var(--rd-or)!important;background:linear-gradient(180deg,#FFF6EC,#fff)!important}
+@media (max-width:1100px){html.rd .v70fov-g{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* どの画面の数のカード（.g4）も、大きな数字のタイルに */
+html.rd .well .g4 > .c{padding:16px 18px}
+html.rd .well .g4 > .c .lbl{font-size:14px;font-weight:800;color:#22324A;margin:0 0 4px}
+html.rd .well .g4 > .c .kv{font-size:32px;font-weight:900;color:#14233A;line-height:1.15}
+html.rd .well .g4 > .c .kv small{font-size:15px;font-weight:800;margin-left:3px}
+/* 上の帯：部品が多いときは2段に折り返す（重ならない） */
+html.rd .bar{height:auto!important;min-height:64px;padding:10px 24px;flex-wrap:wrap;gap:8px 10px}
+html.rd .bar #psw{max-width:240px}
+html.rd .bar #uxsearch{min-width:220px}
+html.rd .bar #usrchip{max-width:260px;overflow:hidden}
+html.rd .bar #usrchip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rdside .rd-ni{font-size:13.5px;letter-spacing:0}
+#rdside .rd-ni span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:900px){ html.rd .rd-kbcols{grid-template-columns:repeat(2,minmax(0,1fr))!important} }

@@ -1,0 +1,75 @@
+/* 貿易クラウドAI商社マン デザイン刷新 第2弾：ログイン画面・管理コンソール（手元だけ・2026-11-11） */
+
+/* ───── ログイン画面 ───── */
+html.rd #lgv.k-lgv{background:radial-gradient(1100px 520px at 90% -80px,#D7E8FB 0%,rgba(215,232,251,0) 70%),linear-gradient(180deg,#EEF5FD,#F7FAFE)!important;display:flex!important;flex-direction:column;align-items:center;gap:16px;padding:22px 24px 30px!important}
+html.rd #lgv .k-lgtop{position:relative;width:min(1180px,100%);min-height:170px;display:flex;align-items:center;gap:18px;overflow:hidden;flex:none}
+html.rd #lgv .k-lglogo2{position:absolute;left:0;top:0;width:190px;height:auto;z-index:2}
+html.rd #lgv .k-lgcatch{position:relative;z-index:2;display:flex;align-items:center;gap:16px;margin-top:40px;max-width:760px}
+html.rd #lgv .k-lgbot{width:130px;height:auto;flex:none;-webkit-mask-image:radial-gradient(ellipse 60% 60% at 50% 50%,#000 70%,transparent 100%);mask-image:radial-gradient(ellipse 60% 60% at 50% 50%,#000 70%,transparent 100%)}
+html.rd #lgv .k-lgcatch h1{margin:0 0 6px;font-size:30px;font-weight:900;color:#0F1E33;letter-spacing:.03em;line-height:1.35}
+html.rd #lgv .k-lgcatch p{margin:0 0 12px;font-size:15px;font-weight:600;color:#2A3B54;line-height:1.7}
+html.rd #lgv .k-lgcatch .k-chip svg{color:var(--k-or)}
+html.rd #lgv .k-lgport{position:absolute;right:-30px;top:0;height:100%;width:auto;z-index:1;-webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 30%);mask-image:linear-gradient(90deg,transparent 0%,#000 30%);opacity:.95}
+html.rd #lgv .k-lgsteps{width:min(1180px,100%);display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fff;border:1px solid var(--k-line);border-radius:18px;box-shadow:var(--k-sh);flex:none}
+html.rd #lgv .k-lgsth{font-size:15px;font-weight:900;line-height:1.3;padding-right:14px;border-right:1px solid var(--k-line);white-space:nowrap}
+html.rd #lgv .k-lgsth span{font-size:24px;color:var(--k-bl)}
+html.rd #lgv .k-lgsteps .k-step{border:0;background:#F8FBFF}
+html.rd #lgv .k-lgsteps .k-step.on{border:2px solid var(--k-or-line);background:#FFF6EC}
+html.rd #lgv .lgc{width:min(1180px,100%)!important;max-width:none!important;background:#fff;border:1px solid var(--k-line);border-radius:22px;box-shadow:var(--k-sh2);padding:22px 26px!important;flex:none}
+html.rd #lgv .k-lghide{display:none!important}
+html.rd #lgv .lgtabs{display:flex;gap:8px;padding:6px;border:1px solid var(--k-line);border-radius:16px;background:#F6F9FD;margin:0 0 16px}
+html.rd #lgv .lgtabs .btn{min-height:48px;border-radius:12px!important;font-size:16px!important;font-weight:800}
+html.rd #lgv .lgtabs .btn.g{background:transparent!important;border-color:transparent!important;box-shadow:none}
+html.rd #lgv .k-lg2{display:grid;grid-template-columns:1fr;gap:16px;max-width:620px;margin:0 auto}
+html.rd #lgv .k-lg2.two{grid-template-columns:1fr 1fr;max-width:none}
+html.rd #lgv .k-lgp{border:1px solid var(--k-line);border-radius:18px;padding:18px 20px;background:#fff;max-width:620px;margin:0 auto 4px;box-sizing:border-box;width:100%}
+html.rd #lgv .k-lg2 .k-lgp{max-width:none;margin:0}
+html.rd #lgv .k-lgp.warm{background:linear-gradient(180deg,#FFF8EF,#fff 70%);border-color:#F8D9B4}
+html.rd #lgv .k-lgph{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+html.rd #lgv .k-lgph > svg{color:var(--k-bl)}
+html.rd #lgv .k-lgph b{font-size:19px;font-weight:900;color:var(--k-ink)}
+html.rd #lgv .k-lgph b small{font-size:13px;font-weight:700;color:var(--k-ink2);margin-left:4px}
+html.rd #lgv .k-lgph .k-tag{margin-left:auto}
+html.rd #lgv .lgin,html.rd #lgv input.lgin{min-height:48px;border-radius:12px;border:1px solid #D6E1EE;font-size:15px;padding:10px 14px;width:100%;box-sizing:border-box;margin-top:8px;background:#fff}
+html.rd #lgv .lgin:focus{outline:0;border-color:var(--k-bl);box-shadow:0 0 0 3px rgba(31,111,209,.15)}
+html.rd #lgv #lg-go,html.rd #lgv #ad-go,html.rd #lgv #v65a-go{min-height:54px;border-radius:14px!important;font-size:17px!important;font-weight:900!important;margin-top:14px!important}
+html.rd #lgv details#v65a-code > summary{list-style:none;font-size:13.5px;font-weight:700;color:var(--k-ink2);cursor:default;margin-bottom:2px}
+html.rd #lgv details#v65a-code > summary::-webkit-details-marker{display:none}
+html.rd #lgv .v80lgn{font-size:12.5px!important;color:var(--k-ink3);line-height:1.6;margin-top:8px}
+html.rd #lgv .k-lgsafe{margin:0 0 14px;border:1px solid var(--k-line2);border-radius:12px;background:#F8FBFF;padding:10px 14px}
+html.rd #lgv .k-lgsafe summary{cursor:pointer;font-size:13.5px;font-weight:800;color:#2A3B54;display:flex;align-items:center;gap:6px}
+html.rd #lgv .k-lgsafe summary svg{color:var(--k-gr)}
+html.rd #lgv .lgerr{border-radius:12px;margin-top:12px;font-size:14px}
+html.rd #lgv #lgsync{border-radius:12px!important;font-size:12.5px!important}
+html.rd #lgv .k-lghelp{width:min(1180px,100%);display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:14px 20px;background:#fff;border:1px solid var(--k-line);border-radius:18px;box-shadow:var(--k-sh);flex:none}
+html.rd #lgv .k-lghelp > b{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:900;color:var(--k-bl);padding-right:16px;border-right:1px solid var(--k-line)}
+html.rd #lgv .k-lghelp a{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid var(--k-line);border-radius:999px;font-weight:800;font-size:14.5px;color:var(--k-ink);text-decoration:none;background:#F8FBFF}
+html.rd #lgv .k-lghelp a:hover{border-color:var(--k-or-line)}
+html.rd #lgv #rdlogin{max-width:620px;margin:14px auto 0}
+@media (max-width:900px){
+  html.rd #lgv .k-lgport{display:none} html.rd #lgv .k-lglogo2{position:static} html.rd #lgv .k-lgtop{flex-direction:column;align-items:flex-start}
+  html.rd #lgv .k-lgcatch{margin-top:0} html.rd #lgv .k-lgbot{width:84px} html.rd #lgv .k-lgcatch h1{font-size:22px}
+  html.rd #lgv .k-lgsteps{flex-wrap:wrap} html.rd #lgv .k-lgsth{border:0} html.rd #lgv .k-lg2.two{grid-template-columns:1fr}
+}
+
+/* ───── 管理コンソール ───── */
+html.rd .well #admkpi{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-bottom:18px}
+html.rd .well #admkpi > .kpi{display:grid!important;grid-template-columns:auto 1fr;grid-template-rows:auto auto auto;column-gap:12px;align-items:center;text-align:left;padding:16px!important;border-radius:16px!important;border:1px solid var(--k-line)!important;background:#fff!important;box-shadow:var(--k-sh);cursor:pointer;min-height:112px;margin:0}
+html.rd .well #admkpi > .kpi:hover{box-shadow:var(--k-sh2);border-color:var(--k-bl-line)!important}
+html.rd .well #admkpi > .kpi .k-ti{grid-row:1 / span 3;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--k-bl-soft);color:var(--k-bl)}
+html.rd .well #admkpi > .kpi.k-or .k-ti{background:var(--k-or-soft);color:var(--k-or)} html.rd .well #admkpi > .kpi.k-gr .k-ti{background:var(--k-gr-soft);color:var(--k-gr)} html.rd .well #admkpi > .kpi.k-pu .k-ti{background:var(--k-pu-soft);color:var(--k-pu)}
+html.rd .well #admkpi > .kpi .lbl{margin:0;font-size:13.5px!important}
+html.rd .well #admkpi > .kpi .kv{font-size:28px}
+html.rd .well #admkpi > .kpi .kd{font-size:12.5px;color:var(--k-ink3)}
+html.rd .well .v84td{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px;background:#fff;border:1px solid var(--k-line);border-radius:16px;box-shadow:var(--k-sh);margin-bottom:16px}
+html.rd .well .v84td-h{font-size:16px;font-weight:900;margin-right:8px}
+html.rd .well .v84td-c{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--k-line)!important;border-radius:12px!important;background:#F8FBFF!important;padding:8px 14px!important;font-weight:700;font-size:14px;cursor:pointer}
+html.rd .well .v84td-c b{font-size:18px;color:#E06A06}
+html.rd .well .k-isst{display:flex;align-items:center;gap:10px;margin:14px 0 6px;flex-wrap:wrap}
+html.rd .well .k-isst .k-sn{width:28px;height:28px;border-radius:50%;background:var(--k-or);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center}
+html.rd .well .k-isst b{font-size:16px;font-weight:900}
+html.rd .well .k-isst small{font-size:12.5px;color:var(--k-ink3);font-weight:600}
+html.rd .well #issue .admform{display:flex;flex-direction:column;gap:6px}
+html.rd .well .acode{font-weight:800;font-family:ui-monospace,Consolas,monospace;color:var(--k-ink)}
+@media (max-width:1200px){ html.rd .well #admkpi{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:700px){ html.rd .well #admkpi{grid-template-columns:repeat(2,minmax(0,1fr))} }

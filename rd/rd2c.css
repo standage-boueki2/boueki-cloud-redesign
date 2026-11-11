@@ -1,0 +1,66 @@
+/* 貿易クラウドAI商社マン デザイン刷新 第2弾：撮影で見つかった直し（11/11） */
+
+/* 見出し：説明が港の絵に重ならないように（絵は右 42%、文字は左 58%まで） */
+html.rd .rd-hero{min-height:136px}
+html.rd .rd-hero .rd-port{width:44%;height:136px;object-fit:cover;object-position:left center;right:-24px;-webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 22%);mask-image:linear-gradient(90deg,transparent 0%,#000 22%)}
+html.rd .rd-hero .rd-ht{max-width:calc(58% - 130px)}
+@media (max-width:1100px){html.rd .rd-hero .rd-port{opacity:.25} html.rd .rd-hero .rd-ht{max-width:none}}
+
+/* 上の帯：検索・言語・通知・会社の4つにそろえる（会社・商品の切り替え・ログアウトなどは会社名のボタンの中） */
+html.rd .bar.k-bar2{display:flex;align-items:center;flex-wrap:nowrap!important;gap:10px;min-height:68px;padding:12px 24px!important}
+html.rd .bar.k-bar2 > :not(#ham):not(#uxsearch):not(#lang):not(#bell):not(.k-co):not(.k-dd):not(.k-sp){display:none!important}
+html.rd .bar.k-bar2 #uxsearch{display:inline-flex!important;flex:1;max-width:460px;min-width:220px;height:46px;border-radius:999px;margin-left:auto}
+html.rd .bar.k-bar2 #lang{display:inline-block!important;width:auto;height:46px}
+html.rd .bar.k-bar2 #bell{display:inline-flex!important;width:46px;height:46px}
+html.rd .bar.k-bar2 .k-co{display:inline-flex;align-items:center;gap:10px;height:46px;max-width:300px;padding:0 16px;border:1px solid var(--k-line);border-radius:999px;background:#fff;box-shadow:var(--k-sh);font:800 14.5px/1 "Noto Sans JP",sans-serif;color:var(--k-ink);cursor:pointer}
+html.rd .bar.k-bar2 .k-co span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.rd .bar.k-bar2 .k-co:hover{border-color:var(--k-or-line)}
+html.rd .k-dd{position:absolute;right:24px;top:64px;z-index:80;width:min(420px,92vw);background:#fff;border:1px solid var(--k-line);border-radius:18px;box-shadow:var(--k-sh2);padding:16px;display:none}
+html.rd .k-dd.on{display:block}
+html.rd .k-dd h4{margin:12px 0 8px;font-size:12.5px;font-weight:800;color:var(--k-ink3);letter-spacing:.06em}
+html.rd .k-dd h4:first-child{margin-top:0}
+html.rd .k-dd .k-ddr{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+html.rd .k-dd .k-ddr > *{display:inline-flex!important}
+html.rd .k-dd #psw{width:100%;height:42px;border-radius:12px}
+html.rd .k-dd #tenant{border:1px solid var(--k-line2);border-radius:12px;padding:6px 10px;width:100%;box-sizing:border-box}
+html.rd .k-dd #v56upldNewco{height:40px;border-radius:12px;border:1px solid var(--k-or-line);background:#FFF7EC;color:#C25600;font-weight:800;padding:0 14px}
+html.rd .k-dd #lgout{width:auto;height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--k-line);background:#fff;gap:6px}
+html.rd .k-dd #lgout::after{content:"ログアウト";font-size:13.5px;font-weight:800;color:var(--k-ink)}
+html.rd .k-dd #easy{height:40px;border-radius:12px}
+html.rd .k-dd .k-ddnote{margin:12px 0 0;font-size:12.5px;color:var(--k-ink3);line-height:1.6}
+
+/* ページの目次（このページの内容）：細い丸ボタンの列 */
+html.rd #uxsec{display:flex!important;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px;padding:0;background:none;border:0;position:static}
+html.rd #uxsec .uxsl{font-size:12.5px;font-weight:800;color:var(--k-ink3);margin-right:4px}
+html.rd #uxsec .uxsc{border:1px solid var(--k-line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;color:#2C3B52;cursor:pointer}
+html.rd #uxsec .uxsc:hover{border-color:var(--k-bl-line);color:var(--k-bl)}
+/* ホームの成長レベル */
+html.rd .k-lvchip{margin-left:auto;position:relative;z-index:2;display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:16px;background:rgba(255,255,255,.92);border:1px solid var(--k-or-line);box-shadow:var(--k-sh);cursor:pointer;font-family:inherit;color:var(--k-ink)}
+html.rd .k-lvchip b{font-size:22px;font-weight:900;color:#E06A06}
+html.rd .k-lvchip small{display:block;font-size:12px;font-weight:700;color:var(--k-ink2);text-align:left}
+/* 輸出のステップ（アイコンなし・5つ） */
+html.rd .k-step b{font-size:15px}
+html.rd .k-step small{font-size:12px}
+
+/* 営業資料：必須／推奨の見出しは上に */
+html.rd .k-items .k-igh{justify-content:flex-start;padding-top:18px}
+
+/* ログイン：説明の重なり・アクセスコードの見出しの重複 */
+html.rd #lgv .k-lgport{width:50%;height:100%;object-fit:cover;object-position:left center}
+html.rd #lgv .k-lgcatch{max-width:52%}
+html.rd #lgv .k-lglogo2{background:transparent}
+html.rd #lgv .k-lgp details#v65a-code > summary{display:none}
+html.rd #lgv .lgc #rdlogin{margin:0 auto 14px}
+@media (max-width:900px){html.rd #lgv .k-lgcatch{max-width:none}}
+
+/* ログイン：ロゴは上の段、キャッチは左 56% に（重ならない） */
+html.rd #lgv .k-lgtop{flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;min-height:230px}
+html.rd #lgv .k-lglogo2{position:relative;left:auto;top:auto;width:200px}
+html.rd #lgv .k-lgcatch{margin-top:0;max-width:58%}
+html.rd #lgv .k-lgcatch h1{font-size:28px}
+html.rd #lgv .k-lgport{width:46%}
+
+/* 数のタイルが5つ以上・狭い枠では、アイコンを上に（文字を折り返さない） */
+html.rd .k-tiles[style*="--n:6"] .k-tile,html.rd .k-tiles[style*="--n:5"] .k-tile,html.rd .k-vt .k-tile{flex-direction:column;align-items:flex-start;gap:8px;padding:14px 16px}
+html.rd .k-vt .k-tile > span:last-child{position:absolute;right:12px;top:12px}
+html.rd .k-tiles[style*="--n:6"] .k-ti,html.rd .k-tiles[style*="--n:5"] .k-ti,html.rd .k-vt .k-ti{width:42px;height:42px}
