@@ -55,7 +55,10 @@ html.rd #lgv .lgc #rdlogin{margin:0 auto 14px}
 
 /* ログイン：ロゴは上の段、キャッチは左 56% に（重ならない） */
 html.rd #lgv .k-lgtop{flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;min-height:230px}
-html.rd #lgv .k-lglogo2{position:relative;left:auto;top:auto;width:200px}
+html.rd #lgv .k-lglogo2{position:relative;left:auto;top:auto;width:200px;height:auto}
+/* 見出し・説明は言葉の切れ目でだけ改行する／「刷新版」の札（ログイン画面の上）はスマホだけ */
+html.rd #lgv .k-nw{display:inline-block}
+html.rd #lgv .k-lgver{display:none}
 html.rd #lgv .k-lgcatch{margin-top:0;max-width:58%}
 html.rd #lgv .k-lgcatch h1{font-size:28px}
 html.rd #lgv .k-lgport{width:46%}

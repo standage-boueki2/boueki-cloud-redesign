@@ -102,17 +102,20 @@
   #k-densm{left:8px;right:8px!important;width:auto}
   #k-tp{max-width:calc(100vw - 24px)}
 
-  /* ── ログイン画面：入力欄をすぐ見せる ── */
-  html.rd #lgv .k-lgtop{padding:0!important;gap:8px!important}
-  html.rd #lgv .k-lglogo2{height:40px!important;width:auto!important}
-  html.rd #lgv .k-lgtop{align-items:stretch!important;width:100%!important}
-  html.rd #lgv .k-lgcatch{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px!important;max-width:none!important;width:100%!important}
-  html.rd #lgv .k-lgcatch > div{flex:1 1 auto;min-width:0}
-  html.rd #lgv .k-lgbot{width:56px!important;flex:none}
-  html.rd #lgv .k-lgcatch h1{font-size:20px!important;line-height:1.4!important;margin:0 0 4px!important}
-  html.rd #lgv .k-lgcatch p{font-size:13px!important;line-height:1.6!important;margin:0 0 6px!important}
-  html.rd #lgv .k-lgcatch .k-chips{gap:6px}
+  /* ── ログイン画面の上部：中央にそろえる・ロゴは縦横比を保つ（11/11 夜：ロゴが横に伸びて見えた） ── */
+  html.rd #lgv.k-lgv{gap:16px!important;padding:12px 16px calc(24px + env(safe-area-inset-bottom))!important}
+  html.rd #lgv .k-lgtop{min-height:0!important;padding:0!important;gap:14px!important;align-items:center!important;justify-content:flex-start!important;width:100%!important;overflow:visible!important}
+  html.rd #lgv .k-lgver{display:inline-flex;align-items:center;padding:3px 12px;border-radius:999px;background:rgba(20,35,58,.07);color:#465A77;font-size:11px;font-weight:700;line-height:1.6;letter-spacing:.02em}
+  html.rd #lgv .k-lglogo2{width:min(204px,58vw)!important;height:auto!important;max-width:none!important;align-self:center!important;flex:none!important;margin:2px 0 0!important}
+  html.rd #lgv .k-lgcatch{display:grid!important;grid-template-columns:1fr auto auto 1fr;align-items:center;column-gap:0;row-gap:10px;max-width:none!important;width:100%!important;margin:0!important}
+  html.rd #lgv .k-lgcatch > div{display:contents}
+  html.rd #lgv .k-lgbot{grid-column:2;grid-row:1;width:60px!important;flex:none;margin-right:12px}
+  html.rd #lgv .k-lgcatch h1{grid-column:3;grid-row:1;text-align:left;font-size:21px!important;line-height:1.42!important;letter-spacing:.03em!important;margin:0!important}
+  html.rd #lgv .k-lgcatch p{grid-column:1 / -1;justify-self:center;max-width:19.5em;text-align:center;font-size:13px!important;font-weight:600!important;color:#4A5D78!important;line-height:1.75!important;margin:0!important}
+  html.rd #lgv .k-lgcatch .k-chips{grid-column:1 / -1;justify-content:center;gap:6px}
   html.rd #lgv .k-lgcatch .k-chip{font-size:12px;min-height:30px;padding:4px 10px}
+  /* 「刷新版」の札は、ログイン画面では上の小さな札に（下に固定すると入力欄に重なる） */
+  body:has(#lgv) #rdbadge{display:none!important}
   html.rd #lgv .k-lghelp{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
   html.rd #lgv .k-lghelp > b{border:0;padding:0;font-size:15px}
   html.rd #lgv input,html.rd #lgv select{font-size:16px!important;min-height:46px}
@@ -126,6 +129,8 @@
   /* ご利用までの3ステップ（説明だけ）はスマホでは出さない＝入力欄を上に */
   html.rd #lgv .k-lgsteps{display:none!important}
   html.rd #lgv .k-lgcatch .k-chips{display:none}
+  /* 見出しは2行に決め打ち（折り返しに任せると箱が横に広がり、ロボットと見出しのまとまりが左に寄る） */
+  html.rd #lgv .k-lgcatch h1 .k-nw{display:block}
   html.rd .rd-hero .rd-bot{width:44px!important}
   html.rd .rd-hero h1{font-size:22px!important}
   html.rd .k-tiles:not(:has(> .k-card)):not(:has(> .k-step)){grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
