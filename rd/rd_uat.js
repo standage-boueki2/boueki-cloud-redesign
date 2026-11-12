@@ -86,6 +86,8 @@
     "SDS": "安全データシート。成分と危険性・取り扱いを書いた書類です（MSDS と同じ）。",
     "COA": "分析証明書。製品の成分や品質を検査した結果を示す書類です。",
     "FDA": "アメリカの食品医薬品局。食品・化粧品を輸出するときの施設登録や事前通報を受け付けます。",
+    "検疫": "動物・植物・食品などが、病気や害虫を持ち込まないかを、国境で調べる手続きです。",
+    "通関業者": "税関への申告を、荷主の代わりに行う会社（通関の専門業者）です。",
   };
   let TERM = null, TERM_RE = null;
   function termDict() {
@@ -98,17 +100,31 @@
     Object.keys(GLx).forEach((k) => add(k, GLx[k], V[k] && V[k].n, V[k] && V[k].t));
     Object.keys(EXTRA).forEach((k) => add(k, EXTRA[k]));
     Object.keys(V).forEach((k) => add(k, V[k].t, V[k].n));
-    [["HS コード", "HSコード"], ["仕向け地", "仕向地"]].forEach(([a, k]) => { if (M[k] && !M[a]) M[a] = Object.assign({}, M[k], { k: a }); }); // 書き方の揺れ
+    [["HS コード", "HSコード"], ["仕向け地", "仕向地"], ["原産地証明", "原産地証明書"]].forEach(([a, k]) => { if (M[k] && !M[a]) M[a] = Object.assign({}, M[k], { k: a }); }); // 書き方の揺れ
     const er = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
     const keys = Object.keys(M).sort((a, b) => b.length - a.length);
-    TERM_RE = new RegExp(keys.map((k) => (/^[A-Za-z0-9/]+$/.test(k) ? `(?<![A-Za-z0-9/])${er(k)}(?![A-Za-z0-9/])` : er(k))).join("|"), "g");
+    // 英字の語は前後が英数字でないときだけ（「FOB/CIF」の FOB・CIF も拾う）
+    TERM_RE = new RegExp(keys.map((k) => (/^[A-Za-z0-9/]+$/.test(k) ? `(?<![A-Za-z0-9])${er(k)}(?![A-Za-z0-9])` : er(k))).join("|"), "g");
     TERM = M;
     return M;
   }
   RD.termDict = termDict;
-  const SKIP = "script,style,textarea,input,select,option,button,a,code,pre,abbr,svg,summary,label,h1,[contenteditable],.k-term,.tm,.v54term,.bb,.ci,[data-noi18n],[lang]:not([lang^=ja]),[role=button],[data-onclick],[data-kact],.k-tag,.k-chip,.p,#k-tp,.k-termhint";
-  const TERM_MAX = 16;
+  /* 11/12 大瀧さんのご意見「HSコードなどの専門用語は、押すと説明が出るように」：
+     前は「画面ごとに最初の16語・1回目だけ」で、2回目以降・入力欄の名前・札（チップ）・表の見出しの用語は押せなかった。
+     → 画面の中の用語は、どこに出ても押すと説明（カードごとの1回目に「？」、同じカードの2回目からは点線だけ）。
+       今のアプリが付けている用語の印（.tm・.v54term）も同じ見た目・同じ説明の窓にそろえる。
+     押せる部品（ボタン・リンク・押せる行）の中の文字は、押した先が変わらないよう印を付けない */
+  // [data-noi18n]（訳さない印）は外した：数字の欄の説明（「FOB 相当」など）も日本語なので押せるように。外国語の欄は [lang] で除く
+  const SKIP = "script,style,textarea,input,select,option,button,a,code,pre,abbr,svg,summary,h1,[contenteditable],.k-term,.tm,.v54term,.bb,.ci,[lang]:not([lang^=ja]),[role=button],[data-onclick],[data-kact],.k-tag,.p,#k-tp,.k-termhint";
+  const TERM_SEL = ".k-term:not(.k-termdemo), .tm, .v54term";
+  const TERM_MAX = 400; // 1画面で付ける印の上限（重くならないように）
+  const BLOCK = ".c, .k-card, section, details, table, .rd-hero, .rd-card";
   let termBusy = false;
+  const termKeyOf = (el) => {
+    if (el.dataset.kterm) return el.dataset.kterm;
+    const s = String(el.dataset.term || el.textContent || "").trim();
+    return /^HS\s?コード/.test(s) ? "HSコード" : s;
+  };
   function termScan() {
     if (termBusy || RD.locked() || isAdmin() || !isJa()) return 0;
     const w = document.getElementById("well"); if (!w) return 0;
@@ -116,8 +132,13 @@
     termBusy = true;
     let made = 0;
     try {
-      const seen = new Set($$(".k-term", w).map((x) => x.dataset.kterm));
-      if (seen.size >= TERM_MAX) return 0;
+      let n0 = $$(".k-term", w).length;
+      if (n0 >= TERM_MAX) return 0;
+      // カードごとに「？」を付けた用語（今のアプリの印も数える）
+      const blk = (el) => (el.parentElement && el.parentElement.closest(BLOCK)) || w;
+      const seen = new Map();
+      const saw = (b, k) => { let s = seen.get(b); if (!s) { s = new Set(); seen.set(b, s); } if (s.has(k)) return true; s.add(k); return false; };
+      $$(".k-term:not(.k-t2), .tm, .v54term", w).forEach((x) => saw(blk(x), termKeyOf(x)));
       const tw = document.createTreeWalker(w, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
         acceptNode(n) {
           if (n.nodeType === 1) { if (n.matches(SKIP)) return NodeFilter.FILTER_REJECT; if (!n.getClientRects().length && n.tagName !== "TBODY" && n.tagName !== "TR") return NodeFilter.FILTER_REJECT; return NodeFilter.FILTER_SKIP; }
@@ -127,28 +148,31 @@
       const texts = [];
       for (let n = tw.nextNode(); n; n = tw.nextNode()) texts.push(n);
       for (const t0 of texts) {
-        if (seen.size >= TERM_MAX) break;
+        if (n0 + made >= TERM_MAX) break;
         let t = t0;
         TERM_RE.lastIndex = 0;
         let s = t.nodeValue, m, guard = 0;
-        while (t && (m = TERM_RE.exec(s)) && guard++ < 20) {
+        while (t && (m = TERM_RE.exec(s)) && guard++ < 40) {
           const key = m[0];
-          if (seen.has(key) || !D[key]) continue;
+          if (!D[key]) continue;
+          const b = blk(t);
+          const again = saw(b, key);
           const mid = t.splitText(m.index);
           const rest = mid.splitText(key.length);
           const ab = document.createElement("abbr");
-          ab.className = "k-term"; ab.tabIndex = 0; ab.dataset.kterm = key;
+          ab.className = again ? "k-term k-t2" : "k-term"; ab.tabIndex = 0; ab.dataset.kterm = key;
           ab.setAttribute("aria-label", key + "（押すと説明）");
           mid.parentNode.replaceChild(ab, mid); ab.appendChild(mid);
-          seen.add(key); made++;
+          made++;
           t = rest; s = t.nodeValue; TERM_RE.lastIndex = 0;
-          if (seen.size >= TERM_MAX) break;
+          if (n0 + made >= TERM_MAX) break;
         }
       }
       if (made || $(".k-term", w)) termHint(w);
     } catch (e) { console.error("[rd uat term]", e); } finally { termBusy = false; }
     return made;
   }
+  RD.termScan = termScan;
   function termHint(w) {
     const ht = $("[data-rdhero] .rd-ht", w);
     if (!ht || $(".k-termhint", ht)) return;
@@ -160,13 +184,16 @@
   let tpPin = false, tpT = 0, tpFor = null;
   function tpClose() { const d = document.getElementById("k-tp"); if (d) d.remove(); if (tpFor) tpFor.removeAttribute("aria-describedby"); tpFor = null; tpPin = false; }
   function tpOpen(ab, pin) {
-    const D = termDict(), x = D[ab.dataset.kterm];
+    const D = termDict(), key = termKeyOf(ab);
+    let x = D[key];
+    if (!x && ab.getAttribute("data-def")) x = { n: key, s: ab.getAttribute("data-def"), long: "" }; // 今のアプリの印（辞書に無い語は、アプリの説明をそのまま）
     if (!x) return;
     if (tpFor === ab && document.getElementById("k-tp")) { if (pin) tpPin = true; return; }
     tpClose();
     const d = document.createElement("div");
     d.id = "k-tp"; d.setAttribute("role", "tooltip");
-    d.innerHTML = `<b>${esc(x.n)}</b><p>${esc(x.s)}</p>${x.long ? `<details><summary>くわしく</summary><p class="k-tpl">${esc(x.long)}</p></details>` : ""}<button type="button" class="k-link" data-kgloss="1">${I("book", 15)}貿易のことばの一覧（用語集）を開く</button>`;
+    const canAsk = !RD.locked() && !isAdmin() && !RD.isFwd();
+    d.innerHTML = `<b>${esc(x.n)}</b><p>${esc(x.s)}</p>${x.long ? `<details><summary>くわしく</summary><p class="k-tpl">${esc(x.long)}</p></details>` : ""}<div class="k-tpgo">${canAsk ? `<button type="button" class="k-link" data-kaskterm="${esc(x.k || key)}">${I("chat", 15)}AI商社マンに、うちの場合を聞く</button>` : ""}${RD.isFwd() ? "" : `<button type="button" class="k-link" data-kgloss="1">${I("book", 15)}用語集（貿易のことばの一覧）を開く</button>`}</div>`;
     document.body.appendChild(d);
     ab.setAttribute("aria-describedby", "k-tp");
     const r = ab.getBoundingClientRect(), Wd = Math.min(360, innerWidth - 24);
@@ -179,34 +206,47 @@
     d.addEventListener("mouseleave", () => { if (!tpPin) { clearTimeout(tpT); tpT = setTimeout(tpClose, 250); } });
     tpFor = ab; tpPin = !!pin;
   }
+  // 今のアプリの印（.tm・.v54term）も、刷新版では同じ説明の窓で出す（ログイン後・日本語の画面だけ）
+  // 押せる部品（ボタン・リンク・押せる行）の中にある今のアプリの印は、押したときは部品の働きを優先する（説明は指を置いたときだけ）
+  const termAt = (t, click) => {
+    if (!t || !t.closest || RD.locked() || isAdmin() || !isJa()) return null;
+    const ab = t.closest(TERM_SEL);
+    if (!ab || ab.closest(".k-termdemo")) return null;
+    if (click && !ab.classList.contains("k-term") && ab.parentElement && ab.parentElement.closest("button,a,[data-onclick],[role=button],summary,[data-kact]")) return null;
+    return ab;
+  };
   document.addEventListener("mouseover", (e) => {
-    const ab = e.target.closest && e.target.closest(".k-term:not(.k-termdemo)");
+    const ab = termAt(e.target);
     if (!ab) return;
     clearTimeout(tpT);
     tpT = setTimeout(() => tpOpen(ab, false), 180);
   });
   document.addEventListener("mouseout", (e) => {
-    const ab = e.target.closest && e.target.closest(".k-term:not(.k-termdemo)");
+    const ab = termAt(e.target);
     if (!ab || tpPin) return;
     clearTimeout(tpT);
     tpT = setTimeout(() => { if (!tpPin) tpClose(); }, 250);
   });
   document.addEventListener("click", (e) => {
     const g = e.target.closest && e.target.closest("[data-kgloss]");
-    if (g) { e.preventDefault(); e.stopPropagation(); tpClose(); goKey("gloss"); return; }
-    const ab = e.target.closest && e.target.closest(".k-term:not(.k-termdemo)");
+    if (g) { e.preventDefault(); e.stopPropagation(); tpClose(); try { closeDW(); } catch (x) { /* 無い */ } goKey("gloss"); return; } // eslint-disable-line no-undef
+    const q = e.target.closest && e.target.closest("[data-kaskterm]");
+    if (q) { e.preventDefault(); e.stopPropagation(); const k = q.dataset.kaskterm; tpClose(); try { closeDW(); } catch (x) { /* 無い */ } askPrefill(`「${k}」について、うちの商品・販売先国の場合に気をつけることを教えて`); return; } // eslint-disable-line no-undef
+    const ab = termAt(e.target, true);
     if (ab) { e.preventDefault(); e.stopPropagation(); if (tpFor === ab && tpPin) tpClose(); else { clearTimeout(tpT); tpClose(); tpOpen(ab, true); } return; }
     if (!(e.target.closest && e.target.closest("#k-tp"))) tpClose();
   }, true);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { tpClose(); densClose(); }
-    const ab = e.target && e.target.closest && e.target.closest(".k-term:not(.k-termdemo)");
+    const ab = termAt(e.target, true);
     if (ab && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); tpOpen(ab, true); }
   });
   window.addEventListener("scroll", () => { if (!tpPin) tpClose(); }, { passive: true, capture: true });
   // 中身が描き直されたら、少し待って用語を付け直す
-  let termT = 0;
-  const termMo = new MutationObserver(() => { if (termBusy) return; clearTimeout(termT); termT = setTimeout(termScan, 700); });
+  // 書き換えが続く画面（時計・進み具合の表示など）でも後回しにし続けないよう、待つのは最長1.5秒（11/12）
+  let termT = 0, termT0 = 0;
+  const termRun = () => { termT0 = 0; termScan(); };
+  const termMo = new MutationObserver(() => { if (termBusy) return; if (!termT0) termT0 = Date.now(); clearTimeout(termT); termT = setTimeout(termRun, Date.now() - termT0 > 1500 ? 0 : 700); });
 
   /* ───────── ③ AIの「考え中」の表示（右下・移ったら1行に） ───────── */
   let thinkKey = null;
@@ -367,7 +407,7 @@
     densBtn();
     const w = document.getElementById("well");
     if (w && !w.dataset.kterm) { w.dataset.kterm = "1"; termMo.observe(w, { childList: true, subtree: true }); }
-    clearTimeout(termT); termT = setTimeout(termScan, 250);
+    clearTimeout(termT); termT = setTimeout(termRun, 250);
   }
   const old = RD.after;
   RD.after = function () { const r = old.apply(this, arguments); try { afterUat(); } catch (e) { console.error("[rd uat]", e); } return r; };

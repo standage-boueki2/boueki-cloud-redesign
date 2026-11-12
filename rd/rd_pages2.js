@@ -444,8 +444,9 @@
     const hd = document.createElement("div");
     hd.className = "rd-x k-helphd";
     hd.innerHTML = `<div class="rd-hero" style="min-height:110px;margin-bottom:12px"><img class="rd-bot" src="${IMG}robot.png" alt="" style="width:96px"><div class="rd-ht"><h1 style="font-size:28px">ヘルプセンター（使い方ガイド）</h1><p>AI商社マンの使い方・困ったときの解決方法が、すぐに見つかります。</p></div></div>
-      <div class="k-grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">
-        <a class="k-card k-row" href="guide/" target="_blank" rel="noopener" style="text-decoration:none">${I("book", 30)}<span class="k-rt"><b>3分でわかるスタートガイド</b><small>はじめての方へ（別のタブで開きます）</small></span>${I("chevR", 18, 2.4)}</a>
+      <div class="k-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px">
+        <button type="button" class="k-card k-row" data-rdquick="1">${I("book", 30)}<span class="k-rt"><b>3分でわかるスタートガイド</b><small>はじめての方へ（5つの手順・この画面の上で開きます）</small></span>${I("chevR", 18, 2.4)}</button>
+        <a class="k-card k-row" href="guide/" target="_blank" rel="noopener" style="text-decoration:none">${I("folder", 30)}<span class="k-rt"><b>はじめてガイド（くわしい版）</b><small>目次から、知りたいところだけ読めます（別のタブ）</small></span>${I("chevR", 18, 2.4)}</a>
         <button type="button" class="k-card k-row" ${act(() => { try { closeDW(); } catch (e) { /* 無視 */ } const s = document.getElementById("uxsearch"); if (s) s.click(); })}>${I("search", 30)}<span class="k-rt"><b>画面・操作を検索する</b><small>Ctrl＋K または ／</small></span>${I("chevR", 18, 2.4)}</button>
         <button type="button" class="k-card k-row" ${act(() => { const h = $$("h3, h4, b, p", pn).find((x) => /お問い合わせ/.test(x.textContent || "")); flash(h && (h.closest(".c") || h)); })}>${I("mail", 30)}<span class="k-rt"><b>お問い合わせ・サポート</b><small>担当の STANDAGE 営業・CS へ</small></span>${I("chevR", 18, 2.4)}</button>
       </div>

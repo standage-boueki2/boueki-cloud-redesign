@@ -128,8 +128,12 @@
     { g: "案件", items: [["fcase", "案件・出荷管理", "box", "fcase"], ["frq", "依頼ページ", "doc", "frq"]] },
     { g: "設定", items: [["fteam", "メンバー・権限・セキュリティ", "users", "fteam"]] },
   ];
+  /* ───── よく使う項目（11/12 大瀧さんのご意見：左のメニューはよく使う数項目だけにし、ほかは「すべての機能」にまとめる） ─────
+     [キー, 名前, アイコン, バッジを読む元, この項目を「いま居る」と見なす画面]。キー "@help" は ヘルプセンター（窓）を開く */
+  const MAIN_S = [["dash:home", "ホーム", "home"], ["today", "今日やること", "sun"], ["item", "商品", "box", "", ["item", "up", "srcs"]], ["ai", "AIに聞く", "chat"], ["@help", "困ったとき", "help"]];
+  const MAIN_F = [["fhome", "ホーム", "home"], ["finbox", "見積受信箱", "mail", "finbox"], ["fcase", "案件・出荷管理", "box", "fcase"], ["fai", "AIに聞く", "chat"], ["@help", "困ったとき", "help"]];
   // 今の版のメニューにある画面（試験で「全部ある」を確かめる）
-  RD.NAV_S = NAV_S; RD.NAV_F = NAV_F;
+  RD.NAV_S = NAV_S; RD.NAV_F = NAV_F; RD.MAIN_S = MAIN_S; RD.MAIN_F = MAIN_F;
 
   /* ───── 画面ごとの見出し ───── */
   const HERO = {
@@ -216,8 +220,9 @@
     const S = G("SES");
     return !!(S && S.code);
   }
-  function foldGet() { try { return JSON.parse(localStorage.getItem("rd_navfold") || "{}") || {}; } catch (e) { return {}; } }
-  function foldSet(o) { try { localStorage.setItem("rd_navfold", JSON.stringify(o)); } catch (e) { /* 無視 */ } }
+  // 「すべての機能」の開け閉め（11/12）：はじめは閉じる。開けたら、閉じるまで開いたまま（この PC に覚える）
+  function allGet() { try { return localStorage.getItem("rd_navall") === "1"; } catch (e) { return false; } }
+  function allSet(v) { try { localStorage.setItem("rd_navall", v ? "1" : "0"); } catch (e) { /* 無視 */ } }
   function buildSide() {
     const side = $(".side");
     if (!side) return;
@@ -228,38 +233,54 @@
     if (!mine) return;
     const fwd = isFwd();
     const A = fwd ? NAV_F : NAV_S;
+    const M = fwd ? MAIN_F : MAIN_S;
     const k = curKey();
     const kp = k.split(":")[0];
-    const fold = foldGet();
+    const open = allGet();
     // 今の版のメニュー下の欄（#sft）は、描き直しで消さないよう、いったん元の場所へ戻してから描く（アプリが #sft を書き換えるため）
     const sft0 = $("#sft");
     if (sft0 && el.contains(sft0)) side.insertBefore(sft0, el);
-    const bdg = (key) => { if (!key) return ""; const n = fwd ? origBadge('[data-fp="' + key + '"]') : origBadge('[data-p="' + key + '"]'); return n ? `<span class="rd-bdg">${esc(n)}</span>` : ""; };
+    const bdgN = (key) => (key ? (fwd ? origBadge('[data-fp="' + key + '"]') : origBadge('[data-p="' + key + '"]')) : "");
+    const bdg = (key) => { const n = bdgN(key); return n ? `<span class="rd-bdg">${esc(n)}</span>` : ""; };
     const isOn = (x) => x === k || (x.indexOf(":") < 0 && k.indexOf(":") < 0 && x === kp);
+    const mainOn = (it) => (it[4] || [it[0]]).some(isOn);
+    // よく使う項目
+    const main = M.map((it) => it[0] === "@help"
+      ? `<button type="button" class="rd-ni rd-main" data-rdact="help">${I(it[2], 20)}<span>${esc(it[1])}</span></button>`
+      : `<button type="button" class="rd-ni rd-main" data-rdk="${esc(it[0])}" aria-current="${mainOn(it)}">${I(it[2], 20)}<span>${esc(it[1])}</span>${bdg(it[3])}</button>`).join("");
+    // すべての機能（今の版の全画面を、仕事の流れのグループで。隠しの画面は開いているときだけ）
+    const items = A.reduce((n, G2) => n + G2.items.filter((it) => !it[4]).length, 0);
+    const inMain = M.some(mainOn);
+    const here = inMain ? null : A.reduce((f, G2) => f || G2.items.find((it) => isOn(it[0])), null);
+    const sumB = A.reduce((n, G2) => n + G2.items.reduce((m, it) => m + (+bdgN(it[3]) || 0), 0), 0);
     const grp = (G2) => {
       const on = G2.items.some((it) => isOn(it[0]));
-      const closed = !!fold[G2.g]; // いま居るグループもたためる（押しても変わらない、をなくす）
-      return `<div class="rd-grp ${on ? "on" : ""}"><button type="button" class="rd-gh" data-rdfold="${esc(G2.g)}" aria-expanded="${!closed}"><span>${esc(G2.g)}</span>${I("chev", 14, 2.4)}</button>
-        ${closed ? "" : G2.items.filter((it) => !it[4] || isOn(it[0])).map((it) => `<button type="button" class="rd-ni" data-rdk="${esc(it[0])}" aria-current="${isOn(it[0])}">${I(it[2], 19)}<span>${esc(it[1])}</span>${bdg(it[3])}</button>`).join("")}</div>`;
+      return `<div class="rd-grp ${on ? "on" : ""}"><div class="rd-gl">${esc(G2.g)}</div>
+        ${G2.items.filter((it) => !it[4] || isOn(it[0])).map((it) => `<button type="button" class="rd-ni" data-rdk="${esc(it[0])}" aria-current="${isOn(it[0])}">${I(it[2], 19)}<span>${esc(it[1])}</span>${bdg(it[3])}</button>`).join("")}</div>`;
     };
     el.innerHTML = `<button type="button" class="rd-logo" data-rdk="${fwd ? "fhome" : "dash:home"}" aria-label="ホームへ"><img src="${IMG}logo.png" alt="貿易クラウド AI商社マン"></button>
       <div class="k-modechip">${I("bldg", 18)}<span>${fwd ? "物流会社向け" : "荷主向け"}</span></div>
-      <nav aria-label="メニュー">${A.map(grp).join("")}
-        <div class="rd-grp rd-grp-help"><button type="button" class="rd-ni" data-rdact="help">${I("help", 19)}<span>ヘルプ</span></button></div></nav>
+      <nav aria-label="メニュー"><div class="rd-mains">${main}</div>
+        <div class="rd-all ${open ? "open" : ""} ${here ? "on" : ""}">
+          <button type="button" class="rd-allh" data-rdall="1" aria-expanded="${open}" aria-controls="rdallb">${I("list", 19)}<span class="rd-allt">すべての機能<small>${items}</small></span>${!open && sumB ? `<span class="rd-bdg" title="未読・対応待ち">${esc(sumB)}</span>` : ""}${I("chev", 16, 2.4)}</button>
+          ${!open && here ? `<button type="button" class="rd-here" data-rdall="1">${I("pin", 14)}<span>いま：${esc(here[1])}</span></button>` : ""}
+          <div class="rd-allb" id="rdallb" ${open ? "" : "hidden"}>${A.map(grp).join("")}</div>
+        </div></nav>
       <div class="rd-sp"></div>
-      <button type="button" class="rd-start" data-rdact="help"><img src="${IMG}robot.png" alt=""><span><b>はじめての方へ<br>${fwd ? "14日で運用を始める" : "3分でわかる"}<br>スタートガイド<span class="rd-go">${I("chevR", 12, 3)}</span></b></span></button>
+      <button type="button" class="rd-start" data-rdact="quick"><img src="${IMG}robot.png" alt=""><span><b>はじめての方へ<br>3分でわかる<br>スタートガイド<span class="rd-go">${I("chevR", 12, 3)}</span></b><small>5つの手順で、使い方の流れだけ</small></span></button>
       <div class="rd-sftw"></div>`;
     // メニューの下の欄（トライアルの残り日数・検索のショートカット）は今の版のものをそのまま入れる
     const sft = $("#sft");
     if (sft) $(".rd-sftw", el).appendChild(sft);
   }
   function onSide(e) {
-    const f = e.target.closest("[data-rdfold]");
-    if (f) { const o = foldGet(); const g = f.getAttribute("data-rdfold"); o[g] = f.getAttribute("aria-expanded") === "true" ? 1 : 0; foldSet(o); buildSide(); return; }
+    const f = e.target.closest("[data-rdall]");
+    if (f) { allSet(!allGet()); buildSide(); const h = $("#rdside .rd-allh"); if (h) h.focus(); return; }
     const b = e.target.closest("[data-rdk],[data-rdact]");
     if (!b) return;
     const act = b.getAttribute("data-rdact");
-    if (act === "help") return openHelp();
+    if (act === "help") { if (document.body.classList.contains("navopen")) document.body.classList.remove("navopen"); return openHelp(); }
+    if (act === "quick") { if (document.body.classList.contains("navopen")) document.body.classList.remove("navopen"); return RD.quickGuide ? RD.quickGuide() : openHelp(); }
     const k = b.getAttribute("data-rdk");
     if (k) goKey(k);
     if (document.body.classList.contains("navopen")) document.body.classList.remove("navopen");

@@ -71,7 +71,8 @@
     }
     const help = document.createElement("div");
     help.className = "k-lghelp rd-x";
-    help.innerHTML = `<b>${I("help", 22)}はじめての方へ</b><a href="guide/" target="_blank" rel="noopener">${I("book", 18)}3分でわかるスタートガイド ${I("chevR", 16, 2.4)}</a><span class="k-hs">アカウントの発行・再有効化は、STANDAGE の担当までご連絡ください。</span>`;
+    // 11/12 大瀧さんのご意見：「3分でわかる」の先が55ページのガイドだった → 1枚の短い案内（5つの手順）を開く。くわしい版は別に残す
+    help.innerHTML = `<b>${I("help", 22)}はじめての方へ</b><button type="button" class="k-lgquick" data-rdquick="1">${I("book", 18)}3分でわかるスタートガイド ${I("chevR", 16, 2.4)}</button><a class="k-lgfull" href="guide/" target="_blank" rel="noopener">くわしい版（はじめてガイド・別のタブ）</a><span class="k-hs">アカウントの発行・再有効化は、STANDAGE の担当までご連絡ください。</span>`;
     v.appendChild(help);
   }
   const mo = new MutationObserver(() => { try { deco(); } catch (e) { console.error("[rd login]", e); } });
