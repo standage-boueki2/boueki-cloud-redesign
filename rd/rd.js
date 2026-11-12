@@ -192,7 +192,18 @@
     if (G("cur") === p && typeof render === "function") render(); else go(p); // eslint-disable-line no-undef
     try { window.scrollTo(0, 0); const st = $(".stage"); if (st) st.scrollTop = 0; } catch (e) { /* 無視 */ }
   }
-  function fGo(p) {
+  // No.364 の再発防止（11/12）：物流会社の画面の切り替えは、今のアプリの物流会社の画面（NAV_F）と fhome だけを受け付ける。
+  //   前は荷主用のキー（gloss など）もそのまま fwdCur に入れ、見出しと中身が食い違う画面になっていた。よく使う荷主用のキーは物流会社の画面に読み替える
+  const F_ALIAS = { ai: "fai", dash: "fhome", "dash:home": "fhome", inbox: "finbox", today: "fhome" };
+  function fKey(p) {
+    const k = F_ALIAS[p] || p;
+    const ok = k === "fhome" || NAV_F.some((g) => g.items.some((it) => it[0] === k));
+    if (!ok) console.warn("[rd] 物流会社の画面に無いキー（切り替えない）：", p);
+    return ok ? k : "";
+  }
+  function fGo(p0) {
+    const p = fKey(p0);
+    if (!p) return;
     RD._want = p;
     RD.fhome = p === "fhome";
     try { fwdCur = p === "fhome" ? "finbox" : p; } catch (e) { return; } // eslint-disable-line no-undef
@@ -849,6 +860,13 @@
 
   /* ───── 案件・出荷管理（デザイン案 d10）：状況ごとの列・選んだ案件・次のアクション ─────
      状況は、この画面の案件の欄（B/L・対応済み・荷主の状況）から。元の案件の欄はすべて下にそのまま */
+  // 案件の行の「日付 ・ 積み港 → 国 ・ 品目」から区間を取り出す。区間の中にも「・」が入る書き方（21.87 の「ロサンゼルス（アメリカ）・香港」など）があるので、
+  //   「 ・ 」（前後に空白）で区切った最初と最後の間を全部使う（No.356 の続き・11/12）
+  function routeOf(t) {
+    const a = t.indexOf(" ・ "), b = t.lastIndexOf(" ・ ");
+    if (a >= 0 && b > a) return t.slice(a + 3, b).trim();
+    return (t.split("・")[1] || "").trim();
+  }
   function caseInfo(w) {
     return $$("section.v33case", w).map((c, i) => {
       const h = $("h3", c); const no = (($(".v33mute", h) || {}).textContent || "").replace(/^案件\s*/, "").trim();
@@ -858,7 +876,7 @@
       const m = t.match(/対応済み\s*(\d+)\s*\/\s*(\d+)/);
       const done = m ? +m[1] : 0, all = m ? +m[2] : 0;
       const held = /仮押さえ/.test(t);
-      const items = $$(".v33li", c).map((li) => ({ id: (($("b", li) || {}).textContent || "").trim(), st: ($$(".v33lv", li).map((x) => x.textContent.trim()).find((s) => /^荷主：/.test(s)) || "").replace(/^荷主：/, ""), route: (($(".v33li-m .v33mute", li) || {}).textContent || "").split("・")[1] || "" }));
+      const items = $$(".v33li", c).map((li) => ({ id: (($("b", li) || {}).textContent || "").trim(), st: ($$(".v33lv", li).map((x) => x.textContent.trim()).find((s) => /^荷主：/.test(s)) || "").replace(/^荷主：/, ""), route: routeOf((($(".v33li-m .v33mute", li) || {}).textContent || "")) }));
       const stage = all && done >= all ? "done" : bl ? "ship" : held ? "held" : "quote";
       return { i, el: c, co, no, bl, done, all, held, items, stage, route: (items[0] && items[0].route.trim()) || "" };
     });

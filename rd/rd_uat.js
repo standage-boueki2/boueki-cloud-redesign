@@ -193,7 +193,7 @@
     const d = document.createElement("div");
     d.id = "k-tp"; d.setAttribute("role", "tooltip");
     const canAsk = !RD.locked() && !isAdmin() && !RD.isFwd();
-    d.innerHTML = `<b>${esc(x.n)}</b><p>${esc(x.s)}</p>${x.long ? `<details><summary>くわしく</summary><p class="k-tpl">${esc(x.long)}</p></details>` : ""}<div class="k-tpgo">${canAsk ? `<button type="button" class="k-link" data-kaskterm="${esc(x.k || key)}">${I("chat", 15)}AI商社マンに、うちの場合を聞く</button>` : ""}${RD.isFwd() ? "" : `<button type="button" class="k-link" data-kgloss="1">${I("book", 15)}用語集（貿易のことばの一覧）を開く</button>`}</div>`;
+    d.innerHTML = `<b>${esc(x.n)}</b><p>${esc(x.s)}</p>${x.long ? `<details><summary>くわしく</summary><p class="k-tpl">${esc(x.long)}</p></details>` : ""}<div class="k-tpgo">${canAsk ? `<button type="button" class="k-link" data-kaskterm="${esc(x.k || key)}">${I("chat", 15)}AI商社マンに、うちの場合を聞く</button>` : ""}<button type="button" class="k-link" data-kgloss="1">${I("book", 15)}用語集（貿易のことばの一覧）を開く</button></div>`; // 物流会社は一覧を窓で開く（rd_1112.js・No.364）
     document.body.appendChild(d);
     ab.setAttribute("aria-describedby", "k-tp");
     const r = ab.getBoundingClientRect(), Wd = Math.min(360, innerWidth - 24);
@@ -294,7 +294,7 @@
       <h2>ログインしています<span class="k-lgwsec">${sec}秒</span></h2>
       <ol class="k-lgwst"><li class="${s2 ? "ok" : "on"}">${s2 ? I("check", 16, 3) : '<i class="k-dot"></i>'}サーバーでアカウントを確かめる</li><li class="${s2 ? "on" : ""}">${s2 ? '<i class="k-dot"></i>' : '<i class="k-dot off"></i>'}貴社のデータ（商品・商談・やり取り）を読み込む</li><li>${'<i class="k-dot off"></i>'}ホームを開く</li></ol>
       <div class="k-lgwbar"><i></i></div>
-      <p>ふだん <b>15〜30秒</b>ほどかかります。データが多いと、もう少しかかります。この画面のままお待ちください。${sec > 60 ? "<br><b>時間がかかっています。</b>通信の状態を確かめて、1〜2分たっても進まないときは、ページを読み込み直してください。" : ""}</p></div></div>`;
+      <p>ふだん <b>30〜60秒</b>ほどかかります。データが多いと、もう少しかかります。この画面のままお待ちください。${sec > 90 ? "<br><b>時間がかかっています。</b>通信の状態を確かめて、2分たっても進まないときは、ページを読み込み直してください。" : ""}</p></div></div>`; // No.367（11/12）：前は「15〜30秒」・60秒で切り替え。実測は荷主・物流会社とも 40〜45秒（大半は同期サーバーの待ち）
     if (p.dataset.h !== html) { p.innerHTML = html; p.dataset.h = html; }
   }
   function codeNote() {

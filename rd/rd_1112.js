@@ -64,9 +64,59 @@
     const x = $(".k-qgx", d); if (x) x.focus();
   }
   RD.quickGuide = quickGuide;
+
+  /* ───────── No.364（11/12 回帰）：物流会社の「用語集」 ─────────
+     今のアプリの物流会社の画面には、用語集のページが無い。見出しの「用語集」・説明の窓の「一覧を開く」は goKey("gloss") を呼ぶので、
+     物流会社では fwdCur が "gloss" になり、見出しだけ「用語集」で中身は見積受信箱が描かれていた
+     → 物流会社では、用語の一覧（説明つき・言葉で探せる）を、この画面の上の窓で開く。荷主は今のアプリの用語集のページのまま */
+  let glBack = null;
+  function glClose() {
+    const d = document.getElementById("k-gl"); if (!d) return;
+    d.remove();
+    document.documentElement.classList.remove("k-qgon");
+    if (glBack && document.contains(glBack)) { try { glBack.focus(); } catch (e) { /* 無視 */ } }
+    glBack = null;
+  }
+  function glList() {
+    const D = RD.termDict ? RD.termDict() : {};
+    const seen = new Set(), L = [];
+    Object.keys(D).forEach((k) => { const x = D[k]; if (!x || !x.s) return; const n = x.n || k; const id = n + "\n" + x.s; if (seen.has(id)) return; seen.add(id); L.push({ n, s: x.s, long: x.long || "" }); });
+    return L.sort((a, b) => a.n.localeCompare(b.n, "ja"));
+  }
+  function glossFwd() {
+    glClose(); qgClose();
+    const L = glList();
+    glBack = document.activeElement;
+    const d = document.createElement("div");
+    d.id = "k-gl"; d.className = "k-qg k-gl rd-x";
+    d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true"); d.setAttribute("aria-labelledby", "k-glt");
+    d.innerHTML = `<div class="k-qgbox">
+      <button type="button" class="k-qgx" data-glclose="1" aria-label="閉じる">${I("x", 22, 2.4)}</button>
+      <div class="k-glhd"><span class="k-qgi">${I("book", 24, 1.9)}</span><div><h2 id="k-glt">用語集（貿易のことばの一覧）</h2><p>画面に出てくる貿易の言葉を、やさしく説明します（${L.length}語）。画面の点線の言葉は、押すとその場で説明が出ます。</p></div></div>
+      <label class="k-glq">${I("search", 18)}<input type="search" id="k-glq" placeholder="言葉で探す（例：FOB、B/L、通関）" autocomplete="off" aria-label="言葉で探す"></label>
+      <p class="k-gln" id="k-gln" aria-live="polite"></p>
+      <ul class="k-gll" id="k-gll">${L.map((x) => `<li data-q="${esc((x.n + " " + x.s + " " + x.long).toLowerCase())}"><b>${esc(x.n)}</b><p>${esc(x.s)}</p>${x.long ? `<details><summary>くわしく</summary><p>${esc(x.long)}</p></details>` : ""}</li>`).join("")}</ul>
+      <div class="k-qgft"><div class="k-qgfb"><span></span><button type="button" class="k-btn" data-glclose="1">${I("check", 17, 2.6)}閉じる</button></div></div>
+    </div>`;
+    document.body.appendChild(d);
+    document.documentElement.classList.add("k-qgon");
+    const q = $("#k-glq", d);
+    q.addEventListener("input", () => {
+      const v = q.value.trim().toLowerCase(); let n = 0;
+      $$("#k-gll li", d).forEach((li) => { const hit = !v || li.dataset.q.includes(v); li.hidden = !hit; if (hit) n++; });
+      $("#k-gln", d).textContent = v ? (n ? `${n}語が見つかりました` : "見つかりませんでした。英字・カタカナなど、別の書き方でも探せます。わからないときは「AIに聞く」で聞けます。") : "";
+    });
+    q.focus();
+  }
+  RD.glossFwd = glossFwd;
+  const goKey1 = RD.goKey;
+  RD.goKey = function (k) { if (k === "gloss" && !RD.locked() && !isAdmin() && RD.isFwd()) { glossFwd(); return; } return goKey1.apply(this, arguments); };
+
   document.addEventListener("click", (e) => {
     const q = e.target.closest && e.target.closest("[data-rdquick]");
     if (q) { e.preventDefault(); e.stopPropagation(); quickGuide(); return; }
+    const gd = document.getElementById("k-gl");
+    if (gd && (e.target === gd || (e.target.closest && e.target.closest("[data-glclose]")))) { e.preventDefault(); glClose(); return; }
     const d = document.getElementById("k-qg"); if (!d) return;
     if (e.target === d || (e.target.closest && e.target.closest("[data-qgclose]"))) { e.preventDefault(); qgClose(); return; }
     const g = e.target.closest && e.target.closest("[data-qggo]");
@@ -75,10 +125,10 @@
     if (h) { e.preventDefault(); qgClose(); if (RD.openHelp) RD.openHelp(); }
   }, true);
   document.addEventListener("keydown", (e) => {
-    const d = document.getElementById("k-qg"); if (!d) return;
-    if (e.key === "Escape") { e.preventDefault(); qgClose(); return; }
+    const d = document.getElementById("k-qg") || document.getElementById("k-gl"); if (!d) return;
+    if (e.key === "Escape") { e.preventDefault(); if (d.id === "k-gl") glClose(); else qgClose(); return; }
     if (e.key === "Tab") { // 窓の中だけを回る
-      const f = $$("button, a[href]", d).filter((x) => x.getClientRects().length);
+      const f = $$("button, a[href], input, summary", d).filter((x) => x.getClientRects().length);
       if (!f.length) return;
       const i = f.indexOf(document.activeElement);
       if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }

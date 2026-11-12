@@ -31,7 +31,21 @@
     }
     PUT.forEach(([sel, z]) => { const x = document.querySelector(sel); const t = dd.querySelector(`[data-z="${z}"]`); if (x && t && x.parentElement !== t) t.appendChild(x); if (x) { x.classList.remove("hm"); /* hidden はアプリの決めのまま（No.361） */ } });
     // 区切りが空なら見出しごと隠す（物流会社・管理者は商品の切り替えが無い）
-    dd.querySelectorAll(".k-ddr").forEach((r) => { const h = r.previousElementSibling; const has = r.children.length > 0; r.style.display = has ? "" : "none"; if (h && h.tagName === "H4") h.style.display = has ? "" : "none"; });
+    // No.369（11/12）：部品が入っていても、今のアプリが隠している部品（hidden・表示なし・選択肢の無い切り替え）だけなら空と見なす。
+    //   前は「部品が入っているか」だけを見ていたので、荷主の「表示」（やさしい説明はアプリが隠す）と、物流会社・管理者の空の商品の切り替えが出ていた
+    const shown = (k) => !k.hidden && getComputedStyle(k).display !== "none" && !(k.tagName === "SELECT" && !k.options.length);
+    const on = {};
+    dd.querySelectorAll(".k-ddr").forEach((r) => { const h = r.previousElementSibling; const has = Array.from(r.children).some(shown); on[r.dataset.z] = has; r.style.display = has ? "" : "none"; if (h && h.tagName === "H4") h.style.display = has ? "" : "none"; });
+    const psw = document.getElementById("psw");
+    const ha = dd.querySelector('[data-z="a"]'); const h4a = ha && ha.previousElementSibling;
+    if (h4a && h4a.tagName === "H4") { const t = psw && shown(psw) ? "表示している会社・商品（切り替え）" : "表示している会社"; if (h4a.textContent !== t) h4a.textContent = t; }
+    const note = dd.querySelector(".k-ddnote");
+    if (note) {
+      const parts = [on.a && psw && shown(psw) ? "会社・商品の切り替え" : "", on.b ? "新しい会社の商品の登録" : "", on.c ? "やさしい説明" : "", on.d ? "ログアウト" : ""].filter(Boolean);
+      const t = parts.length ? `このボタンの中に、${parts.join("、")}があります。` : "";
+      if (note.textContent !== t) note.textContent = t;
+      note.style.display = t ? "" : "none";
+    }
     const S = RD.G("SES") || {};
     const nm = S.t === "admin" ? "STANDAGE 管理者" : RD.coName() || "会社・商品";
     co.innerHTML = `${I(S.t === "admin" ? "gear" : "bldg", 20)}<span>${esc(nm)}</span>${I("chev", 16)}`;
