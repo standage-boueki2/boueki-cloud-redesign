@@ -473,7 +473,15 @@
     return F.filter((r) => r && c.named && String(r.b || "").trim() === c.name).sort((a, b) => String(b.d || "").localeCompare(String(a.d || "")));
   }
   const tShort = (m) => { const s = String((m && m.t) || ""); const y = String(new Date().getFullYear()); const x = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}:\d{2}))?/); if (!x) return s || md(msgAt(m)); return (x[1] === y ? "" : x[1] + "/") + (+x[2]) + "/" + (+x[3]) + (x[4] ? " " + x[4] : ""); };
-  const langAttr = (c, m) => { if (m && m.w === "me" && /[ぁ-ん]/.test(String(m.body || "").slice(0, 200))) return "ja"; const L = { English: "en", 日本語: "ja", 繁體中文: "zh-Hant", 简体中文: "zh-Hans", Español: "es", 한국어: "ko", Français: "fr", Deutsch: "de", ไทย: "th", "Tiếng Việt": "vi", "Bahasa Indonesia": "id" }; return /[ぁ-ん]/.test(String((m && m.body) || "").slice(0, 200)) ? "ja" : L[c.lang] || "en"; };
+  // 文の言語：かなが一定の割合（8%）より多ければ日本語。少なければ相手の言語（中国語の文に会社名の「みなと」が入るなど、かなが少しだけ混じる文は日本語にしない）
+  const langAttr = (c, m) => {
+    const s = String((m && (m.body || m.subj)) || "").slice(0, 400).replace(/\s+/g, "");
+    const kana = (s.match(/[ぁ-んァ-ヶー]/g) || []).length;
+    if (s && kana / s.length > 0.08) return "ja";
+    const L = { English: "en", 日本語: "ja", 繁體中文: "zh-Hant", 简体中文: "zh-Hans", Español: "es", 한국어: "ko", Français: "fr", Deutsch: "de", ไทย: "th", "Tiếng Việt": "vi", "Bahasa Indonesia": "id" };
+    const l = L[c.lang] || "en";
+    return l === "ja" ? (/[一-鿿]/.test(s) && !kana ? "zh" : "en") : l; // 相手の言語が日本語なのに、かなの少ない文＝英語か中国語
+  };
   function caseView(w) {
     const L = allCases();
     const c = L.find((x) => x.key === RD.caseKey) || L.find((x) => x.id === String(RD.caseKey || "").split("|")[1]);

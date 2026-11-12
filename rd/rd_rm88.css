@@ -1,0 +1,21 @@
+/* 刷新版：21.88 目標と道筋・AI商社マンからの提案（rd_rm88.js） */
+html.rd .k-rm88{margin:0 0 16px}
+html.rd .k-rm88 .v88prop{background:linear-gradient(180deg,#EAF2FB,#fff 80%);border:1px solid #CFE0F5;border-radius:var(--rd-r,16px);box-shadow:var(--rd-sh);padding:16px 20px;margin:0 0 12px}
+html.rd .k-rm88 .v88prop-t{font-size:17px;font-weight:800;color:var(--rd-ink)}
+html.rd .k-rm88 .v88ul li{font-size:14px;color:var(--rd-ink2)}
+html.rd .k-rm88 .v88badge{background:#fff;border:1px solid #CFE0F5;color:var(--rd-bl)}
+html.rd .k-rm88g{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--rd-line);border-radius:var(--rd-r,16px);box-shadow:var(--rd-sh);padding:12px 16px}
+html.rd .k-rm88i{font-size:24px;line-height:1}
+html.rd .k-rm88t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+html.rd .k-rm88t b{font-size:16px;color:var(--rd-ink)}
+html.rd .k-rm88t span{font-size:13px;color:var(--rd-ink2)}
+html.rd .k-rm88f{font-style:normal;font-weight:700}
+html.rd .k-rm88f-good{color:var(--rd-good)}html.rd .k-rm88f-warn{color:var(--rd-warn)}html.rd .k-rm88f-crit{color:var(--rd-crit)}
+html.rd .well .v88card,html.rd .well .v88form,html.rd .well .v88prop{border-radius:var(--rd-r,16px)}
+html.rd .well .v88kpi{border-color:var(--rd-line);border-radius:var(--rd-r2,12px)}
+html.rd .well .v88kpi b{font-size:21px}
+@media (max-width:820px){
+  html.rd .k-rm88g{flex-wrap:wrap}
+  html.rd .k-rm88g .btn{width:100%}
+  html.rd .k-rm88 .v88prop{padding:14px}
+}
