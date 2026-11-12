@@ -103,8 +103,8 @@
     [["HS コード", "HSコード"], ["仕向け地", "仕向地"], ["原産地証明", "原産地証明書"]].forEach(([a, k]) => { if (M[k] && !M[a]) M[a] = Object.assign({}, M[k], { k: a }); }); // 書き方の揺れ
     const er = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
     const keys = Object.keys(M).sort((a, b) => b.length - a.length);
-    // 英字の語は前後が英数字でないときだけ（「FOB/CIF」の FOB・CIF も拾う）
-    TERM_RE = new RegExp(keys.map((k) => (/^[A-Za-z0-9/]+$/.test(k) ? `(?<![A-Za-z0-9])${er(k)}(?![A-Za-z0-9])` : er(k))).join("|"), "g");
+    // 英字の語は前が英数字でなく、後ろが英字でないときだけ（「FOB/CIF」の FOB・CIF、「MOQ300本」の MOQ も拾う）
+    TERM_RE = new RegExp(keys.map((k) => (/^[A-Za-z0-9/]+$/.test(k) ? `(?<![A-Za-z0-9])${er(k)}(?![A-Za-z])` : er(k))).join("|"), "g");
     TERM = M;
     return M;
   }
