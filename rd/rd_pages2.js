@@ -205,6 +205,9 @@
     try { W = typeof CTY_W !== "undefined" && CTY_W ? CTY_W : null; } catch (e) { W = null; } // eslint-disable-line no-undef
     W = W || { mkt: 35, reg: 25, comp: 20, base: 20 };
     const oNote = String((S0.ai && S0.ai.orderNote) || "").trim();
+    // No.365（21.87）：今の版が総評の下に出す「FOB価格帯（登録の価格表）」の1行を、おすすめのカードにも同じ文で写す（今の版の行はそのまま残る）
+    const fobEl = $$("[data-v87fob]", w).find((x) => !x.closest(".rd-x"));
+    const fobT = fobEl ? fobEl.textContent.replace(/\s+/g, " ").trim() : "";
     const ai = byText(w, /おまかせ/);
     const boxes = () => orig(w, "input[data-ctypick]");
     const box = (c) => boxes().find((x) => x.dataset.ctypick === c);
@@ -254,7 +257,7 @@
             <div class="k-ctyrank">総合点の順位：<b>${N}か国中 ${rankOf(r.c)}位</b></div>
             <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px">${AX.map((a) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;padding:6px 10px;border-radius:10px;background:#F4F8FD;white-space:nowrap" title="${a[1]}：${esc(lvTxt(a[0], s[a[0]]))}"><small style="font-size:12.5px;font-weight:800;color:var(--k-ink2)">${a[1]}</small><b style="font-size:14px;color:${(s[a[0]] || 0) >= 80 ? "var(--k-gr)" : (s[a[0]] || 0) >= 60 ? "var(--k-am)" : "var(--k-rd)"}">${esc(Math.round(s[a[0]] || 0))}</b></div>`).join("")}</div>
             ${r.why ? `<p style="margin:0 0 10px;font-size:12.5px;font-weight:600;color:#2A3B54;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden" title="${esc(r.why)}">${esc(r.why)}</p>` : ""}
-            <button type="button" class="k-btn ${on ? "" : "white"} wide" data-rdcty="${esc(r.c)}" title="${on ? "押すと外します" : "押すと選びます（3か国まで）"}" ${act(() => toggle(r.c))}>${I(on ? "check" : "plus", 18, 2.6)}${on ? "選択中（押すと外す）" : "選択する"}</button></div>`; }).join("")}</div>` })}
+            <button type="button" class="k-btn ${on ? "" : "white"} wide" data-rdcty="${esc(r.c)}" title="${on ? "押すと外します" : "押すと選びます（3か国まで）"}" ${act(() => toggle(r.c))}>${I(on ? "check" : "plus", 18, 2.6)}${on ? "選択中（押すと外す）" : "選択する"}</button></div>`; }).join("")}</div>${fobT ? `<p class="k-ctyfob" data-rdfob="1">${I("chart", 16, 2.4)}<span>${esc(fobT)}</span></p>` : ""}` })}
         ${card({ ic: "chart", t: "主要指標の比較", b: radar(rec) + `<table class="rd-tbl" style="margin-top:10px"><thead><tr><th>国</th><th style="text-align:right">総合スコア</th><th style="text-align:right">総合点の順位</th></tr></thead><tbody>${rec.map((r) => `<tr><td>${flag(r.c, 16)} <b>${esc(r.c)}</b></td><td style="text-align:right"><b style="font-size:22px;color:#E06A06">${esc(Math.round((r.sc || {}).total || 0))}</b></td><td style="text-align:right;font-weight:800">${N}か国中 ${rankOf(r.c)}位</td></tr>`).join("")}</tbody></table><p class="rd-note" style="margin-top:8px">点数は0〜100点の目安（高いほど有利）。配点は市場性${esc(W.mkt)}・規制${esc(W.reg)}・競合${esc(W.comp)}・拠点${esc(W.base)}。${byAI ? "おすすめは、AI商社マンが点数に加えて商品の特性で決めています。" : ""}</p>` })}
       </div>
       ${O ? `<section class="k-card" id="k-ctyorder" style="margin-bottom:18px;border-left:5px solid var(--k-or)">

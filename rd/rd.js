@@ -138,7 +138,9 @@
   /* ───── 画面ごとの見出し ───── */
   const HERO = {
     "dash:rep": ["分析・レポート", "商談の進み具合・国ごとの手応え・タスクを、データでまとめています。"],
-    today: ["今日やること", "AI商社マンが、今日やることを大事な順に並べました。"],
+    "dash:case": ["案件の詳細", "この案件のやりとり・タスク・書類・商談の記録を、1画面で見られます。"],
+    "dash:prod": ["商品", "登録した商品の一覧です。商品ごとに、販売先国・準備の進み・案件の数を見られます。押すと、その商品に切り替わります。"],
+    today: ["タスク（今日やること）", "AI商社マンが、今日やることを大事な順に並べました。タスクの一覧（期限・担当）も、この画面の下と「タスク・進行」で見られます。"],
     inbox: ["受信箱", "バイヤー・メンバー・AI商社マンからの知らせと、確認待ちをまとめています。"],
     ai: ["AI商社マンに相談", "貴社の商品・商談・規制を覚えたAI商社マンに、何でも相談できます。"],
     up: ["商品情報を登録", "輸出したい商品の資料をアップロードするだけ。AIが読み取り、足りない情報だけ質問します。"],
@@ -862,7 +864,10 @@
      状況は、この画面の案件の欄（B/L・対応済み・荷主の状況）から。元の案件の欄はすべて下にそのまま */
   // 案件の行の「日付 ・ 積み港 → 国 ・ 品目」から区間を取り出す。区間の中にも「・」が入る書き方（21.87 の「ロサンゼルス（アメリカ）・香港」など）があるので、
   //   「 ・ 」（前後に空白）で区切った最初と最後の間を全部使う（No.356 の続き・11/12）
+  //   21.87 の行は「日付 ・ 区間 ・ 品目」で、日付や品目が無い行は空のまま詰めるため、まず「→」のある区切りを区間とする
   function routeOf(t) {
+    const seg = String(t || "").split(" ・ ").find((x) => x.indexOf("→") >= 0);
+    if (seg) return seg.trim();
     const a = t.indexOf(" ・ "), b = t.lastIndexOf(" ・ ");
     if (a >= 0 && b > a) return t.slice(a + 3, b).trim();
     return (t.split("・")[1] || "").trim();
@@ -955,9 +960,11 @@
           let lv = null;
           try { lv = typeof aiLevel === "function" ? aiLevel() : null; } catch (e) { lv = null; } // eslint-disable-line no-undef
           const chip = lv ? `<button type="button" class="k-lvchip" data-rdk="ai" title="AI商社マンの成長レベル（押すと AI商社マンの画面へ）"><img src="${IMG}robot.png" alt="" style="width:40px;height:auto"><span><small>AI商社マンの成長</small><span style="font-weight:800">Lv.${esc(lv.lv)} ${esc(lv.stage)}</span></span><b>${esc(lv.pct)}<small style="display:inline;font-size:13px">%</small></b></button>` : "";
-          putHero(w, greet(), "AI商社マンが、貴社の海外展開をサポートします。", chip);
+          // 11/12 三井さんのご意見：ホーム＝案件一覧（rd_case.js の RD.homeView）。無い版では前のホーム
+          if (RD.homeView) putHero(w, "案件", "1行が1つの案件（バイヤーとの商談）です。相手の最新メッセージの順に並びます。行を押すと、やりとり・タスク・書類・商談の記録を1画面で見られます。☆でお気に入り、上のタブで絞り込みます。", chip);
+          else putHero(w, greet(), "AI商社マンが、貴社の海外展開をサポートします。", chip);
           const cb = $(".k-lvchip", w); if (cb) cb.addEventListener("click", () => goKey("ai"));
-          homeShipper(w);
+          if (RD.homeView) { try { RD.homeView(w); } catch (e) { console.error("[rd] homeView", e); homeShipper(w); } } else homeShipper(w);
         }
         else {
           const h = HERO[k] || HERO[k.split(":")[0]] || [((G("PAGES") || []).find((p) => p.id === k.split(":")[0]) || {}).nm || "", ""];

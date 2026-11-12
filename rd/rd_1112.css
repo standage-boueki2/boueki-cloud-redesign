@@ -120,3 +120,6 @@ html.rd .k-dd .k-ddr > [hidden], html.rd .k-dd .k-ddr > select:not(:has(option))
   .k-glhd h2{font-size:20px;word-break:keep-all}
   .k-glhd .k-qgi{display:none}
 }
+/* No.365（21.87・11/12）：販売先国のおすすめのカードに、今の版の「FOB価格帯（登録の価格表）」の1行を写す */
+html.rd .k-ctyfob{display:flex;align-items:flex-start;gap:8px;margin:14px 0 0;padding:10px 14px;border-radius:10px;background:#F4F8FD;border:1px solid #D5E3F3;color:#14223A;font-size:14px;font-weight:700;line-height:1.7;overflow-wrap:anywhere}
+html.rd .k-ctyfob svg{flex:none;margin-top:3px;color:var(--k-bl)}
