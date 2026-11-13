@@ -1,0 +1,12 @@
+/* 21.89 cty の刷新版の層：No.371 カードの「バイヤー数」の行・以前の数え方の知らせ／No.372 フェーズと期間の区切り／No.375 チーム概要の内訳 */
+html.rd .k-v89buy{display:flex;gap:6px;align-items:flex-start;margin:0 0 10px;padding:7px 10px;border-radius:10px;background:#F4F8FD;font-size:12.5px;font-weight:600;line-height:1.55;color:#2A3B54}
+html.rd .k-v89buy svg{flex:none;margin-top:2px;color:var(--k-bl,#1F6FD1)}
+html.rd .k-v89buy b{display:block;font-size:12px;font-weight:800;color:var(--k-ink2,#46566D)}
+html.rd .k-v89old{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;padding:14px 18px;border-left:5px solid var(--k-am,#C98A00)}
+html.rd .k-v89old > div{flex:1;min-width:240px}
+html.rd .k-v89old p{margin:4px 0 0;font-size:13px;font-weight:600;line-height:1.7;color:#2A3B54}
+html.rd .k-v89oi{color:var(--k-am,#C98A00);display:inline-flex}
+.v89cty-per{color:var(--ink-2,#46566D);font-size:12px;font-weight:600}
+.v89cty-me{display:inline;margin-left:3px;font-size:11px;font-weight:600}
+html.rd .k-v89ts{white-space:normal;line-height:1.5}
+@media (max-width:600px){ html.rd .k-v89old{padding:12px 14px} html.rd .k-v89old .k-btn{width:100%;justify-content:center} }
