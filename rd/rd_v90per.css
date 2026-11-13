@@ -1,0 +1,37 @@
+/* 21.90 per（ペルソナ評価 第4回の横断の課題）：案件一覧の「業種を変えて試す」・ほかの会社の札・見本の完成形の案内・ゆったりの文字 */
+html.rd .k-pill.k-v90persmp{border-style:dashed;border-color:var(--k-bl-line,#C9DDF6);background:#fff;color:#1B5DB0}
+html.rd .k-pill.k-v90persmp:hover{border-style:solid;border-color:var(--k-bl,#1F6FD1);background:#F4F9FF}
+html.rd .k-v90perco{display:inline-flex;align-items:center;gap:4px;margin:4px 0 0;padding:1px 8px;border-radius:999px;background:#EEF2F7;color:#33445C;font:700 12px/1.6 "Noto Sans JP",sans-serif;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.rd td.c-who .k-v90perco{display:flex;width:max-content}
+html.rd .k-v90perconote{display:flex;align-items:flex-start;gap:8px;margin:0;padding:10px 18px;border-top:1px solid var(--k-line,#E3EAF3);background:#F8FBFE;color:#33445C;font:700 13.5px/1.6 "Noto Sans JP",sans-serif}
+html.rd .k-v90perconote svg{flex:none;margin-top:3px;color:#5A6B82}
+html.rd .k-v90perdemo{margin:0 0 14px;padding:12px 14px;border:1px solid var(--k-bl-line,#C9DDF6);border-radius:12px;background:#F4F9FF}
+html.rd .k-v90perdemo p{display:flex;gap:8px;align-items:flex-start;margin:0 0 10px!important;color:#1B3F70!important;font:700 14px/1.6 "Noto Sans JP",sans-serif!important}
+html.rd .k-v90perdemo p svg{flex:none;margin-top:3px;color:#1F6FD1}
+html.rd .k-v90perdemo p b{font-size:inherit!important;font-weight:900;margin:0 2px}
+html.rd .k-v90perdemob{display:flex;flex-wrap:wrap;gap:8px}
+html.rd .k-v90perdemob .k-btn{display:inline-flex;align-items:center;gap:6px}
+
+/* ④ 文字の大きさ「ゆったり」：案件一覧の小さな字を 14px 以上に（.stage の zoom 1.12 と合わせて約 15.7px） */
+html.rd body.dens-comfy .k-cltbl td.c-who small,
+html.rd body.dens-comfy .k-cltbl .k-lt,
+html.rd body.dens-comfy .k-cltbl td.c-nx small,
+html.rd body.dens-comfy .k-cltbl thead th,
+html.rd body.dens-comfy .k-v90perco,
+html.rd body.dens-comfy .k-pill .k-pn,
+html.rd body.dens-comfy .k-stc{font-size:14px}
+html.rd body.dens-comfy .k-cltbl td.c-who b,
+html.rd body.dens-comfy .k-cltbl td.c-nx span,
+html.rd body.dens-comfy .k-cltbl td.c-cty span,
+html.rd body.dens-comfy .k-pill{font-size:15.5px}
+html.rd body.dens-comfy .k-cltbl .k-who{font-size:13px}
+html.rd body.dens-comfy .k-cltbl thead th{font-size:14px!important} /* アプリの th{font-size:12px!important} に勝つため（ゆったりのときだけ） */
+
+@media (max-width:820px){
+  html.rd .k-v90perconote{padding:10px 12px;font-size:13px}
+  html.rd .k-v90perdemob .k-btn{flex:1 1 100%;justify-content:center;min-height:44px}
+  html.rd .k-pill.k-v90persmp{min-height:44px}
+  /* スマホの札の段は横に流す作り（rd_case.css）。見本を表示しているときだけ折り返して、右に隠れないように */
+  html.rd .k-pills:has(.k-v90persmp){flex-wrap:wrap;overflow-x:visible}
+  html.rd .k-pills:has(.k-v90persmp) .k-pill{max-width:100%;white-space:normal;text-align:left}
+}

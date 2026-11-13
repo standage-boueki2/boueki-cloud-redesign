@@ -1,0 +1,43 @@
+/* 貿易クラウドAI商社マン 21.90 adm（刷新版の管理コンソール・2026-11-13 No.402・404・405・409・412・413・416） */
+
+/* 402 刷新版には上に固定の帯（.bar）が無い：タブの帯は画面のいちばん上に付ける（48px の隙間から下の本文が透けない） */
+html.rd .well .v84at{top:0!important;z-index:6}
+
+/* 404 アカウント一覧：横に動かせる表・右端の「無効化」「詳細」はいつも見える・会社名は字ごとに折らない */
+html.rd .well #accounts .tw{overflow-x:auto!important;overscroll-behavior-x:contain;scrollbar-width:auto;scrollbar-color:#9FB3CC #EEF3F9}
+html.rd .well #accounts .tw::-webkit-scrollbar{height:12px}
+html.rd .well #accounts .tw::-webkit-scrollbar-thumb{background:#9FB3CC;border-radius:8px}
+html.rd .well #accounts .tw::-webkit-scrollbar-track{background:#EEF3F9;border-radius:8px}
+@media (min-width:700px){
+  html.rd .well #accounts table td:last-child,html.rd .well #accounts table th:last-child{position:sticky;right:0;z-index:2;background:#fff;box-shadow:-10px 0 12px -10px rgba(19,35,59,.35)}
+  html.rd .well #accounts table thead th:last-child{background:#F4F8FD;z-index:3}
+}
+html.rd .well #accounts table td:nth-child(2){min-width:11.5em;word-break:auto-phrase}
+html.rd .well #accounts table td:first-child .acode{white-space:nowrap}
+html.rd .well #accounts .v90hs{display:flex;align-items:center;gap:8px;margin:8px 0 0;font-size:12.5px;font-weight:700;color:#33507A}
+html.rd .well #accounts .v90hs svg{flex:none}
+html.rd .well #accounts tr.v90duprow td:first-child{box-shadow:inset 3px 0 0 #F0A04B}
+
+/* 405・412・416 語の途中で折らない（日本語の文節で折り返す）・左下の Ctrl+K の案内が切れない */
+html.rd.v90adm #nav .nb,html.rd.v90adm #nav .nb span,html.rd.v90adm .side,html.rd.v90adm #pn,html.rd.v90adm #pn p,html.rd.v90adm #pn h1,html.rd.v90adm #pn h3,
+html.rd.v90adm .well h2,html.rd.v90adm .well h3,html.rd.v90adm .well .k-hs,html.rd.v90adm .k-aahd .rd-ht p,html.rd.v90adm .k-aahd .rd-ht h1{word-break:auto-phrase;line-break:strict;overflow-wrap:anywhere}
+html.rd.v90adm #pn{overflow-x:hidden}
+html.rd.v90adm #pn .dwbody,html.rd.v90adm #pn .v33ntbar{min-width:0;max-width:100%;box-sizing:border-box}
+html.rd.v90adm .k-aahd .rd-ht{min-width:0}
+html.rd.v90adm .side .uxhint{display:inline-block;word-break:auto-phrase;line-height:1.5}
+html.rd.v90adm .side{padding-bottom:18px;box-sizing:border-box}
+
+/* 409 利用の推移：日付の文字を棒の幅に収める（重なって棒とずれて見えない） */
+html.rd .well #admspark svg text{font-size:7px!important;letter-spacing:-.2px}
+
+/* 413 AIエンジン設定：「モデル上書き（任意）」の欄を「自動（最上位モデル）」が切れない幅に */
+html.rd .well [data-v84sec="eng"] table td:nth-child(3) input{min-width:15.5em;width:100%;box-sizing:border-box}
+html.rd .well [data-v84sec="eng"] table td:nth-child(2) input{min-width:9em}
+
+/* 414・406・435 */
+html.rd .well .v90done{font-size:13px;border-radius:10px}
+html.rd .well .v90busy{font-size:13px;border-radius:10px}
+html.rd .well .v90cnt{font-size:12px}
+html.rd #v82kbHist li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+html.rd #v82kbHist .v90kbrs{white-space:nowrap}
+html.rd .well .v90v1why{font-size:13px}

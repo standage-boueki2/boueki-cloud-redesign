@@ -1,0 +1,11 @@
+/* 21.90 reg の刷新版の層：No.346（たたんでも進み具合）・No.445（作れるもの）・No.441（提供の時期） */
+html.rd #aiThink.k-mini.k-v90 .atm{display:block;font-size:11px;line-height:1.5;margin-top:2px;max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.rd #aiThink.k-mini.k-v90 .atbar{display:block;margin-top:4px}
+html.rd #aiThink.k-mini.k-v90 .atc{align-items:flex-start}
+html.rd .k-v90note{text-align:left!important}
+html.rd .k-v90cando{display:grid;gap:4px;font-size:12.5px;line-height:1.6}
+html.rd .k-v90cando .ok{color:var(--k-gr,#1a7f37)}
+html.rd .k-v90cando .ng{color:#C25600}
+html.rd .k-v90when{font-size:12.5px;color:#5A6B82;margin-top:4px}
+html.rd .v90reg-s7{border-radius:12px}
+@media (max-width:600px){html.rd #aiThink.k-mini.k-v90 .atm{max-width:62vw}}

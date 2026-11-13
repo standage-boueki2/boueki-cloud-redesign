@@ -1,0 +1,6 @@
+/* 21.90 i18n（No.394）：英語など日本語以外のとき、左のメニューの名前を「…」で切らずに折り返す。数と単位の間をあける */
+html.rd:not([lang|="ja"]) #rdside .rd-ni span,
+html.rd:not([lang|="ja"]) #rdside .rd-here span,
+html.rd:not([lang|="ja"]) #rdside .rd-allt{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;overflow-wrap:anywhere}
+html.rd:not([lang|="ja"]) #rdside .rd-ni{height:auto;min-height:40px;padding-top:6px;padding-bottom:6px}
+/* 単位の前の空きは文字の空白で入れる（small.v90u） */
