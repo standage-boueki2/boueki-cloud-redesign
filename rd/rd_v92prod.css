@@ -1,0 +1,17 @@
+/* 21.92 prod：充足度のドーナツ（真ん中＝入っている数/全体・下に % か「任意 あと N件」） */
+html.rd .k-ring.v92prod-ring > span,html.rd .rd-ring.v92prod-ring > span{flex-direction:column;gap:2px;line-height:1.1}
+html.rd .v92prod-ring .v92prod-rn{font-size:26px;font-weight:900;color:var(--k-ink,#14233A);letter-spacing:-.5px}
+html.rd .v92prod-ring .v92prod-rn small{font-size:14px;font-weight:800;color:var(--k-ink2,#4A5B72)}
+html.rd .v92prod-ring .v92prod-rs{font-style:normal;font-size:12px;font-weight:800;color:var(--k-ink2,#4A5B72);text-align:center;padding:0 4px}
+html.rd .rd-ring.v92prod-ring .v92prod-rn{font-size:22px}
+html.rd .rd-ring.v92prod-ring .v92prod-rs{font-size:11px}
+html.rd .k-ring.v92prod-optleft .v92prod-rs,html.rd .rd-ring.v92prod-optleft .v92prod-rs{color:#B85300}
+html.rd .k-ring.v92prod-done{--c:var(--k-gr,#14995A);background:conic-gradient(var(--c) calc(var(--p)*1%),#DDF3E6 0)}
+html.rd .rd-ring.v92prod-done{background:conic-gradient(var(--k-gr,#14995A) calc(var(--p)*1%),#DDF3E6 0)}
+html.rd .k-ring.v92prod-done .v92prod-rs,html.rd .rd-ring.v92prod-done .v92prod-rs{color:var(--k-gr,#14995A)}
+html.rd .k-ck .v92prod-optli small{font-size:11px;font-weight:700;color:var(--k-ink3,#6B7A90);margin-left:2px}
+html.rd .k-v92note{margin:8px 0 0;font-size:12.5px;font-weight:600;color:var(--k-ink2,#4A5B72);line-height:1.6}
+html.rd .v92prod-qd{gap:8px}
+html.rd .v92prod-qd .btn{min-height:36px;font-size:13px}
+@media (max-width:600px){html.rd .v92prod-qd .btn{flex:1 1 calc(50% - 8px)}}
+html.rd .k-chip .v92prod-hsg{font-size:11.5px;font-weight:800;color:#B85300;margin-left:2px}

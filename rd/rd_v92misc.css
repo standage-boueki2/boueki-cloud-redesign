@@ -1,0 +1,9 @@
+/* 21.92 misc の刷新版の見た目：R-9 用語集への入口（左のメニューの「はじめての方へ」の下・ヘルプセンター）と No.471 の知らせ */
+#rdside .v92misc-gl{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;margin-top:8px;padding:10px 12px;border:1px solid #DCE5F2;border-radius:14px;background:#fff;color:var(--rd-ink,#16233A);font:inherit;text-align:left;cursor:pointer;min-height:44px}
+#rdside .v92misc-gl svg{flex:none;color:var(--rd-bl,#0064BF)}
+#rdside .v92misc-gl b{display:block;font-size:13.5px;line-height:1.4}
+#rdside .v92misc-gl small{display:block;margin-top:1px;font-size:11.5px;font-weight:600;line-height:1.4;color:var(--rd-ink3,#6B7B93)}
+#rdside .v92misc-gl:hover{border-color:#B9CCE6;background:#F6F9FE}
+#rdside .v92misc-gl[aria-current="true"]{border-color:var(--rd-bl,#0064BF);background:#EEF5FF}
+.k-helphd .v92misc-glc{width:100%;margin:0 0 14px;text-align:left;font:inherit;cursor:pointer}
+html.rd .v92misc-tr{font-size:13px;border-radius:14px}
