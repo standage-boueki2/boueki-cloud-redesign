@@ -1,0 +1,148 @@
+/* 貿易クラウドAI商社マン デザイン刷新：貿易ジャーニーの現在地バー（2026-11-17・rd_v94jny.js）
+   荷主のすべての画面の一番上（.main の中の .stage の直前）。はじめてガイドの「輸出は7つのステップ」と同じ道のりの絵 */
+html.rd .k-jny{flex:none;margin:16px 24px 0;background:#fff;border:1px solid var(--rd-line);border-radius:16px;padding:12px 18px 8px;box-shadow:0 1px 2px rgba(20,35,58,.05);color:var(--rd-ink);font-size:13px;line-height:1.45}
+html.rd .k-jny button{font:inherit}
+html.rd .k-jny-hd{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+html.rd .k-jny-tt{display:flex;align-items:center;gap:6px;white-space:nowrap}
+html.rd .k-jny-tic{color:var(--rd-or);display:inline-flex}
+html.rd .k-jny-tt b{font-size:15px;color:var(--rd-bl-deep);letter-spacing:.02em}
+html.rd .k-jny-sub{font-size:12px;color:var(--rd-ink3);font-weight:600}
+html.rd .k-jny-prod{display:flex;align-items:center;gap:6px;min-width:0}
+html.rd .k-jny-pl{font-size:12px;color:var(--rd-ink3);font-weight:700;white-space:nowrap}
+html.rd .k-jny-psel{max-width:220px;min-width:0;font-size:13px;font-weight:700;color:var(--rd-ink);padding:5px 26px 5px 10px;border:1px solid var(--rd-line);border-radius:10px;background-color:var(--rd-bg);cursor:pointer;text-overflow:ellipsis}
+html.rd .k-jny-pnm{font-weight:700}
+html.rd .k-jny-now{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+html.rd .k-jny-nwl{background:var(--rd-or);color:#fff;font-size:11.5px;font-weight:800;border-radius:999px;padding:1px 9px}
+html.rd .k-jny-now>b{font-size:14px;color:var(--rd-ink)}
+html.rd .k-jny-all{font-size:12.5px;color:var(--rd-ink2);font-weight:700}
+html.rd .k-jny-all b{font-size:16px;color:var(--rd-bl-deep)}
+html.rd .k-jny-gaps{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#B45309;background:var(--rd-or-soft);border:1px solid var(--rd-or-line);border-radius:999px;padding:1px 8px}
+html.rd .k-jny-tools{display:inline-flex;align-items:center;gap:6px;flex:none}
+html.rd .k-jny-min{display:inline-flex;align-items:center;gap:3px;height:26px;padding:0 8px;border-radius:13px;border:1px solid var(--rd-line);background:#fff;color:var(--rd-ink2);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+html.rd .k-jny-min[aria-expanded="true"] svg{transform:rotate(180deg)}
+html.rd .k-jny-next{margin-left:auto;display:inline-flex;align-items:center;gap:8px;max-width:340px;min-width:0;border:0;border-radius:12px;background:var(--rd-or);color:#fff;padding:7px 12px;cursor:pointer;box-shadow:0 2px 6px rgba(247,147,30,.28)}
+html.rd .k-jny-next:hover{background:var(--rd-or2)}
+html.rd .k-jny-nxl{font-size:11px;font-weight:800;background:rgba(255,255,255,.22);border-radius:6px;padding:1px 6px;white-space:nowrap}
+html.rd .k-jny-nxt{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+html.rd .k-jny-fin{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#15803D}
+html.rd .k-jny-q{width:26px;height:26px;border-radius:50%;border:1px solid var(--rd-line);background:#fff;color:var(--rd-ink2);font-weight:800;cursor:pointer;flex:none}
+html.rd .k-jny-q[aria-expanded="true"]{background:var(--rd-bl-soft);border-color:var(--rd-bl-line);color:var(--rd-bl)}
+html.rd .k-jny-help{margin-top:8px;background:var(--rd-bl-soft);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.7;color:var(--rd-ink2)}
+html.rd .k-jny-help b{color:var(--rd-ink)}
+
+/* 道のり（日本 → 海外のバイヤー） */
+html.rd .k-jny-route{position:relative;margin-top:6px;padding:0 64px 0 44px}
+html.rd .k-jny-route::before{content:"";position:absolute;left:30px;right:56px;top:40px;border-top:3px dashed #BFD6F2}
+html.rd .k-jny-end{position:absolute;top:33px;font-size:11px;font-weight:700;color:var(--rd-ink3);background:#fff;line-height:1.2;z-index:1}
+html.rd .k-jny-jp{left:0;padding-right:3px}
+html.rd .k-jny-ww{right:0;width:54px;top:27px;text-align:center}
+html.rd .k-jny-ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));position:relative}
+html.rd .k-jny-ol::after{content:"";position:absolute;left:-16px;top:39px;height:5px;border-radius:3px;background:var(--rd-or);width:calc((var(--now,0) + .5) * 100% / 7 + 16px)}
+html.rd .k-jny-li{min-width:0;display:flex}
+html.rd .k-jny-st{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:17px 4px 6px;margin:0 2px;border:1px solid transparent;border-radius:12px;background:transparent;cursor:pointer;text-align:center;color:inherit}
+html.rd .k-jny-st:hover{background:var(--rd-bl-soft)}
+html.rd .k-jny-st.open{background:var(--rd-or-soft);border-color:var(--rd-or-line)}
+html.rd .k-jny-st:focus-visible{outline:3px solid var(--rd-bl);outline-offset:1px}
+html.rd .k-jny-ring{position:relative;z-index:1;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--rd-or) calc(var(--p,0) * 1%),#DCE6F2 0)}
+html.rd .k-jny-ic{width:36px;height:36px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--rd-bl-deep)}
+html.rd .k-jny-st.done .k-jny-ic{color:var(--rd-or);background:#FFF7EC}
+html.rd .k-jny-st.now .k-jny-ring{box-shadow:0 0 0 4px rgba(247,147,30,.22)}
+html.rd .k-jny-st.now .k-jny-ic{background:var(--rd-or);color:#fff}
+html.rd .k-jny-st.gap .k-jny-ring::after{content:"";position:absolute;right:-1px;top:-1px;width:11px;height:11px;border-radius:50%;background:#EA580C;border:2px solid #fff}
+html.rd .k-jny-here{position:absolute;top:-2px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:3px;background:var(--rd-or);color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;padding:0 8px;white-space:nowrap;line-height:17px}
+html.rd .k-jny-no{margin-top:4px;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--rd-or)}
+html.rd .k-jny-nm{font-size:13.5px;font-weight:800;color:var(--rd-ink);line-height:1.25}
+html.rd .k-jny-ns{display:none}
+html.rd .k-jny-pc{font-size:12px;color:var(--rd-ink2);font-weight:700;line-height:1.2}
+html.rd .k-jny-pc b{font-size:17px;color:var(--rd-bl-deep)}
+html.rd .k-jny-st.done .k-jny-pc b{color:#C2410C}
+html.rd .k-jny-cnt{margin-left:5px;font-size:11px;color:var(--rd-ink3);font-weight:600;white-space:nowrap}
+html.rd .k-jny-gapb{margin-top:2px;font-size:11px;background:var(--rd-or-soft);color:#B45309;border:1px solid var(--rd-or-line);border-radius:999px;padding:0 7px;font-weight:800;white-space:nowrap}
+
+/* 押したステップの項目（足りない項目を先に。押すとその場所へ） */
+html.rd .k-jny-det{margin-top:6px;border-top:1px dashed var(--rd-line);padding:10px 2px 4px}
+html.rd .k-jny-dh{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding-right:30px;position:relative}
+html.rd .k-jny-dh>b{font-size:14px}
+html.rd .k-jny-dp{font-weight:800;color:var(--rd-bl-deep)}
+html.rd .k-jny-dn{flex-basis:100%;font-size:12px;color:var(--rd-ink3)}
+html.rd .k-jny-x{position:absolute;right:0;top:-4px;width:28px;height:28px;border-radius:8px;border:1px solid var(--rd-line);background:#fff;color:var(--rd-ink2);display:grid;place-items:center;cursor:pointer}
+html.rd .k-jny-ul{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+html.rd .k-jny-go{width:100%;display:flex;align-items:center;gap:8px;text-align:left;border:1px solid var(--rd-line);background:#fff;border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600;color:var(--rd-ink);cursor:pointer;min-height:36px}
+html.rd .k-jny-go>span:nth-child(2){flex:1;min-width:0}
+html.rd .k-jny-go svg{color:var(--rd-or);flex:none}
+html.rd .k-jny-go:hover{border-color:var(--rd-or);background:#FFFBF5}
+html.rd .k-jny-bx{width:14px;height:14px;border:2px solid var(--rd-or-line);border-radius:4px;flex:none}
+html.rd .k-jny-ok{margin:8px 0 0;display:flex;align-items:center;gap:6px;color:#15803D;font-weight:700}
+html.rd .k-jny-okl{margin-top:8px;font-size:12.5px;color:var(--rd-ink2)}
+html.rd .k-jny-okl summary{cursor:pointer;font-weight:700;color:var(--rd-ink3)}
+html.rd .k-jny-okl ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:4px 14px}
+html.rd .k-jny-okl li{display:inline-flex;align-items:center;gap:4px}
+html.rd .k-jny-okl li svg{color:#16A34A}
+html.rd .k-jny-soon{margin:8px 0 0;font-size:12px;color:var(--rd-ink2)}
+html.rd .k-jny-soon span{background:var(--rd-or);color:#fff;font-weight:800;border-radius:6px;padding:0 6px;margin-right:6px;font-size:11px}
+
+/* 移った先の「足りない所」を光らせる */
+html.rd .k-jnyhit{outline:3px solid var(--rd-or)!important;outline-offset:3px;border-radius:8px;animation:kJnyHit 1.1s ease-in-out 3}
+@keyframes kJnyHit{0%,100%{outline-color:var(--rd-or)}50%{outline-color:rgba(247,147,30,.2)}}
+
+/* 商品情報の画面の4つの手順の帯（商品登録→国選定→規制確認→提案準備）は、このバーの STEP 01〜04 と同じ行き先なので出さない */
+html.rd.rd-jny .rd-stepbar[data-rdsb]{display:none!important}
+/* タスクの画面の「輸出のステップ（今どこ？）」5段も同じ理由で出さない（行き先はこのバーの STEP から行ける） */
+html.rd.rd-jny .k-jny-dup{display:none!important}
+
+/* 中くらいの幅（ノートPC・左のメニューを出したままの 1024〜1280px など）：バーの幅で決める（container query） */
+html.rd .k-jny{container-type:inline-size;container-name:jny}
+@container jny (max-width:1000px){
+  html.rd .k-jny-cnt{display:none}
+  html.rd .k-jny-nm{font-size:12.5px}
+  html.rd .k-jny-route{padding:0 52px 0 34px}
+  html.rd .k-jny-route::before{left:24px;right:46px}
+  html.rd .k-jny-gapb{font-size:10.5px;padding:0 5px}
+  html.rd .k-jny-next{max-width:300px}
+}
+@container jny (max-width:760px){
+  html.rd .k-jny-no,html.rd .k-jny-nl,html.rd .k-jny-gapb{display:none}
+  html.rd .k-jny-ns{display:block;font-size:12px;margin-top:3px}
+  html.rd .k-jny-ring{width:40px;height:40px}
+  html.rd .k-jny-ic{width:31px;height:31px}
+  html.rd .k-jny-route::before{top:37px}
+  html.rd .k-jny-ol::after{top:36px}
+  html.rd .k-jny-end{top:30px}
+  html.rd .k-jny-ww{top:24px}
+  html.rd .k-jny-here{font-size:10px;padding:0 6px}
+  html.rd .k-jny-here svg{display:none}
+}
+@media (max-width:400px){
+  html.rd .k-jny-here{font-size:9px;padding:0 3px;letter-spacing:-.02em}
+}
+
+/* スマホ（820px 以下＝刷新版のスマホの決まり rd_mob.css と同じ幅） */
+@media (max-width:820px){
+  html.rd .k-jny{margin:10px 12px 0;padding:10px 10px 6px;border-radius:14px}
+  html.rd .k-jny-hd{gap:6px 8px}
+  html.rd .k-jny-tt{flex:1}
+  html.rd .k-jny-sub{display:none}
+  html.rd .k-jny-tools{order:2}
+  html.rd .k-jny-q{width:32px;height:32px}
+  html.rd .k-jny-min{height:32px;border-radius:16px}
+  html.rd .k-jny-prod{order:3;flex-basis:100%}
+  html.rd .k-jny-psel{max-width:none;flex:1;font-size:16px;padding:6px 26px 6px 10px}
+  html.rd .k-jny-now{order:4;flex-basis:100%}
+  html.rd .k-jny-next,html.rd .k-jny-fin{order:5;flex-basis:100%;max-width:none;margin-left:0;min-height:40px}
+  html.rd .k-jny-route{padding:0;margin-top:4px}
+  html.rd .k-jny-route::before{left:7%;right:7%;top:35px}
+  html.rd .k-jny-end{display:none}
+  html.rd .k-jny-ol::after{left:0;top:34px;width:calc((var(--now,0) + .5) * 100% / 7)}
+  html.rd .k-jny-st{padding:18px 0 4px;margin:0 1px;border-radius:10px}
+  html.rd .k-jny-ring{width:36px;height:36px}
+  html.rd .k-jny-ic{width:28px;height:28px}
+  html.rd .k-jny-ic svg{width:16px;height:16px}
+  html.rd .k-jny-here{font-size:9.5px;padding:0 5px;line-height:15px;top:0}
+  html.rd .k-jny-no,html.rd .k-jny-nl,html.rd .k-jny-cnt,html.rd .k-jny-gapb{display:none}
+  html.rd .k-jny-here svg{display:none}
+  html.rd .k-jny-ns{display:block;font-size:11.5px;margin-top:3px}
+  html.rd .k-jny-pc{font-size:10px}
+  html.rd .k-jny-pc b{font-size:13px}
+  html.rd .k-jny-ul{grid-template-columns:minmax(0,1fr)}
+  html.rd .k-jny-go{min-height:42px}
+}
