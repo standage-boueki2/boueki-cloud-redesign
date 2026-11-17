@@ -11,7 +11,7 @@
    ・No.501（アクセスコードのログインの誤りの文言）：存在しないコード・招待されていない名前のどちらも
      「アクセスコードかご担当者名が違います」にそろえる（どちらが違うかを明かさない）。名前の照合の方式は同期サーバーが決める（変えない）。
    ・No.502（管理者の確認コードの期限）：同期サーバーの答え（admin_login・adm_code の「（N分間有効）」）から期限を読み、
-     確認コードの欄の下に期限の時刻と残りを出す。画面の安全の決まりの文言も、STANDAGE の管理者は N分（今の GAS は5分）と書く。
+     確認コードの欄の下に期限の時刻と残りを出す。画面の安全の決まりの文言も、STANDAGE の管理者は N分（GAS d95〔11/17 バージョン 43〕から10分。21.95.1 で既定を 300→600 に）と書く。
    同期サーバー（GAS）のコードは変えない（別の会話「正式セキュリティチェック＋サーバー移管」が扱う）。 */
 var V95AI = window.V95AI = { v: "21.95", lim: null, add: 0, meAt: 0, pullAsk: 0, otp: null, err: [], n: { relay: 0, deny: 0, me: 0, qfix: 0, moqU: 0, msg: 0 } };
 function v95aiErr(k, e) { try { V95AI.err.push(k + ": " + String((e && e.message) || e).slice(0, 160)); if (V95AI.err.length > 30) V95AI.err.shift(); } catch (x) { /* 無視 */ } }
@@ -81,7 +81,7 @@ function v95aiOtpTtl(r, def) {
   } catch (e) { /* 無視 */ }
   return def;
 }
-function v95aiAdmTtl() { try { const v = +localStorage.getItem("bc20_v95_admttl"); return v >= 60 && v <= 3600 ? v : 300; } catch (e) { return 300; } }
+function v95aiAdmTtl() { try { const v = +localStorage.getItem("bc20_v95_admttl"); return v >= 60 && v <= 3600 ? v : 600; } catch (e) { return 600; } }
 function v95aiOtpSeen(op, r) {
   try {
     if (!r) return;
