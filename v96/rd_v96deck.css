@@ -1,0 +1,67 @@
+/* v21.96 deck（見せ方）：日本語の文字が写っている写真を選ぶ箱・切り取る／隠す画面・営業資料の作成中の進み具合 */
+/* ── No.509 写真を選ぶ箱（写真の欄の下・作る前の選ぶ画面） ── */
+.v96dk-jp{margin-top:10px;border:1px solid var(--warn,#E8A33A);background:var(--warn-soft,#FFF7EA);min-width:0}
+.v96dk-jp h3{margin:0 0 6px;font-size:var(--fs-md,16px);line-height:1.4;overflow-wrap:anywhere}
+.v96dk-jp .nn,.v96dk-lead{overflow-wrap:anywhere}
+.v96dk-lead{margin:0 0 4px;font-size:var(--fs-sm,14px);line-height:1.65;color:var(--ink-2,#3b4a5c)}
+.v96dk-cnt{margin:6px 0 8px;font-size:var(--fs-sm,14px);color:var(--ink-2,#3b4a5c)}
+.v96dk-jpl{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.v96dk-jprow{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 12px;align-items:start;padding:10px;border-radius:var(--r2,10px);background:var(--surface,#fff);border:1px solid var(--line,#E3E8EF);min-width:0}
+.v96dk-jprow[data-v96dkst="jpAsk"]{border-color:var(--warn,#E8A33A)}
+.v96dk-jprow[data-v96dkst="jpUse"],.v96dk-jprow[data-v96dkst="good"]{border-color:var(--good,#2E8B57)}
+.v96dk-jprow[data-v96dkst="jpNo"]{opacity:.85}
+.v96dk-jpimg{width:96px;height:72px;object-fit:contain;background:#fff;border:1px solid var(--line,#E3E8EF);border-radius:6px;grid-row:span 2}
+.v96dk-jptx{min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.5}
+.v96dk-jptx b{font-size:var(--fs-sm,14px)}
+.v96dk-jpwhy{font-size:var(--fs-xs,13px);color:var(--ink-2,#3b4a5c);overflow-wrap:anywhere}
+.v96dk-jpst{font-size:var(--fs-xs,13px);font-weight:700;overflow-wrap:anywhere}
+.v96dk-st-jpAsk{color:var(--or-deep,#B45309)}
+.v96dk-st-jpUse,.v96dk-st-good{color:var(--good,#2E8B57)}
+.v96dk-st-jpNo,.v96dk-st-bad{color:var(--ink-3,#6B7A90)}
+.v96dk-jpbtns{grid-column:2;display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.v96dk-b{white-space:normal;text-align:left;max-width:100%;min-height:36px}
+.v96dk-bulk{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
+.v96dk-askgo{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.v96dk-asknote{margin-top:8px}
+.v96dk-lnk{margin-left:6px;background:none;border:0;padding:0;color:var(--k-bl,#1F6FD1);text-decoration:underline;cursor:pointer;font:inherit;font-weight:700}
+.v96dk-ask{margin:0;border:0;background:transparent;padding:0}
+.v96dk-jump{margin-left:6px;font-size:var(--fs-xs,13px);font-weight:700;text-decoration:underline;cursor:pointer;background:none;border:0;padding:0;color:var(--k-bl,#1F6FD1)}
+@media(max-width:560px){
+  .v96dk-jprow{grid-template-columns:72px minmax(0,1fr)}
+  .v96dk-jpimg{width:72px;height:56px;grid-row:auto}
+  .v96dk-jpbtns{grid-column:1 / -1}
+  .v96dk-jpbtns .v96dk-b{flex:1 1 calc(50% - 6px)}
+  .v96dk-bulk .v96dk-b,.v96dk-askgo .v96dk-b{flex:1 1 100%}
+}
+/* ── 切り取る・隠す画面 ── */
+.v96dk-ed{position:fixed;inset:0;z-index:400;background:rgba(14,18,26,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+.v96dk-edbox{background:var(--surface,#fff);color:var(--ink,#14213D);border-radius:14px;box-shadow:0 18px 48px rgba(0,0,0,.35);width:min(920px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.v96dk-edbox > *{flex-shrink:0}
+.v96dk-edbox h3{margin:0;font-size:var(--fs-md,17px);line-height:1.4;overflow-wrap:anywhere}
+.v96dk-edbox .nn{margin:0;overflow-wrap:anywhere}
+.v96dk-edbands,.v96dk-edtools,.v96dk-edgo{display:flex;flex-wrap:wrap;gap:6px}
+.v96dk-edstage{display:flex;justify-content:center;align-items:center;background:repeating-conic-gradient(#eef1f5 0% 25%,#fff 0% 50%) 50%/18px 18px;border-radius:8px;padding:6px;min-height:160px;min-width:0}
+.v96dk-edcv{max-width:100%;height:auto;cursor:crosshair;touch-action:none;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.v96dk-edcv:focus-visible{outline:3px solid var(--k-bl,#1F6FD1);outline-offset:2px}
+.v96dk-edmsg{margin:0;min-height:1.5em;font-size:var(--fs-sm,14px);color:var(--ink-2,#3b4a5c);overflow-wrap:anywhere}
+.v96dk-edgo{justify-content:flex-end;border-top:1px solid var(--line,#E3E8EF);padding-top:10px}
+.v96dk-edbox .btn{white-space:normal;max-width:100%}
+.v96dk-edbox .btn:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:560px){.v96dk-ed{padding:0;align-items:stretch}.v96dk-edbox{border-radius:0;max-height:100vh;padding:12px 16px}.v96dk-edgo .btn{flex:1 1 auto}}
+/* ── No.522 作成中の進み具合 ── */
+.v96dk-psum{margin:10px 0 8px;padding:10px 12px;border-radius:var(--r2,10px);background:var(--tint,#EEF3F9);border:1px solid var(--line,#E3E8EF);min-width:0}
+.v96dk-pst{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font-size:var(--fs-sm,14px)}
+.v96dk-pst b{font-size:var(--fs-md,16px)}
+.v96dk-ppc{font-weight:700;color:var(--or-deep,#B45309)}
+.v96dk-ptl{color:var(--ink-2,#3b4a5c);overflow-wrap:anywhere}
+.v96dk-pbar{height:8px;border-radius:4px;background:var(--sunk,#E3E8EF);overflow:hidden;margin:8px 0 6px}
+.v96dk-pbi{display:block;height:100%;width:3%;border-radius:4px;background:linear-gradient(90deg,var(--or,#F39A4E),#ffc266);transition:width .9s linear}
+.v96dk-pnow{font-size:var(--fs-sm,14px);line-height:1.6;overflow-wrap:anywhere}
+.v96dk-pai,.v96dk-psl{display:inline-block;margin-left:8px;color:var(--ink-3,#6B7A90);font-size:var(--fs-xs,13px)}
+.v96dk-paway{margin:4px 0 0;font-size:var(--fs-xs,13px);color:var(--ink-2,#3b4a5c);overflow-wrap:anywhere}
+#aiThink.v96dk-deck .atbar i{animation:none!important;transform:none!important;transition:width .9s linear}
+#aiThink .v96dk-open{pointer-events:auto;margin-top:8px;min-height:34px;padding:4px 14px}
+html.rd #aiThink.k-mini .v96dk-open{display:inline-flex}
+#aiThink.v96dk-fin .atbar{display:none!important}
+html.rd #aiThink.k-mini.v96dk-fin .att::after{content:none}
+@media (prefers-color-scheme: dark){html:not([data-theme="light"]) .v96dk-edstage{background:repeating-conic-gradient(#2a3140 0% 25%,#1e2430 0% 50%) 50%/18px 18px}}

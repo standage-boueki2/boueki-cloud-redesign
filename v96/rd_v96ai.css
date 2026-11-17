@@ -1,0 +1,43 @@
+/* 21.96 分野 ai の見せ方：AI のカウンタ（回数とトークン使用量を2つの数に）・上限の帯・受信箱と「案件」の札の範囲 */
+.v96ai-q .v96ai-qb{display:flex;flex-direction:column;gap:4px}
+.v96ai-q .v96ai-head{display:block}
+.v96ai-q .v96ai-dev{margin-left:4px;font-size:12px;color:var(--ink-3,#6b7280);font-weight:400}
+.v96ai-al{display:block;padding:6px 10px;border-radius:8px;border:1px solid var(--warn,#b26a00);background:var(--warn-soft,#fff4e0);color:var(--ink,#1f2933);font-size:13px;line-height:1.6}
+.v96ai-al b{color:var(--warn-ink,#8a4b00)}
+.v96ai-al[data-st="near"]{border-color:var(--line,#D8DEE8);background:var(--surface-2,#F6F8FB)}
+.v96ai-ms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:2px 0}
+.v96ai-m{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"l v" "p p";align-items:baseline;gap:2px 8px;padding:6px 10px;border:1px solid var(--line,#D8DEE8);border-radius:8px;background:var(--surface,#fff);min-width:0}
+.v96ai-ml{grid-area:l;font-size:12.5px;font-weight:700;color:var(--ink-2,#3d4a5c);white-space:nowrap}
+.v96ai-mv{grid-area:v;justify-self:end;text-align:right;font-size:13px;overflow-wrap:anywhere;min-width:0}
+.v96ai-mv b{font-size:15px}
+.v96ai-mv small{margin-left:2px;font-size:12px;color:var(--ink-3,#6b7280)}
+.v96ai-pg{grid-area:p;width:100%;height:6px;margin-top:3px;border:0;border-radius:3px;background:var(--line-2,#E8EDF3);color:var(--bl,#0064BF);accent-color:var(--bl,#0064BF);-webkit-appearance:none;appearance:none;overflow:hidden}
+.v96ai-pg::-webkit-progress-bar{background:var(--line-2,#E8EDF3);border-radius:3px}
+.v96ai-pg::-webkit-progress-value{background:var(--bl,#0064BF);border-radius:3px}
+.v96ai-pg::-moz-progress-bar{background:var(--bl,#0064BF);border-radius:3px}
+.v96ai-m[data-st="near"]{border-color:var(--warn,#b26a00)}
+.v96ai-m[data-st="near"] .v96ai-pg::-webkit-progress-value{background:var(--warn,#b26a00)}
+.v96ai-m[data-st="near"] .v96ai-pg::-moz-progress-bar{background:var(--warn,#b26a00)}
+.v96ai-m[data-st="hit"]{border-color:var(--crit,#b42318);background:var(--crit-soft,#fdecea)}
+.v96ai-m[data-st="hit"] .v96ai-ml{color:var(--crit,#b42318)}
+.v96ai-m[data-st="hit"] .v96ai-pg::-webkit-progress-value{background:var(--crit,#b42318)}
+.v96ai-m[data-st="hit"] .v96ai-pg::-moz-progress-bar{background:var(--crit,#b42318)}
+.v96ai-m[data-st="na"] .v96ai-mv small{display:block;text-align:left}
+.v96ai-foot{display:block;font-size:12px;line-height:1.6}
+.v96ai-none{display:block}
+.v92ai-bar .v96ai-barn{font-weight:700}
+/* 受信箱の範囲（案件一覧の k-v95sc と同じ見た目） */
+.k-v96ix{margin:0 0 14px;border:1px solid var(--k-line,#E3EAF3);border-radius:14px}
+/* 左のメニュー「案件」の札：前の層の札を隠して、範囲をそろえた札を出す */
+#rdside .rd-main[data-rdk="dash:home"][data-v96b="1"] .rd-bdg{display:none!important}
+#rdside .rd-main[data-rdk="dash:home"] .k-v96bdg{margin-left:auto;min-width:22px;height:22px;padding:0 8px;border-radius:11px;background:var(--rd-crit,#D93025);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+#rdside .rd-main[data-rdk="dash:home"] .k-v96bdg[hidden]{display:none}
+#rdside .rd-main[data-rdk="dash:home"] .k-v96bdg::before{content:"要対応\00a0";font-weight:700}
+html[data-lang="en"] #rdside .rd-main[data-rdk="dash:home"] .k-v96bdg::before{content:"To do\00a0"}
+html[data-lang="zh"] #rdside .rd-main[data-rdk="dash:home"] .k-v96bdg::before{content:"待处理\00a0"}
+html[data-lang="es"] #rdside .rd-main[data-rdk="dash:home"] .k-v96bdg::before{content:"Pend.\00a0"}
+@media (max-width:600px){
+  .v96ai-ms{grid-template-columns:minmax(0,1fr)}
+  .v96ai-mv b{font-size:14px}
+  .v96ai-al{font-size:12.5px}
+}

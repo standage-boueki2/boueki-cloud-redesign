@@ -1,0 +1,72 @@
+/* 21.96 cty：販売先国の「点数の内訳（効いた入力）」・規制の AI 詳細調査の「一般知識の下書き」の欄（rd_v96cty.js が出す） */
+
+/* ── 点数の内訳 ── */
+.v96cty-bd { margin: 0 0 10px; border: 1px solid var(--k-line, #DCE5F0); border-radius: 10px; background: var(--k-surface, #fff); font-size: 12.5px; line-height: 1.6; overflow-wrap: anywhere; }
+.v96cty-bd > summary { cursor: pointer; padding: 7px 10px; font-weight: 800; color: var(--k-ink2, #2A3B54); list-style: revert; display: list-item; }
+.v96cty-bd > summary small { display: block; margin-top: 2px; font-weight: 600; color: var(--k-ink3, #5B6B82); font-size: 11.5px; }
+.v96cty-bd[open] > summary { border-bottom: 1px solid var(--k-line, #DCE5F0); }
+.v96cty-bdb { padding: 8px 10px 10px; }
+.v96cty-in { margin: 0 0 8px; padding: 6px 8px; border-radius: 8px; background: #F4F8FD; color: #2A3B54; font-weight: 700; }
+.v96cty-ax { margin: 0 0 8px; }
+.v96cty-ax > b { font-weight: 900; color: #1B2B42; }
+.v96cty-axv { margin-left: 8px; font-weight: 800; color: var(--k-or-deep, #C25600); }
+.v96cty-ax ul { margin: 4px 0 0; padding: 0; list-style: none; }
+.v96cty-ax li { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 6px; align-items: start; padding: 2px 0; }
+.v96cty-ax li.v96cty-mine > span:last-child::before { content: "★ "; color: var(--k-or, #F57C0F); font-weight: 900; }
+.v96cty-ax li a { color: var(--k-bl, #1F6FD1); font-weight: 700; white-space: nowrap; }
+.v96cty-pt { display: inline-block; min-width: 46px; text-align: right; font-weight: 900; font-variant-numeric: tabular-nums; }
+.v96cty-pt.pos { color: var(--k-gr, #12874B); }
+.v96cty-pt.neg { color: var(--k-rd, #C8372D); }
+.v96cty-pt.z { color: var(--k-ink3, #5B6B82); }
+.v96cty-f { margin: 6px 0 0; padding-top: 6px; border-top: 1px dashed var(--k-line, #DCE5F0); font-weight: 800; color: #1B2B42; }
+.v96cty-note { margin: 6px 0 0; color: var(--k-ink3, #5B6B82); font-size: 11.5px; }
+.v96cty-card { margin-top: 2px; }
+.v96cty-card .v96cty-ax li { grid-template-columns: 44px minmax(0, 1fr); }
+.v96cty-all { margin: 12px 0 4px; padding: 12px 14px; border: 1.5px solid var(--k-or-line, #F6C08E); border-radius: 12px; background: #FFFBF6; }
+.v96cty-all.v96cty-old { border-color: var(--k-line, #DCE5F0); background: #F7FAFD; }
+.v96cty-h { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 900; color: #1B2B42; }
+.v96cty-lead { margin: 0 0 8px; font-size: 12.5px; color: #2A3B54; line-height: 1.7; }
+.v96cty-row > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.v96cty-row > summary::before { content: "▸"; color: var(--k-ink3, #5B6B82); }
+.v96cty-row[open] > summary::before { content: "▾"; }
+.v96cty-row > summary small { display: inline; margin: 0; }
+.v96cty-row > summary span { color: var(--k-or-deep, #C25600); font-weight: 900; }
+
+/* ── 規制の AI 詳細調査：一般知識の下書き・確かめ方 ── */
+.v96reg-top { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.v96reg-gen { border: 1.5px solid var(--warn, #B45309); background: var(--warn-soft, #FFF7E6); color: #4A3410; }
+.v96reg-ok { border: 1px solid var(--line, #DCE5F0); background: var(--surface-2, #F7FAFD); color: #2A3B54; }
+.v96reg-t { display: block; margin-bottom: 4px; font-size: 13px; color: var(--warn, #B45309); }
+.v96reg-top p { margin: 0 0 6px; }
+.v96reg-act { margin: 6px 0 4px; display: flex; gap: 6px; flex-wrap: wrap; }
+.v96reg-okl { color: #2A3B54; font-weight: 700; }
+.v96reg-unk { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line, #DCE5F0); }
+.v96reg-unk > b { display: block; margin-bottom: 4px; color: #1B2B42; }
+.v96reg-unk ol { margin: 0 0 8px; padding-left: 18px; }
+.v96reg-unk ol > li { margin: 0 0 8px; }
+.v96reg-unk ol > li.est { color: #3B4A5E; }
+.v96reg-unk ol > li > details > summary { cursor: pointer; }
+.v96reg-st { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; background: #FDE8E6; color: var(--crit, #B42318); }
+.v96reg-unk li.est .v96reg-st { background: #EEF2F7; color: #5B6B82; }
+.v96reg-how { margin: 4px 0 0; }
+.v96reg-how small { display: block; font-weight: 800; color: #3B4A5E; }
+.v96reg-how ul { margin: 2px 0 4px; padding-left: 16px; }
+.v96reg-how a { color: var(--bl, #1F6FD1); }
+.v96reg-q { margin: 2px 0 4px; padding: 6px 8px; border-radius: 6px; background: #fff; border: 1px solid var(--line, #DCE5F0); font-size: 11.5px; color: #1B2B42; white-space: pre-wrap; }
+.v96reg-cp { padding: 3px 9px; font-size: 11px; }
+.v96reg-busy { gap: 8px; align-items: center; }
+.v96reg-s4 { display: block; margin-top: 2px; color: #2A3B54; }
+.v96reg-s4.gen { color: var(--warn, #B45309); font-weight: 700; }
+.v96-dup { display: none !important; }
+.v96-ta { position: fixed; left: -9999px; top: 0; opacity: 0; }
+
+/* カードの中は短く（商品から付けた点と点の動きだけ） */
+.v96cty-cmp .v96cty-in { font-weight: 600; font-size: 11.5px; }
+.v96cty-mv { margin: 0 0 6px; font-weight: 900; color: var(--k-or-deep, #C25600); }
+.v96cty-goto { display: block; margin-top: 6px; padding: 0; border: 0; background: none; color: var(--k-bl, #1F6FD1); font-weight: 800; font-size: 12px; cursor: pointer; text-align: left; }
+
+@media (max-width: 640px) {
+  .v96cty-ax li, .v96cty-card .v96cty-ax li { grid-template-columns: 42px minmax(0, 1fr); gap: 8px; }
+  .v96cty-all { padding: 10px; }
+  .v96reg-top { padding: 9px 10px; }
+}
