@@ -1,0 +1,15 @@
+/* v21.95 deck（刷新版での見せ方）：訳だけやり直す・使えない写真の直し方 */
+.v95dk-retrbox{margin-top:8px}
+.v95dk-retrw,.v95dk-retrw2{display:inline-flex;flex-wrap:wrap;gap:6px;max-width:100%}
+.v95dk-retrw2{display:flex;margin-top:8px}
+.v95dk-retr{font-weight:700;white-space:normal;text-align:left;max-width:100%}
+.v95dk-phg{margin-top:10px;border:1px solid var(--warn,#E8A33A);background:var(--warn-soft,#FFF7EA)}
+.v95dk-phg h3{margin:0 0 6px;font-size:var(--fs-md,16px);overflow-wrap:anywhere}
+.v95dk-phl{margin:0;padding:0 0 0 18px;display:grid;gap:10px}
+.v95dk-phl li{min-width:0;line-height:1.55}
+.v95dk-phl li b{display:block;overflow-wrap:anywhere}
+.v95dk-phl li span{display:block;color:var(--ink-2,#3b4a5c);font-size:var(--fs-sm,14px);overflow-wrap:anywhere}
+.v95dk-phbtns{display:flex!important;flex-wrap:wrap;gap:6px;margin-top:6px}
+.v95dk-phrep{white-space:normal;max-width:100%}
+.v95dk-jump{margin-left:6px;font-size:var(--fs-xs,13px);font-weight:700;text-decoration:underline;cursor:pointer;background:none;border:0;padding:0;color:var(--k-bl,#1F6FD1)}
+@media(max-width:560px){.v95dk-phl{padding-left:14px}.v95dk-phrep,.v95dk-retr{width:100%}}

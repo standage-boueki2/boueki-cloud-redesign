@@ -1,0 +1,40 @@
+/* 21.95 prod（商品登録・取り込み・ドキュメント）の見せ方。中身は logic_v2195prod.js、部品は rd_v95prod.js */
+
+/* No.484 取り込みで0項目のとき（商品は作らない） */
+#prg > .c.v95p-empty,.v95p-empty{margin-top:8px;padding:14px 16px;border:1.5px solid var(--warn,#C77700);border-radius:12px;background:var(--warn-soft,#FFF5E0);line-height:1.7;font-size:14px;box-shadow:none}
+.v95p-empty .v95p-eh{display:block;font-size:15px;font-weight:800;color:var(--ink,#1F2937)}
+.v95p-empty .v95p-ep{margin:6px 0 0;color:var(--ink-2,#44546A)}
+.v95p-empty .v95p-ew{margin:6px 0 0;padding-left:20px;color:var(--ink-2,#44546A);font-size:13px}
+.v95p-empty .v95p-eb{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.v95p-empty .v95p-eb .btn{min-height:44px;white-space:normal;text-align:left}
+
+/* No.500 公開範囲を選んでアップロード（窓） */
+.v95p-dlg{position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.v95p-dbox{width:min(480px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--surface,#fff);color:var(--ink,#1F2937);border-radius:16px;padding:18px 18px 16px;box-shadow:0 18px 50px rgba(0,0,0,.25);outline:none}
+.v95p-dbox h3{margin:0 0 6px;font-size:18px;font-weight:900}
+.v95p-dn{margin:6px 0 0;font-size:13px;line-height:1.6;color:var(--ink-2,#44546A);word-break:break-word}
+.v95p-fs{border:0;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.v95p-fs legend{font-size:13px;font-weight:800;margin-bottom:4px;padding:0}
+.v95p-opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line,#E2E8F0);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:44px}
+.v95p-opt:has(input:checked){border-color:#EE6A0C;background:#FFF6EE}
+.v95p-opt input{margin-top:4px;width:18px;height:18px;flex:none;accent-color:#EE6A0C}
+.v95p-opt span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.v95p-opt b{font-size:15px}
+.v95p-opt small{font-size:12px;line-height:1.5;color:var(--ink-3,#6B7A90)}
+.v95p-def{font-style:normal;font-size:11px;font-weight:700;color:#B45309;margin-left:6px}
+.v95p-db{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;justify-content:flex-end}
+@media (max-width:600px){.v95p-db{justify-content:stretch}.v95p-db .k-btn{flex:1 1 100%}}
+
+/* No.479・500 ドキュメントの一覧：名前だけの行 */
+.v95p-lsc{padding:2px 4px;font-size:12px;max-width:120px}
+.v95p-ldel{padding:2px 7px;font-size:11px}
+.v95p-lchip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line,#E2E8F0);background:var(--surface-2,#F6F8FB);color:var(--ink-2,#44546A);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;cursor:pointer;min-height:28px;font-family:inherit}
+.v95p-lchip .v95p-i{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--ink-3,#6B7A90);color:#fff;font-size:10px}
+.v95p-lnote td{font-size:12.5px;line-height:1.6;color:var(--ink-2,#44546A);background:var(--surface-2,#F6F8FB)}
+
+/* No.483 中古車と判定されたままの自動車部品 */
+.v95p-car{margin:0 0 16px;border:1.5px solid #EE6A0C;background:#FFF6EE;padding:14px 16px;line-height:1.7}
+.v95p-car .v95p-ch{display:block;font-size:16px;font-weight:900;color:var(--ink,#1F2937)}
+.v95p-car p{margin:6px 0 0;font-size:14px;color:var(--ink-2,#44546A)}
+.v95p-car .v95p-cb{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+@media (max-width:600px){.v95p-car .v95p-cb .k-btn{flex:1 1 100%;white-space:normal}}

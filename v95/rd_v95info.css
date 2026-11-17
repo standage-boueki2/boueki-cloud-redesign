@@ -1,0 +1,12 @@
+/* 21.95 info：英文社名の案・%の意味・強みの件数・補完パネルの戻した値（スマホ 390px でも折り返す） */
+.v95coen{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:8px 0 2px;padding:8px 10px;border:1px solid #F5C08A;border-radius:10px;background:#FFF8EF;font-size:13px;line-height:1.5;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+.v95coen .v95coen-l{color:#8A4B00;font-weight:700}
+.v95coen b{color:#1F2D3D;word-break:break-word}
+.v95coen .v95coen-why{display:block;flex:1 1 100%;color:#5B6B7F;font-size:12px;font-weight:400}
+.v95coen .btn{font-size:12px;padding:3px 10px;white-space:normal}
+.k-it .v95coen{flex-basis:100%}
+.v95pctnote{display:block;margin-top:6px;color:#5B6B7F;font-size:12.5px;line-height:1.55}
+.v95strnote{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0 0;color:#8A4B00;font-size:13px;line-height:1.5}
+.v95pdnote{margin:0 0 8px;padding:6px 10px;border-radius:8px;background:#EEF6FF;color:#1D4E89;font-size:12.5px}
+.v95coenchip .btn{max-width:100%;white-space:normal;text-align:left}
+@media (max-width:640px){.v95coen{font-size:12.5px}.v95coen .btn{flex:1 1 100%}}

@@ -1,0 +1,13 @@
+/* 21.95 分野 ai の見せ方：AI 利用量のカウンタ（上限・数え方）と、管理者の確認コードの期限 */
+.v95ai-q .v95ai-qb{flex:1;min-width:0;overflow-wrap:anywhere}
+.v95ai-q[data-v95lim="hit"],.v95ai-q[data-v95lim="wait"]{border-color:var(--warn,#b26a00);background:var(--warn-soft,#fff4e0)}
+.v95ai-q .v95ai-line{display:inline}
+.v95ai-q .v95ai-hit{color:var(--warn-ink,#8a4b00)}
+.v95ai-how{margin-top:4px;font-size:12px;color:var(--ink-2,#3d4a5c)}
+.v95ai-how summary{cursor:pointer;color:var(--bl,#0064BF);line-height:1.6;list-style-position:outside}
+.v95ai-how ul{margin:4px 0 0 18px;padding:0;line-height:1.65}
+.v95ai-how li{margin:2px 0}
+.v92ai-bar .v95ai-barn{font-weight:600}
+.v95ai-otpt{font-size:11.5px;line-height:1.6;margin:6px 0 0;color:var(--ink-2,#3d4a5c);text-align:left;overflow-wrap:anywhere}
+.v95ai-otpt[data-st="dead"]{color:var(--crit,#b42318);font-weight:600}
+@media (max-width:600px){.v95ai-how{font-size:11.5px}.v95ai-how ul{margin-left:14px}}

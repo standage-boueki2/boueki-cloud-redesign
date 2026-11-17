@@ -1,0 +1,34 @@
+/* 21.95 reg：刷新版の層（規制を調べる）の見せ方。No.493 表で確かめる／No.494 件数の一文／No.482 輸送の前提／No.508 調べ方と次の一歩／No.477 関税の理由 */
+.k-v95-regok{display:inline-flex;align-items:center;gap:6px;margin:8px 0 4px;padding:8px 16px;border-radius:999px;font-weight:700;max-width:100%;white-space:normal;text-align:left;line-height:1.4}
+.k-v95-regok.is-done{background:var(--good-soft,#e7f6ec);color:var(--good,#1f7a3d);border-color:var(--good,#1f7a3d)}
+.v95reg-dn{margin:4px 0 0;font-size:11px;line-height:1.55;color:var(--warn,#b45309);font-weight:600;white-space:normal;overflow-wrap:anywhere}
+.v95reg-dn.own,.v92ct-ref.v95reg-own{color:var(--good,#1f7a3d)}
+.v95reg-dn.own a{color:var(--bl,#1d5fd0);word-break:break-all}
+.v95reg-hide{display:none!important}
+.v95reg-cn{display:block;margin:4px 0 0;font-size:12px;line-height:1.65;font-weight:700;color:var(--crit,#b91c1c)}
+span.v95reg-cn{display:inline}
+.v95reg-mode{margin:4px 0 8px;padding:6px 9px;border-radius:8px;background:var(--surface-2,#f4f6f9);font-size:11.5px;line-height:1.6;color:var(--ink-2,#44546a);overflow-wrap:anywhere}
+.v95reg-mode b{color:var(--ink,#1b2a3a)}
+.v95reg-next{margin:10px 0;padding:12px 14px;border:1.5px solid var(--bl,#1d5fd0);border-radius:12px;background:var(--surface,#fff);font-size:12.5px;line-height:1.7;overflow-wrap:anywhere}
+.v95reg-nh{display:block;font-size:14px;margin-bottom:2px}
+.v95reg-ns{margin:0 0 6px;color:var(--ink-2,#44546a);font-size:11.5px}
+.v95reg-ol{margin:0;padding-left:1.4em}
+.v95reg-ol>li{margin:0 0 8px}
+.v95reg-ol>li>b{display:block}
+.v95reg-ol small{display:block;color:var(--ink-2,#44546a);font-size:11.5px}
+.v95reg-items{margin:3px 0 0;padding-left:1.1em}
+.v95reg-items li{margin:2px 0}
+.v95reg-items a{color:var(--bl,#1d5fd0);word-break:break-all}
+.v95reg-lv{display:inline-block;margin-right:6px;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:700;background:var(--warn-soft,#fff4e5);color:var(--warn,#b45309)}
+.v95reg-lv.required{background:var(--crit-soft,#fdecea);color:var(--crit,#c0392b)}
+.v95reg-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.v95reg-btns .btn{white-space:normal;text-align:left;max-width:100%}
+.v95reg-ask{margin-top:5px}
+.v95reg-ask summary{cursor:pointer;color:var(--bl,#1d5fd0);font-weight:700;font-size:11.5px}
+.v95reg-ask pre{margin:4px 0 0;padding:8px 10px;border-radius:8px;background:var(--surface-2,#f4f6f9);font-size:11px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+.v95reg-ta{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0}
+@media (max-width:640px){
+  .k-v95-regok{width:100%;justify-content:center}
+  .v95reg-btns .btn{flex:1 1 100%}
+  .v95reg-next{padding:10px 11px}
+}

@@ -1,0 +1,42 @@
+/* 21.95 刷新版：画面の幅 821〜1180px でページが横にすべるもともとの癖の直し（2026-11-17 大森さんの依頼）
+   原因：この幅では左のメニュー（262px）が出たまま本文が 560〜900px に縮むのに、
+     ① 上の帯：検索の欄（最小 220px）・表示の密度（148px）・会社名のボタン（221px）が縮まず右へはみ出す
+     ② 2列の並び（.k-grid・.g2・AIバイヤー開拓の拠点・メンバーの画面）が狭い列に押し込まれ、中の表や文が列の外へはみ出す
+     ③ 案件一覧の表（約 710px）がカードより広く、右の列が切れて見えない
+     ④ 書類をつくるの「追加」の中身（.v85doc-skipf）が小さな枠から右へ伸びる
+   直し：帯の部品を縮められるように（検索は最小 120px・表示の密度は「Aa」の丸だけ・会社名は最小 110px で省略記号）、
+        この幅では2列の並びを1列に、表はカードの中で横にだけ動かせるように。PC（1181px 以上）とスマホ（820px 以下）の見た目は変えない。 */
+.main, .stage, .stage > .well { min-width: 0; }
+#k-clbody { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.well select { max-width: 100%; }
+@media (min-width: 821px) and (max-width: 1180px) {
+  /* ① 上の帯 */
+  .rd-bar { min-width: 0; }
+  .rd-bar #uxsearch { min-width: 120px !important; flex: 1 1 120px; overflow: hidden; }
+  .rd-bar .k-dens { flex: 0 0 auto; padding: 0 7px !important; gap: 0 !important; }
+  .rd-bar .k-dens .k-dl { display: none !important; }
+  .rd-bar .k-co { flex: 0 1 auto; min-width: 110px; max-width: 190px; overflow: hidden; }
+  .rd-bar .k-co > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 画面の見出しの行（ロボ・見出し・成長レベル・次は）：見出しが縦に潰れないよう、足りないときは次の行へ */
+  .well .rd-hero { flex-wrap: wrap; row-gap: 10px; }
+  .well .rd-hero > .rd-ht { flex: 1 1 260px; min-width: 240px; }
+  /* ② 2列の並びは1列に（中身を列の外へ押し出さない） */
+  .well .k-grid, .well .g2, .well .v41net, .well .k-team2, .well .rd-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .well .k-grid > *, .well .g2 > *, .well .v41net > *, .well .k-team2 > *, .well .rd-grid > * { min-width: 0; grid-column: auto !important; }
+  .well .rd-ch { flex-wrap: wrap; }
+  .well .rd-ch .rd-tag { white-space: normal; max-width: 100%; }
+  .well .v41staff, .well .rw > * { min-width: 0; }
+  .well .v80sec-g { grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)) !important; }
+  .well .k-card { min-width: 0; }
+  .well .k-card > .rd-tbl { display: block; overflow-x: auto; max-width: 100%; }
+  /* ④ 書類をつくるの「追加」 */
+  .well .v85doc-act { flex-wrap: wrap; min-width: 0; }
+  .well .v85doc-add { min-width: 0; max-width: 100%; }
+  .well .v85doc-add[open] { flex-basis: 100%; }
+  .well .v85doc-skipf { display: flex; flex-wrap: wrap; margin-left: 0; max-width: 100%; }
+}
+/* 821〜900px：カードの中の横並び（商品情報の「データの充足度」など）も1列に */
+@media (min-width: 821px) and (max-width: 900px) {
+  .well .k-card { grid-template-columns: minmax(0, 1fr) !important; }
+  .well .k-card > * { grid-column: auto !important; min-width: 0; }
+}
