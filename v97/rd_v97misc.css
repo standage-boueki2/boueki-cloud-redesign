@@ -1,0 +1,4 @@
+/* 21.97.2 No.534：写真の確認が途中で止まったときの帯（外国語営業資料の画面の上） */
+.v97m-ph { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid var(--line, #e3e6ec); background: var(--surface-2, #fff8ef); font-size: 13px; line-height: 1.6; }
+.v97m-ph span { flex: 1 1 260px; min-width: 0; }

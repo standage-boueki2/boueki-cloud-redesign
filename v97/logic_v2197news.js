@@ -67,3 +67,22 @@ function v97news1() {
   } catch (e) { v97newsErr("news1", e); }
 }
 v97news1();
+/* 21.97.2（同じ日・改修一覧の詳細で分かったもの）：外国語営業資料 */
+var V21972_NEWS_TITLE = "外国語営業資料の直し（画面を開いたときの写真の確認の表示・外した文言と同じ品番や実績の文）";
+var V21972_NEWS_ITEMS = [
+  "外国語営業資料の画面を開いたときの商品写真の自動の確認を、「営業資料に使う商品写真を確かめています（資料はまだ作りません）」と表示し、終わったら使える枚数をお知らせします（前は「営業資料を作成しています」と出ていました）",
+  "確かめた写真の結果を覚え、同じ写真は次から AI に聞き直しません。確かめられなかったときは「写真をもう一度確かめる」で確かめ直せます",
+  "根拠と照らし合わせて外した文言と同じ品番（別の商品の品番）や、同じ採用・導入の実績を書いたほかの文も資料から外します"
+];
+function v97news2() {
+  try {
+    if (typeof S30_NEWS === "undefined" || !Array.isArray(S30_NEWS)) return;
+    let x = S30_NEWS.find((r) => r && r[1] === "v21.97.2");
+    if (!x) { x = ["2026-11", "v21.97.2", V21972_NEWS_TITLE, []]; S30_NEWS.unshift(x); }
+    if (!Array.isArray(x[3])) x[3] = [];
+    V21972_NEWS_ITEMS.forEach((s) => { if (s && x[3].indexOf(s) < 0) x[3].push(s); });
+    const idx = new Map(S30_NEWS.map((r, i) => [r, i]));
+    S30_NEWS.sort((a, b) => (v97newsVerN(b && b[1]) - v97newsVerN(a && a[1])) || (idx.get(a) - idx.get(b)));
+  } catch (e) { v97newsErr("news2", e); }
+}
+v97news2();

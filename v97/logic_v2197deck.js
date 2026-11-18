@@ -704,11 +704,64 @@ function v97dkKeys(txt, lang) {
     if (typeof dk3Ids === "function") dk3Ids(t).forEach(id => out.push({ key: "id:" + id, kind: "id", id, lab: String(id).replace(/^([A-Z]+)(\d)/, "$1 $2") }));
     V97DK_CERT.forEach(([k, re]) => { if (re.test(t)) out.push({ key: "cert:" + k, kind: "cert", lab: k.toUpperCase() === "ORGANIC" ? "organic" : k.toUpperCase() }); });
     if (typeof DK3_SUPF !== "undefined" && Array.isArray(DK3_SUPF)) DK3_SUPF.forEach((f, i) => { try { if (f[0].test(t)) out.push({ key: "sup:" + i, kind: "sup", i, lab: (t.match(f[0]) || [""])[0] }); } catch (e) { } });
+    /* 21.97.2（管理者の再試行・シートの No.533 の詳細）：品番・型番（D「HT-SERUM-30」）と、採用・導入の実績（G「保育園採用実績」） */
+    v97dkCodes(t).forEach(c => out.push({ key: "code:" + c, kind: "code", code: c, lab: c }));
+    v97dkTrack(t).forEach(s => out.push({ key: "track:" + s, kind: "track", sec: s, lab: v97dkTrackLab(s) }));
   } catch (e) { v97dkErr("keys", e); }
   const seen = new Set();
   return out.filter(k => !seen.has(k.key) && seen.add(k.key));
 }
 V97DK.keys = v97dkKeys;
+/* 品番・型番：英大文字で始まり、ハイフンで区切った2〜5つの部分で、どこかに数字がある（ISO などの規格番号は dk3Ids の id で扱う） */
+function v97dkCodes(t) {
+  const out = [];
+  try {
+    const s = String(t || "").normalize ? String(t || "").normalize("NFKC") : String(t || "");
+    (s.match(/\b[A-Z][A-Z0-9]{0,7}(?:-[A-Z0-9]{1,10}){1,4}\b/g) || []).forEach(c => {
+      if (!/\d/.test(c) || /^(?:ISO|JIS|IEC|EN|ASTM|COVID|SARS)-/i.test(c)) return;
+      const k = c.toUpperCase();
+      if (out.indexOf(k) < 0) out.push(k);
+    });
+  } catch (e) { v97dkErr("codes", e); }
+  return out;
+}
+/* 採用・導入の実績（どこで使われているか）。分野ごとに1つの鍵にする（英語の資料と日本語の根拠を同じ鍵で比べる） */
+const V97DK_TRACK_RE = /採用実績|導入実績|納入実績|採用され|導入され|納入され|ご採用|ご導入|実績(?:あり|多数|がある)|adopted (?:by|in|at)|used (?:by|in|at) (?:over |more than |\d)|in use (?:at|in)|trusted by|chosen by|installed (?:in|at)|supplied to|deployed (?:in|at)|track record|采用|導入實績|adoptado por|utilizado (?:por|en)/i;
+const V97DK_TRACK_SEC = [
+  ["childcare", /保育園|保育所|幼稚園|こども園|託児|nurser(?:y|ies)|daycare|day-care|kindergarten|preschool|childcare|幼儿园|托儿所|guarder[ií]a/i],
+  ["medical", /病院|クリニック|医療機関|介護施設|hospital|clinic|care (?:home|facilit)|医院|hospital(?:es)?/i],
+  ["school", /学校|小学校|中学校|大学|school|universit|学校|escuela/i],
+  ["hotel", /ホテル|旅館|hotel|ryokan|酒店|hotel(?:es)?/i],
+  ["food", /飲食店|レストラン|restaurant|caf[eé]|餐厅|restaurante/i],
+  ["public", /自治体|官公庁|行政|municipal|government|public (?:sector|facilit)|政府|gobierno/i],
+  ["retail", /小売|スーパー|百貨店|量販店|retailer|supermarket|department store|零售|超市|minorista|supermercado/i],
+  ["airline", /航空会社|airline|航空公司|aerol[ií]nea/i]
+];
+function v97dkTrack(t) {
+  const out = [];
+  try {
+    const s = String(t || "");
+    if (!V97DK_TRACK_RE.test(s)) return out;
+    const s2 = s.replace(/nursery schools?|保育学校/gi, "nursery");   /* 「nursery school」は保育（学校には数えない） */
+    V97DK_TRACK_SEC.forEach(([k, re]) => { if (re.test(s2)) out.push(k); });
+    if (!out.length) out.push("any");
+  } catch (e) { v97dkErr("track", e); }
+  return out;
+}
+function v97dkTrackLab(s) {
+  const L = { childcare: "保育園などでの採用実績", medical: "医療機関での採用実績", school: "学校での採用実績", hotel: "ホテルでの採用実績", food: "飲食店での採用実績", public: "自治体・官公庁での採用実績", retail: "小売店での採用実績", airline: "航空会社での採用実績", any: "採用・導入の実績" };
+  return L[s] || L.any;
+}
+/* 自社の商品の品番（その商品の SKU・品番の欄）か */
+function v97dkOwnCode(code, T) {
+  try {
+    const own = [];
+    const add = (v) => { String(v || "").split(/[\s,、／/]+/).forEach(x => { x = x.trim().toUpperCase(); if (x) own.push(x); }); };
+    const P = (typeof dk3Prods === "function" && T) ? (dk3Prods(T) || []) : [T];
+    P.forEach(p => { if (p) { add(p.sku); add(p.model); add(p.partNo); } });
+    return own.indexOf(String(code).toUpperCase()) >= 0;
+  } catch (e) { return false; }
+}
 /* 根拠（登録の情報と資料＝C）にある主張か */
 function v97dkSupported(K, C) {
   try {
@@ -718,13 +771,22 @@ function v97dkSupported(K, C) {
     if (K.kind === "id") return !!(N.ids && N.ids.has(K.id));
     if (K.kind === "cert") { const re = (V97DK_CERT.find(c => "cert:" + c[0] === K.key) || [])[1]; return !!(re && re.test(String(C.text || ""))); }
     if (K.kind === "sup") { const f = DK3_SUPF[K.i]; return !!(f && f[1].test(String(N.supTxt || C.text || ""))); }
+    if (K.kind === "code") { const tx = String(C.text || "").normalize ? String(C.text || "").normalize("NFKC").toUpperCase() : String(C.text || "").toUpperCase(); return tx.indexOf(K.code) >= 0; }
+    if (K.kind === "track") {
+      const tx = String(C.text || "");
+      if (!V97DK_TRACK_RE.test(tx)) return false;
+      if (K.sec === "any") return true;
+      const re = (V97DK_TRACK_SEC.find(x => x[0] === K.sec) || [])[1];
+      return !!(re && re.test(tx));
+    }
   } catch (e) { v97dkErr("sup", e); }
   return false;
 }
 /* 外した理由から、ほかの文に広げる主張の種類を決める（数の上限・別の商品・返事なし・産地・効能は広げない） */
 function v97dkWhyClass(why) {
   why = String(why || "");
-  if (/2回まで|別の商品|含まれなかった|産地|所在地|医薬品的|同じ主張/.test(why)) return "";
+  if (/別の商品/.test(why)) return "code";   /* 別の商品の品番を書いた文：同じ品番のほかの文も外す（21.97.2） */
+  if (/2回まで|含まれなかった|産地|所在地|医薬品的|同じ主張/.test(why)) return "";
   if (/^根拠に無い数字：/.test(why)) return "num";
   if (/根拠に無い最上級/.test(why)) return "sup";
   return "all";
@@ -740,7 +802,13 @@ function v97dkProp(r, lang, T) {
     r.dropped.forEach(d => {
       const cls = v97dkWhyClass(d.why); if (!cls || !d.txt) return;
       let ks = v97dkKeys(d.txt, lang);
-      if (cls === "num") { const raws = String(d.why).replace(/^根拠に無い数字：/, "").split(/[・,、]/).map(s => s.trim()).filter(Boolean); ks = ks.filter(k => (k.kind === "num" || k.kind === "rank") && raws.some(x => String(k.n.raw).indexOf(x.replace(/[^\d.]/g, "")) >= 0 || x.indexOf(String(k.n.raw)) >= 0) || (k.kind === "id" && raws.some(x => x.indexOf(String(k.id).replace(/^[A-Z]+/, "")) >= 0))); }
+      /* 自社の商品の品番は、外した文にあっても広げない */
+      ks = ks.filter(k => !(k.kind === "code" && v97dkOwnCode(k.code, T)));
+      if (cls === "code") {
+        ks.filter(k => k.kind === "code").forEach(k => { rep.keys++; if (!bad.has(k.key)) bad.set(k.key, { k, d }); });
+        return;
+      }
+      if (cls === "num") { const raws = String(d.why).replace(/^根拠に無い数字：/, "").split(/[・,、]/).map(s => s.trim()).filter(Boolean); ks = ks.filter(k => (k.kind === "num" || k.kind === "rank") && raws.some(x => String(k.n.raw).indexOf(x.replace(/[^\d.]/g, "")) >= 0 || x.indexOf(String(k.n.raw)) >= 0) || (k.kind === "id" && raws.some(x => x.indexOf(String(k.id).replace(/^[A-Z]+/, "")) >= 0)) || k.kind === "track"); }   /* 「200の保育園で採用」の数で外した文：採用の実績の主張も広げる（21.97.2） */
       /* 最上級で外した文：最上級の主張は根拠に無ければ外す。同じ文の数字は根拠どおりなら「強い表現で書いた同じ数字」を外す */
       const frame = cls === "sup" || V97DK_FRAME.test(String(d.why)) || V97DK_STRONG.test(String(d.txt)) || (typeof DK3_SUPF !== "undefined" && DK3_SUPF.some(f => { try { return f[0].test(String(d.txt)); } catch (e) { return false; } }));
       ks.forEach(k => {
@@ -760,7 +828,7 @@ function v97dkProp(r, lang, T) {
       const ks = v97dkKeys(c.txt, lang);
       let why = "";
       for (const k of ks) {
-        if (bad.has(k.key)) { why = "外した文言と同じ主張（" + k.lab + "）・根拠に無い"; break; }
+        if (bad.has(k.key)) { const src = bad.get(k.key); why = (k.kind === "code" && src && src.d && /別の商品/.test(String(src.d.why))) ? "外した文言と同じ品番（" + k.lab + "）・別の商品" : "外した文言と同じ主張（" + k.lab + "）・根拠に無い"; break; }
         if (weak.has(k.key) && V97DK_STRONG.test(c.txt)) { why = "外した文言と同じ主張（" + k.lab + "）を強い表現で書いた文"; break; }
       }
       if (why) { rep.add.push({ path: c.path, txt: c.txt, why, v97: 1 }); gone.add(c.path); dk3Drop(r.plan, c.path); }
@@ -797,7 +865,12 @@ function v97dkPropCheck(deck, ctx, r) {
     const lang = deck.lang || "en";
     const C = (typeof dk3Corpus === "function") ? (() => { try { return dk3Corpus(v97dkDeckT()); } catch (e) { return null; } })() : null;
     const bad = new Map();
-    dr.forEach(d => { const cls = v97dkWhyClass(d.why); if (!cls) return; v97dkKeys(d.txt, lang).forEach(k => { if ((k.kind === "num" || k.kind === "id") && C && !v97dkSupported(k, C) && !bad.has(k.key)) bad.set(k.key, k); }); });
+    const TT = v97dkDeckT();
+    dr.forEach(d => { const cls = v97dkWhyClass(d.why); if (!cls) return; v97dkKeys(d.txt, lang).forEach(k => {
+      if (k.kind === "code" && v97dkOwnCode(k.code, TT)) return;
+      if (cls === "code" && k.kind !== "code") return;
+      if ((k.kind === "num" || k.kind === "id" || k.kind === "code" || k.kind === "track") && C && (cls === "code" || !v97dkSupported(k, C)) && !bad.has(k.key)) bad.set(k.key, k);
+    }); });
     const hits = [];
     if (bad.size) deck.slides.forEach((S, si) => (S && S.els || []).forEach(e => {
       if (!e || e.k !== "text" || e.name === "foot" || e.name === "pno" || e.name === "draft") return;
