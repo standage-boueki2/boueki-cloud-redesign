@@ -1,0 +1,51 @@
+/* v21.98 prod：営業資料の写真とロゴ（No.509）・全成分表の和名（No.546）の見せ方 */
+.v98p-guide{margin:10px 0 4px;padding:12px 14px;border:1px solid var(--bl,#0064BF);border-radius:var(--r2,10px);background:var(--bl-soft,#EEF5FC);min-width:0;overflow-wrap:anywhere}
+.v98p-guide.v98p-web{margin-top:14px;border-color:var(--warn,#E8A33A);background:var(--warn-soft,#FFF7EA)}
+.v98p-gh{margin:0 0 6px;font-size:var(--fs-sm,13.5px);line-height:1.6;color:var(--ink,#1A1A1A)}
+.v98p-gh b{font-size:var(--fs-md,15px)}
+.v98p-need{margin:4px 0 8px}
+.v98p-need ul{margin:2px 0 0;padding-left:1.2em;font-size:12.5px;line-height:1.7;color:var(--ink-2,#46566D)}
+.v98p-need li{margin:2px 0}
+.v98p-nh{margin:6px 0 4px;font-size:12px;font-weight:700;color:var(--ink-2,#46566D)}
+.v98p-acts{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 2px}
+.v98p-b{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:13px;line-height:1.35;white-space:normal;text-align:center;cursor:pointer;max-width:100%}
+.v98p-note{margin:6px 0 0;font-size:11.5px;line-height:1.6}
+.v98p-pend{margin-top:10px;border:1px solid var(--bl,#0064BF);background:var(--surface,#fff);min-width:0}
+.v98p-pend h3{margin:0 0 6px;font-size:var(--fs-md,16px);line-height:1.4;overflow-wrap:anywhere}
+.v98p-pend[data-v98pai="fail"],.v98p-pend[data-v98pai="run"]{border-color:var(--warn,#E8A33A)}
+.v98p-prow[data-v96dkst="pend"]{border-color:var(--bl,#0064BF)}
+.v98p-pchip{display:inline-block;width:fit-content;margin:2px 0;padding:1px 8px;border-radius:999px;background:var(--bl-soft,#EEF5FC);color:var(--bl,#0064BF);font-size:11.5px;font-weight:700;line-height:1.6;max-width:100%;overflow-wrap:anywhere}
+.v98p-slst{color:var(--ink-2,#46566D)}
+.v98p-slpend{color:var(--bl,#0064BF);font-weight:700}
+.v98p-lgst{font-size:8.5px;margin:3px 0 0;line-height:1.3;color:var(--good,#2E8B57)}
+.v98p-lgst.v98p-miss{color:var(--ink-3,#7A8699)}
+/* 登録済みの写真から選ぶ */
+.v98p-dw h3{margin:0 0 6px}
+.v98p-rg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:10px 0}
+.v98p-rgc{border:1px solid var(--line,#E3E8EF);border-radius:var(--r2,10px);padding:7px;background:var(--surface-2,#F6F7F9);min-width:0}
+.v98p-rgimg{height:90px;border-radius:6px;background:#fff;border:1px solid var(--line-2,#EDF0F4);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--ink-3,#7A8699)}
+.v98p-rgimg img{max-width:100%;max-height:100%;object-fit:contain}
+.v98p-rgn{margin:5px 0 1px;font-size:11px;line-height:1.35;color:var(--ink-2,#46566D);overflow-wrap:anywhere}
+.v98p-rgf{margin:0 0 5px;font-size:10.5px;line-height:1.35;color:var(--ink-3,#7A8699);overflow-wrap:anywhere}
+.v98p-rgb{display:flex;flex-wrap:wrap;gap:4px}
+.v98p-rgb .v98p-b{min-height:36px;font-size:12px;padding:3px 8px}
+.v98p-rgnote{margin:4px 0 0;font-size:11px;line-height:1.4}
+.v98p-empty{margin:10px 0;padding:10px 12px;border:1px dashed var(--line,#E3E8EF);border-radius:8px;font-size:12.5px;line-height:1.7}
+/* No.546 全成分表の和名が無い成分 */
+.v98p-noja{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 6px;max-width:100%}
+.v98p-nojat{display:inline-block;padding:0 6px;border:1px dashed var(--line,#C9D2DE);border-radius:999px;font-size:11px;font-weight:400;color:var(--ink-3,#7A8699);line-height:1.7}
+.v98p-jab{border:0;background:none;padding:2px 0;color:var(--bl,#0064BF);font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer;min-height:28px}
+.v98p-cand{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:11.5px;font-weight:400;color:var(--ink-2,#46566D)}
+.v98p-jaf{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;margin-top:4px}
+.v98p-jaf input{flex:1 1 140px;min-width:0;min-height:36px;font-size:13px}
+.v98p-jaf .v98p-b{min-height:36px;font-size:12.5px;padding:3px 10px}
+.v98p-jahint{flex-basis:100%;font-size:11px;font-weight:400;color:var(--ink-3,#7A8699);line-height:1.5}
+@media (max-width:600px){
+  .v98p-guide{padding:10px 11px}
+  .v98p-acts{flex-direction:column;align-items:stretch}
+  .v98p-acts .v98p-b{width:100%}
+  .v98p-rg{grid-template-columns:repeat(2,minmax(0,1fr))}
+  /* 全成分表（横に動かせる表）：和名の欄の札とボタンは縦に並べ、INCI 名は単語の途中で折らない */
+  .v98p-noja,.v98p-cand{flex-direction:column;align-items:flex-start}
+  tr[data-v68ing] td:nth-child(2){min-width:9.5em;word-break:normal;overflow-wrap:normal}
+}

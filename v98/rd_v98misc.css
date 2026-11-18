@@ -1,0 +1,21 @@
+/* 21.98 misc（rd_v98misc.js）No.530 旅程の全体 % と取り込みの % を言葉で分ける／No.520 日数は要確認／No.526 Ver1.0 の取り込みの1行 */
+html.rd .k-jny-all.v98m-jall{white-space:normal}
+html.rd .k-jny-all .v98m-avg{font-size:11.5px;font-weight:600;color:var(--rd-ink3)}
+html.rd .k-jny .v98m-jb{margin:6px 0 0;padding:6px 10px;border-radius:10px;background:var(--rd-bl-soft,#EEF5FD);font-size:12px;line-height:1.6;color:var(--rd-ink2);display:flex;flex-wrap:wrap;gap:2px 10px;min-width:0;overflow-wrap:anywhere}
+html.rd .k-jny .v98m-jb .v98m-jbf{color:var(--rd-ink);font-weight:700}
+html.rd .k-jny .v98m-jhelp{display:inline}
+/* 輪の下の1行（商品情報・商品情報を登録） */
+html.rd .v98m-rn{margin:6px 0 2px;font-size:12px;line-height:1.6;color:var(--rd-ink3,#5b6577);overflow-wrap:anywhere}
+/* ホームの「AI商社マンの成長」の言葉（説明の小さな字として隠れていたもの）：旅程の % と別の数だと分かるように見せる */
+html.rd .k-lvchip > span > small.k-qhide{display:block!important}
+/* 目安の無い COURIER の既定値 */
+html.rd .v98m-unk{background:#FFF4E5;border-color:#F6C38B;color:#9A4A00}
+html.rd .v98m-unkn{color:#9A4A00}
+/* 国のページ・AI商社マンの画面の全社版の1行に添える Ver1.0 の取り込みの状況 */
+/* 長い行は画面で数行にたたまれる（-webkit-line-clamp）ので、ブロックにせず文の中に入れる（届いていないときは行の頭） */
+.v98m-v1{display:inline;color:var(--rd-ink3,#5b6577)}
+.v98m-v1.late{color:#9A4A00;font-weight:700}
+@media (max-width:820px){
+  html.rd .k-jny-all .v98m-avg{display:block;font-size:11px}
+  html.rd .k-jny .v98m-jb{font-size:11.5px;padding:5px 8px;gap:2px 6px}
+}
