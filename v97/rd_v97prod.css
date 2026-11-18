@@ -1,0 +1,10 @@
+/* 21.97 prod：タスク（今日やること）の調査の状態（No.534）・成分表の和名なし（No.514） */
+.v97td{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:0 0 12px;padding:12px 16px;border-radius:12px;border:1px solid var(--line,#e3e7ee);background:var(--surface,#fff);font-size:14px;line-height:1.7;font-weight:600;color:var(--ink,#1f2a37)}
+.v97td .v97td-tx{flex:1 1 260px;min-width:0}
+.v97td.run{border-color:var(--bl,#2f6fde);background:var(--bl-soft,#eef4ff)}
+.v97td.ok{border-color:var(--good,#1f9d55);background:var(--good-soft,#ecf8f1)}
+.v97td.ng{border-color:#e0a106;background:#fff8e6}
+.v97td .v97td-go{flex:none}
+[data-v97noja]{font-size:12.5px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .v97td.ng{background:rgba(224,161,6,.12)}}
+:root[data-theme="dark"] .v97td.ng{background:rgba(224,161,6,.12)}

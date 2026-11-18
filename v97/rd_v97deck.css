@@ -1,0 +1,6 @@
+/* v21.97 deck（見せ方）：No.509 理由のある写真すべてを選べる箱（21.96 の箱の形のまま・直し方の一言だけ足す） */
+.v97dk-hint{font-size:var(--fs-xs,13px);color:var(--ink-3,#5f6f84);line-height:1.5;overflow-wrap:anywhere}
+.v97dk-hint::before{content:"💡 "}
+.v97dk-ph .v96dk-jprow[data-v97dkwhy~="small"] .v96dk-jpwhy,.v97dk-ph .v96dk-jprow[data-v97dkwhy~="low"] .v96dk-jpwhy{color:var(--or-deep,#B45309)}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .v97dk-hint{color:var(--ink-3,#a9b4c4)} }
+:root[data-theme="dark"] .v97dk-hint{color:var(--ink-3,#a9b4c4)}

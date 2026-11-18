@@ -1,0 +1,36 @@
+/* v21.97 fwd：中央値の出し方・COURIER の日数の目安・容積の食い違い（rd_v97fwd.js） */
+.v97fmednote{margin:8px 0 10px;padding:9px 12px;border:1px solid var(--line,#e3e7ee);border-radius:10px;background:var(--surface-2,#f7f9fc);font-size:12px;line-height:1.7;color:var(--ink-2,#3a4250)}
+.v97fmednote b{display:block;font-size:12.5px;color:var(--ink,#1d2430);margin-bottom:2px}
+.v97fmednote span{display:block}
+.v97fmednote ul{margin:4px 0 0;padding-left:18px}
+.v97fmednote li{margin:1px 0}
+.v97fbasis{display:block;margin-top:3px;font-size:11px;color:var(--ink-3,#6b7383);line-height:1.5}
+.v96ttb.v97est{background:var(--bl-soft,#e8f1ff);color:var(--bl,#1f5fbf);border-color:transparent}
+.v96ttb.v97est.reg{background:var(--good-soft,#e6f6ec);color:var(--good,#1d7a43)}
+.v97ttest{display:block;margin-top:3px;font-size:11px;color:var(--bl,#1f5fbf);line-height:1.45}
+.v97ttbulk{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0 10px;padding:9px 12px;border:1px solid var(--bl,#1f5fbf);border-radius:10px;background:var(--bl-soft,#e8f1ff);font-size:12px;line-height:1.6}
+.v97ttbulk span{flex:1 1 320px}
+.v97ttbulk .btn{flex:none}
+.v97tttbl{width:100%;font-size:12px}
+.v97tttbl td,.v97tttbl th{padding:5px 6px;vertical-align:top}
+.v97tttbl small{color:var(--ink-3,#6b7383);line-height:1.45;display:block;min-width:180px}
+.v97ttin{width:72px !important;min-height:30px}
+.v97ttwhy{margin:6px 0 0;font-size:11.5px;color:var(--ink-2,#3a4250);line-height:1.6}
+.v97ttmsg{color:var(--crit,#c0392b);font-size:12px;min-height:1em}
+.v97fvolbar{margin:10px 0;padding:11px 13px;border:1.5px solid var(--warn,#d98a00);border-radius:12px;background:var(--warn-soft,#fff6e5);font-size:12.5px;line-height:1.65}
+.v97fvolbar.ok{border-color:var(--good,#1d7a43);background:var(--good-soft,#e9f7ef)}
+.v97fvolbar-h{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.v97fvolbar-h b{font-size:13.5px}
+.v97fvolbar-amt{margin:4px 0 0;font-size:14px}
+.v97fvolbar-amt b{font-size:16px}
+.v97fvolbar-amt b.dn{color:var(--good,#1d7a43)}
+.v97fvolbar-amt b.up{color:var(--crit,#c0392b)}
+.v97fvolbar-l{margin:4px 0 0;padding-left:18px;font-size:12px}
+.v97fvolbar-act{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:8px}
+.v97fvolbar-act small{flex:1 1 260px;font-size:11px;color:var(--ink-3,#6b7383);line-height:1.5}
+.v97fvtag{display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;background:var(--warn-soft,#fff6e5);color:var(--warn-ink,#8a5600);font-size:10.5px;line-height:1.6;white-space:normal}
+.v97fvolused{margin:10px 0 4px !important;padding:7px 10px;border-radius:8px;background:var(--surface-2,#f7f9fc);font-size:11.5px;line-height:1.65}
+.v97fvoltoast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10050;display:flex;gap:10px;align-items:center;max-width:min(560px,calc(100vw - 32px));padding:10px 12px 10px 16px;border-radius:12px;background:var(--ink,#1d2430);color:#fff;font-size:12.5px;box-shadow:0 8px 28px rgba(0,0,0,.25)}
+.v97fvoltoast .btn{flex:none;background:#fff;color:var(--ink,#1d2430)}
+.v97fvoltoast-x{flex:none;background:none;border:0;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:2px 4px}
+@media (max-width:600px){.v97fvolbar-act .btn{width:100%}.v97ttbulk .btn{width:100%}}

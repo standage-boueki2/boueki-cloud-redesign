@@ -1,0 +1,23 @@
+/* 21.97 分野 ai の見せ方：ログイン画面の「確かめる順番・回数・待ち時間」・「自己申告」の札・AI のカウンタ（式・先に届く上限・今月の回数） */
+#lgv .v97ai-lgh{margin:8px 0 2px;padding:10px 12px;border-radius:10px;border:1px solid var(--line,#D8DEE8);background:var(--surface-2,#F6F8FB);color:var(--ink-2,#3B4A61);font-size:13px;line-height:1.7;text-align:left}
+#lgv .v97ai-lgh[data-st="lock"]{border-color:#E7A39B;background:#FDF0EE}
+#lgv .v97ai-lgh p{margin:0}
+#lgv .v97ai-lgh p + p,#lgv .v97ai-lgh ul + p{margin-top:6px}
+#lgv .v97ai-lgl b{display:block;color:#A32B1F;font-size:14px}
+#lgv .v97ai-lgsl{margin:2px 0 0;padding-left:0;list-style:none}
+#lgv .v97ai-lgsl li{margin:2px 0}
+#lgv .v97ai-lgn{font-size:12px;color:var(--ink-3,#6b7280)}
+#lgv .v97ai-lgc{font-weight:700;color:var(--ink,#1f2933)}
+#lgv #lg-go[data-v97lock="1"]{opacity:.55;cursor:not-allowed}
+/* 自己申告の札（やりとりの投稿者） */
+.v97ai-self{display:inline-block;margin-left:6px;padding:0 6px;border-radius:9px;border:1px solid var(--warn,#b26a00);color:var(--warn-ink,#8a4b00);background:var(--warn-soft,#fff4e0);font-size:11px;font-weight:700;line-height:18px;vertical-align:1px}
+/* AI のカウンタ */
+.v97ai-q .v97ai-head b{font-size:14px}
+.v97ai-q .v97ai-first,.v97ai-q .v97ai-mon,.v97ai-q .v97ai-dq{display:block;font-size:12.5px;line-height:1.65;color:var(--ink-2,#3d4a5c)}
+.v97ai-q .v97ai-first{padding:5px 10px;border-left:3px solid var(--bl,#0064BF);background:var(--surface-2,#F6F8FB);border-radius:0 6px 6px 0}
+.v97ai-q .v97ai-mon small,.v97ai-q .v97ai-dq small{display:block;font-size:11.5px;color:var(--ink-3,#6b7280);font-weight:400}
+.v97ai-q .v97ai-dq{padding-top:4px;border-top:1px dashed var(--line,#D8DEE8)}
+@media (max-width:600px){
+  #lgv .v97ai-lgh{font-size:12.5px}
+  .v97ai-q .v97ai-first,.v97ai-q .v97ai-mon,.v97ai-q .v97ai-dq{font-size:12px}
+}

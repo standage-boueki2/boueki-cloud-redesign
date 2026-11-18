@@ -1,0 +1,49 @@
+/* 21.97 cty：前回の分析からの変化（No.517）・要約と詳細の照合（No.536）・規制の AI 詳細調査の調べ直しと内蔵データ（No.515/508）・計算の根拠（No.537） */
+.v97cty-wrap{margin:10px 0 2px;display:flex;flex-direction:column;gap:8px}
+.v97cty-diff{border:1px solid var(--line,#e3e6ec);border-radius:12px;background:var(--surface,#fff);padding:0}
+.v97cty-diff>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;font-weight:700;font-size:13px}
+.v97cty-diff>summary::-webkit-details-marker{display:none}
+.v97cty-diff>summary::before{content:"▸";color:var(--ink-3,#8a90a0);transition:transform .15s}
+.v97cty-diff[open]>summary::before{transform:rotate(90deg)}
+.v97cty-diff>summary small{font-weight:600;font-size:11.5px;color:var(--ink-3,#6b7280);background:var(--surface-2,#f4f6f9);border-radius:999px;padding:2px 9px}
+.v97cty-diff>summary small.chg{color:var(--or-deep,#b45309);background:var(--or-soft,#fff4e5)}
+.v97cty-diff>*:not(summary){margin:0 14px}
+.v97cty-diff>*:last-child{margin-bottom:12px}
+.v97cty-top{font-size:13px;line-height:1.7}
+.v97cty-top.chg b{color:var(--or-deep,#b45309)}
+.v97cty-same{font-size:12.5px;color:var(--ink-2,#4b5563);line-height:1.7}
+.v97cty-diff>ul.v97cty-why{margin:6px 14px 0 32px;padding:0;font-size:12.5px;line-height:1.75}
+.v97cty-sub{margin-top:8px!important;font-size:12px;color:var(--ink-3,#6b7280)}
+.v97cty-diff>ul.v97cty-per{list-style:none;margin:4px 14px 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.v97cty-per>li>details{border:1px solid var(--line-2,#eceff3);border-radius:9px;padding:6px 10px;background:var(--surface-2,#f8f9fb)}
+.v97cty-per summary{cursor:pointer;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:12.5px}
+.v97cty-per summary .v97cty-mv{font-variant-numeric:tabular-nums;font-weight:700}
+.v97cty-per summary small{font-size:11px;color:var(--ink-3,#6b7280)}
+.v97cty-per ul{margin:6px 0 2px 16px;padding:0;font-size:12px;line-height:1.7;color:var(--ink-2,#4b5563)}
+.v97cty-note{font-size:11.5px;color:var(--ink-3,#6b7280);line-height:1.6;margin-top:8px!important}
+.v97cty-audit{border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7}
+.v97cty-audit.bad{border:1px solid var(--crit,#dc2626);background:var(--crit-soft,#fef2f2)}
+.v97cty-audit.bad b{color:var(--crit,#b91c1c)}
+.v97cty-audit.bad ul{margin:4px 0 4px 18px;padding:0}
+.v97cty-audit.ok{color:var(--good,#047857);font-size:12px;padding:2px 2px}
+.v97reg-add{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.v97reg-att,.v97reg-known{border:1px solid var(--line,#e3e6ec);border-radius:10px;padding:9px 12px;background:var(--surface,#fff);font-size:12.5px;line-height:1.7}
+.v97reg-att ol{margin:4px 0 4px 20px;padding:0}
+.v97reg-att li.pm{color:var(--crit,#b91c1c)}
+.v97reg-att li.ok{color:var(--good,#047857)}
+.v97reg-att p,.v97reg-known p{margin-top:4px;color:var(--ink-2,#4b5563)}
+.v97reg-known{border-color:var(--good,#10b981);background:var(--good-soft,#ecfdf5)}
+.v97reg-known>ul{margin:4px 0 2px 18px;padding:0}
+.v97reg-known ul ul{margin:2px 0 2px 14px;padding:0}
+.v97reg-known small{display:block;color:var(--ink-3,#6b7280)}
+.v97reg-lv{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:0 6px;background:var(--surface-2,#f1f5f9)}
+.v97reg-lv.req{color:#fff;background:var(--crit,#dc2626)}
+.v97reg-lv.con{color:var(--or-deep,#b45309);background:var(--or-soft,#fff4e5)}
+.v97reg-lv.ban{color:#fff;background:#111827}
+.v97reg-act{display:flex;gap:8px;flex-wrap:wrap}
+.v97reg-later.on{border-color:var(--or,#f59e0b)}
+.v97-dup{display:none!important}
+.v97calc{margin-top:8px;padding:7px 10px;border-radius:8px;font-size:12.5px;line-height:1.65;font-variant-numeric:tabular-nums}
+.v97calc.ok{background:var(--good-soft,#ecfdf5);color:var(--ink-1,#1f2937);border:1px solid var(--good,#10b981)}
+.v97calc.ng{background:var(--or-soft,#fff4e5);border:1px solid var(--or,#f59e0b)}
+@media (max-width:600px){.v97cty-diff>*:not(summary){margin:0 10px}.v97cty-diff>ul.v97cty-why{margin:6px 10px 0 26px}.v97cty-diff>ul.v97cty-per{margin:4px 10px 0}.v97cty-diff>summary{padding:9px 10px}}
