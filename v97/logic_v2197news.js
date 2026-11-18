@@ -48,3 +48,22 @@ function v97news() {
   } catch (e) { v97newsErr("news", e); }
 }
 v97news();
+/* 21.97.1（同じ日・管理者の再試行で見つかったもの）：管理コンソール */
+var V21971_NEWS_TITLE = "管理コンソールの表示をそろえる直し（AI の利用量の上限・期限切れの札・商社デスクと CS 横断の件数）";
+var V21971_NEWS_ITEMS = [
+  "管理コンソールの AI 接続：「利用量（%）の見方」の上限の数を、上の「AI の利用量の上限」の行と同じ同期サーバーの設定から出すようにしました（デモ用の上限の数が食い違っていました）",
+  "管理コンソールの今日の作業：期限が過ぎたアカウントの札を「期限切れ（延長か停止を決める）」にし、数え方を札の説明に書きました",
+  "管理コンソール：商社デスクと CS 横断の欄は、開いたときに前の取得から3分以上たっていれば取り直し、取得した時刻を出します"
+];
+function v97news1() {
+  try {
+    if (typeof S30_NEWS === "undefined" || !Array.isArray(S30_NEWS)) return;
+    let x = S30_NEWS.find((r) => r && r[1] === "v21.97.1");
+    if (!x) { x = ["2026-11", "v21.97.1", V21971_NEWS_TITLE, []]; S30_NEWS.unshift(x); }
+    if (!Array.isArray(x[3])) x[3] = [];
+    V21971_NEWS_ITEMS.forEach((s) => { if (s && x[3].indexOf(s) < 0) x[3].push(s); });
+    const idx = new Map(S30_NEWS.map((r, i) => [r, i]));
+    S30_NEWS.sort((a, b) => (v97newsVerN(b && b[1]) - v97newsVerN(a && a[1])) || (idx.get(a) - idx.get(b)));
+  } catch (e) { v97newsErr("news1", e); }
+}
+v97news1();
