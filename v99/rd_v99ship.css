@@ -1,0 +1,33 @@
+/* 21.99 ship（刷新版の見せ方）No.530・551・520・550 */
+/* No.530：7ステップの平均の % は出さない（21.98 の「貿易の旅程 全体 N%」・内訳の1行・輪の下の1行・見方の足し書きは隠す） */
+#rdjny .k-jny-all, #rdjny .v98m-jall, #rdjny .v98m-jb, #rdjny .v98m-jhelp, .v98m-rn { display: none !important; }
+#rdjny .v99s-all { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-left: 8px; font-size: 13.5px; font-weight: 700; color: var(--k-ink2, #4a5568); }
+#rdjny .v99s-all b { font-size: 16px; color: var(--k-ink, #1a202c); }
+#rdjny .v99s-all .v99s-cnt { padding: 1px 8px; border-radius: 999px; background: var(--k-bg2, #eef2f7); color: var(--k-ink, #1a202c); white-space: nowrap; }
+#rdjny .v99s-jb { margin: 6px 16px 2px; font-size: 13px; line-height: 1.7; color: var(--k-ink2, #4a5568); overflow-wrap: anywhere; }
+#rdjny .v99s-jb .v99s-jbf { display: block; color: var(--k-ink, #1a202c); }
+.v99s-rn { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--k-ink2, #4a5568); overflow-wrap: anywhere; }
+/* No.551・No.520：荷主の AI見積の窓の「届いた見積」 */
+.v99s-qsum { font-size: 13.5px; line-height: 1.7; }
+.v99s-qsum .v99s-qline { margin: 0 0 6px; }
+.v99s-qtw { overflow-x: auto; max-width: 100%; }
+.v99s-qt { width: 100%; border-collapse: collapse; font-size: 13px; }
+.v99s-qt th, .v99s-qt td { padding: 5px 8px; border-bottom: 1px solid var(--k-line, #e2e8f0); text-align: left; vertical-align: top; }
+.v99s-qt .r { text-align: right; white-space: nowrap; }
+.v99s-qt small { display: block; font-size: 11.5px; color: var(--k-ink3, #718096); }
+.v99s-qt .v99s-old { color: #b45309; }
+.v99s-qpend, .v99s-qcour { margin: 8px 0 0; font-size: 12.5px; color: var(--k-ink2, #4a5568); overflow-wrap: anywhere; }
+/* No.550：規制の AI 詳細調査の「未完了」 */
+.v99s-inc { margin: 4px 0 10px; padding: 11px 13px; border: 1.5px solid var(--warn, #d97706); border-radius: 10px; background: var(--or-soft, #fff7ed); font-size: 12.5px; line-height: 1.8; overflow-wrap: anywhere; }
+.v99s-inc .v99s-inch { display: block; font-size: 13.5px; color: var(--crit, #b91c1c); }
+.v99s-inc ul { margin: 4px 0 6px; padding-left: 18px; }
+.v99s-inc .v99s-incb { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.v99s-inc small { display: block; color: var(--ink-2, #4a5568); }
+.v99s-prev { margin-top: 8px; padding: 6px 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; }
+.v99s-prev summary { cursor: pointer; font-weight: 700; font-size: 12.5px; }
+@media (max-width: 600px) {
+  #rdjny .v99s-all { margin-left: 0; font-size: 12.5px; }
+  #rdjny .v99s-jb { margin: 6px 10px 2px; font-size: 12.5px; }
+  .v99s-qt th, .v99s-qt td { padding: 4px 5px; font-size: 12px; }
+}
+#regaiO.v99s-incon > :not(.v99s-inc):not(.v99s-prev) { display: none !important; }

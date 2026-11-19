@@ -1,0 +1,24 @@
+/* 21.99 cty：前回の分析との比較（No.517）・国の行の下の点の動き・同じ点の理由・競合の未評価の理由・進出希望国の希望なし（No.549） */
+.v99cty-sum{margin:8px 0 10px;padding:10px 14px;border:2px solid var(--or,#f59e0b);border-radius:12px;background:var(--surface,#fff);font-size:12.5px;line-height:1.7;color:var(--ink-1,#1f2937);overflow-wrap:anywhere}
+.v99cty-sum p{margin:0 0 4px!important}
+.v99cty-sum .v99cty-ttl{font-size:14px;margin-bottom:6px!important}
+.v99cty-sum .v99cty-hint{color:var(--ink-2,#4b5563);font-size:12px}
+.v99cty-sum .v99cty-ver{color:var(--or-deep,#b45309)}
+.v99cty-sum .v99cty-none{background:var(--surface-2,#f4f6f9);border-radius:8px;padding:5px 9px}
+.v99cty-cwbox{margin-top:6px;padding:7px 10px;border-radius:8px;background:var(--surface-2,#f4f6f9)}
+.v99cty-cwbox .v99cty-src{color:var(--ink-3,#6b7280);font-size:11.5px}
+tr.v99cty-chg>td{padding:0 8px 8px!important;border-top:0!important;background:var(--surface,#fff)}
+.v99cty-in{position:sticky;left:0;max-width:min(880px,calc(100vw - 48px));white-space:normal;font-size:12px;line-height:1.65;color:var(--ink-1,#1f2937);border-left:3px solid var(--or,#f59e0b);padding:4px 10px;background:var(--surface-2,#f8f9fb);border-radius:0 8px 8px 0;overflow-wrap:anywhere}
+.v99cty-in p{margin:0!important}
+.v99cty-in .v99cty-mv.same{color:var(--ink-2,#4b5563)}
+.v99cty-in .v99cty-ax{display:block;font-weight:600;color:var(--or-deep,#b45309)}
+.v99cty-in ul.v99cty-why{margin:2px 0 4px 18px!important;padding:0!important}
+.v99cty-in ul.v99cty-why>li{margin:0;list-style:disc}
+.v99cty-in .v99cty-tw,.v99cty-in .v99cty-cw{margin-top:4px!important}
+.v99cty-tchg{margin:2px 0 8px;font-size:12px;font-weight:700;line-height:1.5;color:var(--ink-2,#4b5563);overflow-wrap:anywhere}
+.v99cty-tchg.up{color:var(--good,#047857)}
+.v99cty-tchg.dn{color:var(--crit,#b91c1c)}
+@media (max-width:600px){.v99cty-sum{padding:9px 10px;font-size:12px}.v99cty-in{max-width:calc(100vw - 40px)}}
+.v99cty-twbox{margin-top:6px;padding:7px 10px;border-radius:8px;background:var(--surface-2,#f4f6f9)}
+.v99cty-twbox ul.v99cty-why{margin:2px 0 2px 18px!important;padding:0!important}
+.v99cty-sum .v99cty-ct{color:var(--ink-2,#4b5563);font-size:12px;background:var(--surface-2,#f4f6f9);border-radius:8px;padding:5px 9px}

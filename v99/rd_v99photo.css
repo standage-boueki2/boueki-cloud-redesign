@@ -1,0 +1,39 @@
+/* v21.99 photo（見せ方）：写真・ロゴの使い方の箱（No.509）・作る前／作った後の写真の箱（No.552）
+   箱の中は入れ子にしない（見出し・説明・写真の名前・状態・理由・ボタンを箱の直下に並べる）。並びは折り返しの横並びで作る */
+.v99ph{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:10px;min-width:0;border:1px solid var(--bl,#0064BF);background:var(--surface,#fff)}
+.v99ph-ask{border:0;margin:0;padding:0;background:transparent}
+.v99ph-after{border-color:var(--warn,#E8A33A);background:var(--warn-soft,#FFF7EA);margin:10px 0}
+.v99ph > .v99ph-h{flex:1 1 100%;margin:0;font-size:var(--fs-md,16px);line-height:1.45;overflow-wrap:anywhere}
+.v99ph-lead{flex:1 1 100%;margin:0 0 2px;font-size:13px;line-height:1.65;color:var(--ink-2,#3b4a5c);overflow-wrap:anywhere}
+.v99ph-grp{flex:1 1 100%;margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line,#E3E8EF);font-size:13px;font-weight:700;color:var(--ink,#1A1A1A);overflow-wrap:anywhere}
+.v99ph-grp[data-v99grp="flag"]{color:var(--or-deep,#B45309)}
+.v99ph-th{flex:0 0 72px;width:72px;height:54px;object-fit:contain;background:#fff;border:1px solid var(--line,#E3E8EF);border-radius:6px}
+.v99ph-none{display:inline-grid;place-items:center;font-size:22px;color:var(--ink-3,#7A8699)}
+.v99ph-nm{margin:0;flex:0 0 auto;font-weight:800;font-size:14px}
+.v99ph-st{margin:0;flex:1 1 220px;min-width:0;font-size:12.5px;font-weight:700;line-height:1.5;overflow-wrap:anywhere}
+.v99ph-st[data-v99st="good"],.v99ph-st[data-v99st="use"]{color:var(--good,#2E8B57)}
+.v99ph-st[data-v99st="flag"]{color:var(--or-deep,#B45309)}
+.v99ph-st[data-v99st="pend"]{color:var(--bl,#0064BF)}
+.v99ph-st[data-v99st="no"],.v99ph-st[data-v99st="none"]{color:var(--ink-3,#6B7A90)}
+.v99ph-why{margin:0 0 0 80px;flex:1 1 100%;font-size:12px;line-height:1.55;color:var(--ink-2,#3b4a5c);overflow-wrap:anywhere}
+.v99ph-b{min-height:36px;padding:4px 10px;font-size:12.5px;line-height:1.35;white-space:normal;text-align:center;max-width:100%}
+.v99ph-b[aria-pressed="true"]{background:var(--good-soft,#E8F5EE);border-color:var(--good,#2E8B57);color:var(--good,#1E6B43);font-weight:800}
+.v99ph-b[aria-pressed="true"]::before{content:"✓ "}
+.v99ph-br{flex:1 1 100%;height:0;margin:0;padding:0}
+/* 写真の欄（ロゴ・商品写真1〜10）のボタン */
+.v99ph-sb{padding:3px 8px;font-size:10px;min-height:28px}
+.v99ph-dw{min-width:0}
+/* 画面の文の幅の決まり（p の max-width）・カードの並べ方に左右されないように */
+.v99ph.v99ph{display:flex!important;flex-wrap:wrap!important;grid-template-columns:none}
+.v99ph > p,.v99ph > h3{max-width:none!important}
+.v99ph > .v99ph-lead,.v99ph > .v99ph-grp,.v99ph > .v99ph-why,.v99ph > .v99ph-br,.v99ph > .v99ph-h{flex-basis:100%!important;flex-grow:1;width:100%}
+.v99ph > .v99ph-why{width:auto}
+@media (max-width:600px){
+  .v99ph-why{margin-left:0}
+  .v99ph-th{flex-basis:60px;width:60px;height:45px}
+  .v99ph-st{flex-basis:calc(100% - 140px)}
+  .v99ph-b{flex:1 1 calc(50% - 8px)}
+  .v99ph-sb{min-height:32px}
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .v99ph{background:var(--surface,#1e2430)} }
+:root[data-theme="dark"] .v99ph{background:var(--surface,#1e2430)}
