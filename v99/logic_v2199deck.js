@@ -1236,7 +1236,7 @@ document.addEventListener("click", e => {
     const T = v99dkCur(); if (!T) return;
     const L = v99dkNgList(T).slice();
     const push = (s) => { s = String(s || "").trim().slice(0, 80); if (s && !L.some(x => v99dkNF(x.t).toLowerCase() === v99dkNF(s).toLowerCase())) L.push({ t: s, at: new Date().toISOString() }); };
-    if (add) { const inp = document.getElementById("v99dkngin"); const v = inp ? inp.value : ""; if (!String(v).trim()) { if (typeof toast === "function") toast(v99dkM("載せない言葉・数値を入れてください", "Enter a word or figure to leave out", "请输入不放入的词语・数值", "Escriba una palabra o cifra")); return; } String(v).split(/[、,／\/]\s*(?=\D)|\n/).forEach(push); }
+    if (add) { const inp = document.getElementById("v99dkngin"); const v = inp ? inp.value : ""; if (!String(v).trim()) { if (typeof toast === "function") toast(v99dkM("載せない言葉・数値を入れてください", "Enter a word or figure to leave out", "请输入不放入的词语・数值", "Escriba una palabra o cifra")); return; } String(v).split(/[、，]\s*|,\s*(?=\D)|\s+[／\/]\s+|(?<![A-Za-z㎜㎏µμ])／|／(?![A-Za-z])|\n/).map(x => String(x || "").trim()).filter(x => x && !/^[A-Za-z]$/.test(x)).forEach(push); /* 11/20：単位の中の「/」（0.8 mm/s・km/h）では分けない。1文字だけの語は指示にしない */ }
     if (pick) { const d = v99dkDroppedNow()[+pick.getAttribute("data-v99dkngpick")]; if (d) v99dkTermOf(d.txt).forEach(push); }
     if (del) { const i = +del.getAttribute("data-v99dkngdel"); if (i >= 0 && i < L.length) L.splice(i, 1); }
     v99dkNgSave(T, L);
@@ -1262,3 +1262,35 @@ try {
     ].reverse().forEach(p => I18N.pat.unshift(p));
   }
 } catch (e) { v99dkErr("i18n", e); }
+
+/* ══════════ 11/20 まとめ役（本番の実操作で見つけた残り）：ヒアリングの AI の読み取りが答えの一部を落とす ══════════
+   本番では、ヒアリングの答えを AI が「この項目に登録する値」に整える段（llmFillTriage）で、C の材質表の答え
+   「材質：軸受鋼 SUJ2／内径：20mm／外径：47mm／幅：14mm」から内径・外径・幅を落とし「材質：軸受鋼 SUJ2」だけを返した
+   （手元の模擬の AI では起きない経路。利用者が答えた数値が黙って消え、英語資料の仕様の表にも出なかった）。
+   成分表・材質表・寸法・強みの問いでは、利用者が打った数値・「項目：値」が AI の値から消えたら、打ったとおりの答えで登録する
+   （表への分け方はアプリの読み取り〈v68 の材質表・上の「1つの値に2つの項目」の分け方〉に任せる。AI の回数は増やさない）。 */
+if (typeof llmFillTriage === "function") {
+  const __ft99 = llmFillTriage;
+  llmFillTriage = async function (cu, v) { // eslint-disable-line no-global-assign
+    const j = await __ft99.apply(this, arguments);
+    try {
+      const k = cu && cu.k;
+      if (j && j.kind === "answer" && /^(compRows|dimRows|strengths)$/.test(String(k || ""))) {
+        const raw = String(v == null ? "" : v).trim();
+        const val = String(j.value == null ? "" : j.value);
+        const N = (s) => v99dkNF(String(s || ""));
+        const nums = (s) => (N(s).match(/\d+(?:\.\d+)?/g) || []);
+        const labs = (s) => (N(s).match(/(?:^|[\/／、，,\n　\s])([^\/／、，,\n　\s：:0-9]{1,12})\s*[：:]/g) || []).map(x => x.replace(/^[\/／、，,\n　\s]/, "").replace(/\s*[：:]$/, "").trim()).filter(Boolean);
+        const vn = nums(val), vl = labs(val);
+        const lostN = nums(raw).filter(n => vn.indexOf(n) < 0);
+        const lostL = labs(raw).filter(l => vl.indexOf(l) < 0);
+        if (raw && val && (lostN.length || lostL.length)) {
+          j.value = raw;
+          V99DECK.triageRaw = { k, lostN: lostN.slice(0, 8), lostL: lostL.slice(0, 8), at: Date.now() };
+          v99dkN("triageRaw");
+        }
+      }
+    } catch (e) { v99dkErr("triage99", e); }
+    return j;
+  };
+}
