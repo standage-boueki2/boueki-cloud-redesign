@@ -328,7 +328,11 @@ function v99fCtxDedupe(s) {
     if (a < 0 || b < 0 || b < a) return t;
     const sec = t.slice(a, b);
     const lines = sec.split("\n");
-    const keep = lines.filter((ln) => !/^・.+ COURIER（/.test(ln));
+    /* 21.99.3（11/20 回帰の洗い出し）：21.97 の節は有効期限内のレートしか載せない。期限切れの COURIER のレーン（例：ベトナム）まで外すと
+       「日数は既定値」の印が AI に届かなくなったため、21.97 の節に同じレーンがある行だけを外す */
+    const sec97 = t.slice(b);
+    const dup97 = (ln) => { const m = /^(・.+?) COURIER（/.exec(ln); return !!m && sec97.indexOf("\n" + m[1] + " COURIER：") >= 0; };
+    const keep = lines.filter((ln) => !dup97(ln));
     const body = keep.filter((ln) => /^・/.test(ln));
     let ns;
     if (!body.length) ns = "";   /* COURIER だけだった＝21.97 の節と同じ中身 */

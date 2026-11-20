@@ -269,3 +269,35 @@
     } catch (e) { err("tick", e); }
   }, 500);
 })();
+
+/* 21.99.3（11/20 回帰の洗い出し）：ログイン画面で誤ったコードを入れたときの 21.97 の説明（#v97lgHelp）が、21.99 の決め
+   （体験用のコードでは名前を照らさない＝V97AI_OPEN_VERIFY=0・RESULT_adm 80-90）と食い違っていた（「体験用のコードでも…照らし合わせます」
+   「お名前だけが違うときはお知らせします」）。照らし合わせを切っているときだけ、その2か所を今の動きに合わせる（日英中西） */
+(function () {
+  try {
+    const REP = [
+      ["（体験用のコードでも、登録されたお名前があれば照らし合わせます）", "（体験用のコードでは、お名前は確かめません）"],
+      ["(trial codes are also checked against registered names, if any)", "(with a trial code, the name is not verified)"],
+      ["（体验用代码如有登记姓名也会核对）", "（使用体验用代码时不核对姓名）"],
+      ["(los códigos de prueba también se cotejan si hay nombres registrados)", "(con un código de prueba no se verifica el nombre)"],
+      ["（体験用の共通のコードで、お名前だけが違うときは、そのことをお知らせします）", ""],
+      [" (for the shared trial codes, we do tell you when only the name is wrong)", ""],
+      ["（体验用共用代码仅姓名有误时会告知）", ""],
+      [" (en los códigos de prueba compartidos sí avisamos si solo falla el nombre)", ""]
+    ];
+    const off = () => { try { return typeof V97AI_OPEN_VERIFY !== "undefined" && !V97AI_OPEN_VERIFY; } catch (e) { return false; } }; // eslint-disable-line no-undef
+    const fix = () => {
+      try {
+        if (!off()) return;
+        const el = document.getElementById("v97lgHelp"); if (!el) return;
+        const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        const ns = []; while (tw.nextNode()) ns.push(tw.currentNode);
+        ns.forEach((n) => { const t0 = n.nodeValue || ""; let t = t0; REP.forEach(([a, b]) => { if (t.indexOf(a) >= 0) t = t.split(a).join(b); }); if (t !== t0) n.nodeValue = t; });
+        if (typeof V99ADM !== "undefined" && V99ADM && V99ADM.n) V99ADM.n.lgHelp = (V99ADM.n.lgHelp || 0) + 1;
+      } catch (e) { try { v99admErr("lghelp", e); } catch (z) { /* 無視 */ } }
+    };
+    new MutationObserver(() => { if (document.body && document.body.classList.contains("locked") && document.getElementById("v97lgHelp")) fix(); })
+      .observe(document.body || document.documentElement, { childList: true, subtree: true, characterData: true });
+    setTimeout(fix, 0);
+  } catch (e) { try { v99admErr("lghelpwrap", e); } catch (z) { /* 無視 */ } }
+})();

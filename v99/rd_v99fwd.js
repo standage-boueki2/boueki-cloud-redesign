@@ -73,7 +73,8 @@
         const b = idTd.querySelector("b");
         const btn = document.createElement("button");
         btn.type = "button"; btn.className = "v99frid"; btn.setAttribute("data-v99rid", id); btn.setAttribute("data-noi18n", "");
-        btn.innerHTML = `<b>${E(id)}</b><span class="v99fridx">${E(M("明細を開く", "Open details", "打开明细", "Ver detalle"))}</span>`;
+        /* 21.99.3：番号と「Open details」の間に空白（英語・スペイン語で「RQ-…Open」とつながり、21.96・21.97 の層が依頼を見失って B/L の札が消えていた） */
+        btn.innerHTML = `<b>${E(id)}</b> <span class="v99fridx">${E(M("明細を開く", "Open details", "打开明细", "Ver detalle"))}</span>`;
         if (b) b.replaceWith(btn); else { idTd.textContent = ""; idTd.appendChild(btn); }
       }
       /* 日数のセル */
@@ -211,7 +212,9 @@
       if (!del) return;
       const i = +del.dataset.frdel, W = A.by[i] || [];
       const want = W.map((x) => x.k + ":" + x.label).join("|");
-      tr.dataset.v99why = W.map((x) => x.k).join(" ");
+      /* 21.99.3：値が変わったときだけ書く（毎回書くと見張りどうしで書き換えが回り続けた・11/20 回帰の洗い出し K09） */
+      const why = W.map((x) => x.k).join(" ");
+      if (tr.dataset.v99why !== why) tr.dataset.v99why = why;
       const old = tr.querySelectorAll(".v90fchk");
       if ((tr.dataset.v99ws || "") === want && (!W.length || [...old].every((o) => o.hidden))) return;
       tr.dataset.v99ws = want;
@@ -246,9 +249,13 @@
       const b = ev.target && ev.target.closest && ev.target.closest("[data-v99whyf]");
       if (!b) return;
       ev.preventDefault();
+      const prevF = WHYF.f;
       WHYF.f = b.getAttribute("data-v99whyf") || "";
-      /* 期限切れでたたんだ行も、理由で絞るときは開く（21.89 の札と同じ） */
+      /* 期限切れでたたんだ行も、理由で絞るときは開く（21.89 の札と同じ）
+         21.99.3：絞り込む前の「期限切れの行をたたんでいたか」を覚え、「すべての行」に戻したら元どおりにたたむ（11/20 回帰の洗い出し K05） */
+      if (WHYF.f && !prevF) { try { WHYF.exp0 = typeof v89fShowGet === "function" ? !!v89fShowGet() : null; } catch (e) { WHYF.exp0 = null; } }
       if (WHYF.f && typeof window.v89fShowExpired === "function") { try { window.v89fShowExpired(true); } catch (e) { /* 無視 */ } }
+      else if (!WHYF.f && prevF) { if (WHYF.exp0 === false && typeof window.v89fShowExpired === "function") { try { window.v89fShowExpired(false); } catch (e) { /* 無視 */ } } WHYF.exp0 = null; }
       const w = well(); if (!w) return;
       w.querySelectorAll("[data-v99whyf]").forEach((x) => { const on = (x.getAttribute("data-v99whyf") || "") === WHYF.f; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
       const t = [...w.querySelectorAll("table")].find((x) => x.querySelector("tbody [data-frdel]"));
@@ -429,15 +436,23 @@
       cnt("navFix");
     } catch (e) { err("navfix", e); }
   }
-  /* 「すべての機能」の見出しを押した＝押す前の見た目の逆を覚える（記録が使えないブラウザでも） */
+  /* 「すべての機能」の見出しを押した＝押す前の見た目の逆を覚える（記録が使えないブラウザでも）
+     21.99.3（11/20 大森さん「押しても閉じない」）：元の rd.js の onSide も同じクリックで rd_navall を逆にするため、
+     ここで覚えたあとに元の処理が走ると2回ひっくり返って閉じなかった。開け閉めはここで1回だけ行い、元の処理には渡さない */
   document.addEventListener("click", (ev) => {
     try {
       const f = ev.target && ev.target.closest && ev.target.closest("#rdside [data-rdall]");
       if (!f) return;
+      ev.stopPropagation();
+      ev.preventDefault();
       const all = document.querySelector("#rdside .rd-all");
       const was = !!(all && all.classList.contains("open"));
       navSet(f.classList.contains("rd-here") ? true : !was);
-      setTimeout(navFix, 0);
+      if (window.RDX && typeof RDX.buildSide === "function") RDX.buildSide();
+      navFix();
+      const h = document.querySelector("#rdside .rd-allh");
+      if (h) { try { h.focus({ preventScroll: true }); } catch (e) { /* 無視 */ } }
+      cnt("navToggle");
     } catch (e) { err("navclick", e); }
   }, true);
   /* スマホの下の帯：「メニュー」→「すべて」（押すと「すべての機能」を開いたメニュー） */

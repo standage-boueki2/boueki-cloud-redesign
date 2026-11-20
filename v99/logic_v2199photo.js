@@ -227,7 +227,17 @@ var V99PHOTO = window.V99PHOTO = { v: "21.99", err: null, errs: [], n: { panel: 
       }
       V99PHOTO.n.panel++;
       const label = mode === "ask" ? M("作る前に写真を確かめる", "Check the photos before making", "制作前确认照片", "Revisar las fotos antes de crear") : mode === "after" ? M("資料に入らなかった写真", "Photos not in the deck", "未放入资料的照片", "Fotos que no están en la presentación") : M("写真・ロゴの使い方", "How to use the photos and logo", "照片・标志的使用方式", "Uso de las fotos y el logo");
-      return `<div class="${mode === "ask" ? "" : "c "}v99ph v99ph-${mode}" role="region" aria-label="${E(label)}" data-v99phpanel="${mode}" data-noi18n="1">` +
+      /* 21.99.3（11/20 回帰の洗い出し R1）：21.96 の「情報の入力状況」の写真の行の「文字入りの写真を選ぶ」（rd_v96deck.js の jump()）は
+         21.96〜21.98 の箱（data-v96dkjpbox）を行き先にしていた。この層で箱を1つにまとめたため行き先が無くなりボタンが消えていた。
+         営業資料の画面の箱で、21.96 と同じ条件（日本語の文字が写っている写真がある）のときは、この箱を行き先にする */
+      let jpBox = false;
+      if (mode !== "ask" && mode !== "after") {
+        try {
+          if (typeof v96dkPhSum === "function") { const S6 = v96dkPhSum(T); jpBox = !!(S6 && S6.L && S6.L.some((x) => x.st === "jpAsk" || x.st === "jpUse" || x.st === "jpNo" || (x.o && (x.o.v96edit || (typeof v96dkJpFlag === "function" && v96dkJpFlag(x.o) && x.st === "bad"))))); }
+          else jpBox = flagU.length > 0;
+        } catch (e) { jpBox = flagU.length > 0; }
+      }
+      return `<div class="${mode === "ask" ? "" : "c "}v99ph v99ph-${mode}" role="region" aria-label="${E(label)}" data-v99phpanel="${mode}"${jpBox ? ' data-v96dkjpbox="1"' : ""} data-noi18n="1">` +
         `<h3 class="v99ph-h">${E(head)}</h3><p class="v99ph-lead">${E(lead)}</p>` + (bulk ? bulk + `<span class="v99ph-br" aria-hidden="true"></span>` : "") + rows + go + `</div>`;
     } catch (e) { err("panel", e); return ""; }
   }
@@ -689,4 +699,51 @@ var V99PHOTO = window.V99PHOTO = { v: "21.99", err: null, errs: [], n: { panel: 
       ].reverse().forEach((p) => I18N.pat.unshift(p)); // eslint-disable-line no-undef
     }
   } catch (e) { err("i18n", e); }
+})();
+
+/* 21.99.3（11/20 回帰の洗い出し）：21.99 で写真の理由の言い方を「AI の見立て：…」「…の可能性」に変えたが、21.97 の訳の表（v97dkWTr）は
+   「AI の判定」などの前の言い方しか知らず、英語などの画面の最終チェックに日本語が残っていた。訳す前に 21.99 の言い方を訳してから 21.97 の訳に渡す */
+(function () {
+  try {
+    if (typeof v97dkWTr !== "function") return;
+    const T99 = [
+      ["AI の見立て：商品写真に向かない可能性", ["AI’s view: possibly not suited as a product photo", "AI 的看法：可能不适合作商品照片", "Opinión de la IA: posiblemente no apta como foto de producto"]],
+      ["日本語の文字が目立つ可能性", ["possibly prominent Japanese text", "可能有显眼的日文文字", "posible texto en japonés destacado"]],
+      ["図・文字が中心の可能性", ["possibly mainly diagram/text", "可能以图表或文字为主", "posiblemente sobre todo diagrama/texto"]],
+      ["ぼやけの可能性", ["possibly blurry", "可能模糊", "posiblemente borrosa"]],
+      ["AI の確認がまだ", ["not yet checked by AI", "AI 尚未确认", "aún sin revisar por la IA"]],
+      ["外れた写真", ["left out", "被排除的照片", "excluida"]]
+    ];
+    const JA = /[぀-ヿ㐀-鿿]/;
+    const __wtr99 = v97dkWTr; // eslint-disable-line no-undef
+    v97dkWTr = function (s, li) { // eslint-disable-line no-global-assign
+      try {
+        const i = +li || 0;
+        let x = String(s);
+        T99.forEach(([k, v]) => { if (x.indexOf(k) >= 0) x = x.split(k).join(v[i] || v[0]); });
+        /* AI の答えの理由（日本語）は、訳せないので「AI の見立て」だけにする（英数字の理由はそのまま） */
+        x = x.replace(/AI の見立て：「?([^・）)」]*)」?/g, (m, r) => (JA.test(r) || !r ? ["AI’s view", "AI 的看法", "Opinión de la IA"][i] : ["AI’s view: ", "AI 的看法：", "Opinión de la IA: "][i] + r));
+        s = x;
+      } catch (e) { try { (window.V99PHOTO && V99PHOTO.errs || []).push("wtr " + String(e).slice(0, 80)); } catch (z) { /* 無視 */ } }
+      return __wtr99.call(this, s, li);
+    };
+  } catch (e) { try { (window.V99PHOTO && V99PHOTO.errs || []).push("wtrwrap " + String(e).slice(0, 80)); } catch (z) { /* 無視 */ } }
+})();
+
+/* 21.99.3（11/20 回帰の洗い出し K5）：21.97.2 の写真の結果の覚え書き（v97mApplyCache）は、判定の無い写真に覚え書きの結果を戻してから AI に聞く。
+   確かめ直し（21.96 v96dkRecheck・21.99 の箱の「AI にもう一度確かめてもらう」）は判定を消して v96re の印を付けてから聞くため、
+   消した判定がすぐ覚え書きから戻り、AI に聞き直していなかった（21.97.2・21.98・21.99.2 とも）。確かめ直しの印がある写真は戻さない */
+(function () {
+  try {
+    if (typeof v97mApplyCache !== "function") return;
+    const __ac99 = v97mApplyCache; // eslint-disable-line no-undef
+    v97mApplyCache = function () { // eslint-disable-line no-global-assign
+      const held = [];
+      try { (typeof v97mPhotos === "function" ? v97mPhotos() : []).forEach((o) => { if (o && o.v96re && !o._dq) { held.push(o); o._dq = { v99hold: 1 }; } }); } catch (e) { /* 無視 */ }
+      try { return __ac99.apply(this, arguments); } finally {
+        held.forEach((o) => { try { if (o._dq && o._dq.v99hold) delete o._dq; } catch (e) { /* 無視 */ } });
+        try { if (held.length && window.V99PHOTO) V99PHOTO.n.recheckAi = (V99PHOTO.n.recheckAi || 0) + held.length; } catch (e) { /* 無視 */ }
+      }
+    };
+  } catch (e) { try { (window.V99PHOTO && V99PHOTO.errs || []).push("acwrap " + String(e).slice(0, 80)); } catch (z) { /* 無視 */ } }
 })();

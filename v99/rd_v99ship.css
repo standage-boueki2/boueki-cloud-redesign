@@ -30,4 +30,5 @@
   #rdjny .v99s-jb { margin: 6px 10px 2px; font-size: 12.5px; }
   .v99s-qt th, .v99s-qt td { padding: 4px 5px; font-size: 12px; }
 }
-#regaiO.v99s-incon > :not(.v99s-inc):not(.v99s-prev) { display: none !important; }
+/* 21.99.3（11/20 回帰の洗い出し）：21.97 の欄（試した回ごとの理由・内蔵データ・10分後にもう一度・Web 検索つきでもう一度＝.v97reg-add）は隠さない */
+#regaiO.v99s-incon > :not(.v99s-inc):not(.v99s-prev):not(.v97reg-add) { display: none !important; }

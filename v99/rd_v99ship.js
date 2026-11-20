@@ -291,15 +291,29 @@
     if (typeof toast !== "function") return;
     const vis = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden" && +getComputedStyle(el).opacity > 0.05;
     let tm = 0;
+    /* 21.99.3（11/20 回帰の洗い出し）：本体の toast() は作るときに1回だけ「bottom:24px」を直に書く。
+       前は戻すときにその bottom を消していたため、PC の幅（821px 以上）では知らせが文書の終わり＝画面の外に出て見えなかった。
+       自分でずらしたときだけ印（data-v99sh）を付け、戻すときは、ずらす前の値に戻す */
+    let base = null;
+    const unshift = (t) => {
+      if (!t || !t.dataset.v99sh) return;
+      delete t.dataset.v99sh;
+      if (base && base.v) t.style.setProperty("bottom", base.v, base.p || ""); else t.style.setProperty("bottom", "24px");
+      base = null;
+    };
     const place = () => {
       const t = document.getElementById("tst"), a = document.getElementById("aiThink");
       if (!t) return;
       /* 出始め（透明から変わっている途中）も「出ている」とみなす：toast() は style.opacity="1"、消すときは "0" にする */
-      if (t.style.opacity === "0" && !(+getComputedStyle(t).opacity > 0.05)) { t.style.removeProperty("bottom"); return; }
-      if (!(a && a.classList.contains("on") && vis(a))) { t.style.removeProperty("bottom"); return; }
+      if (t.style.opacity === "0" && !(+getComputedStyle(t).opacity > 0.05)) { unshift(t); return; }
+      if (!(a && a.classList.contains("on") && vis(a))) { unshift(t); return; }
       const ra = a.getBoundingClientRect(), rt = t.getBoundingClientRect();
       const hit = rt.left < ra.right && ra.left < rt.right && rt.top < ra.bottom && ra.top < rt.bottom;
-      if (hit || t.style.getPropertyValue("bottom")) { const v = Math.max(0, Math.round(innerHeight - ra.top + 8)) + "px"; if (t.style.getPropertyValue("bottom") !== v) t.style.setProperty("bottom", v, "important"); }
+      if (hit || t.dataset.v99sh) {
+        const v = Math.max(0, Math.round(innerHeight - ra.top + 8)) + "px";
+        if (!t.dataset.v99sh) { base = { v: t.style.getPropertyValue("bottom"), p: t.style.getPropertyPriority("bottom") }; t.dataset.v99sh = "1"; }
+        if (t.style.getPropertyValue("bottom") !== v || t.style.getPropertyPriority("bottom") !== "important") t.style.setProperty("bottom", v, "important");
+      }
     };
     /* 札（#aiThink）の大きさ・中身が変わったら、その場でずらし直す（小さい札→終わった知らせの大きい札 など。間をあけない） */
     let moOn = null;
@@ -313,11 +327,11 @@
       try {
         clearInterval(tm); place();
         let n = 0;
-        tm = setInterval(() => { try { place(); } catch (e) { } if (++n > 16) { clearInterval(tm); const t = document.getElementById("tst"); if (t && t.style.opacity === "0" && !(+getComputedStyle(t).opacity > 0.05)) t.style.removeProperty("bottom"); } }, 200);
+        tm = setInterval(() => { try { place(); } catch (e) { } if (++n > 16) { clearInterval(tm); const t = document.getElementById("tst"); if (t && t.style.opacity === "0" && !(+getComputedStyle(t).opacity > 0.05)) unshift(t); } }, 200);
       } catch (e) { try { (window.V99SHIP && V99SHIP.errs || []).push("tst " + String(e).slice(0, 80)); } catch (z) { } }
       return r;
     };
     /* 知らせを直接書き換える経路・札があとから大きくなる場合もあるので、知らせが見えている間は 250ms ごとに確かめる */
-    setInterval(() => { try { const t = document.getElementById("tst"); if (t && (t.style.opacity !== "0" || +getComputedStyle(t).opacity > 0.05 || t.style.getPropertyValue("bottom"))) place(); } catch (e) { } }, 150);
+    setInterval(() => { try { const t = document.getElementById("tst"); if (t && (t.style.opacity !== "0" || +getComputedStyle(t).opacity > 0.05 || t.dataset.v99sh)) place(); } catch (e) { } }, 150);
   } catch (e) { try { (window.V99SHIP && V99SHIP.errs || []).push("tstwrap " + String(e).slice(0, 80)); } catch (z) { } }
 })();
