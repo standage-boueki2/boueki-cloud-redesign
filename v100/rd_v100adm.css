@@ -1,0 +1,47 @@
+/* 22.00 分野 adm の見せ方（管理コンソール）。色は刷新版の変数だけを使う */
+/* No.524 同期中は台帳の行と件数を出さない（同期前の控えは押したときだけ） */
+#accounts[data-v100sync="wait"] tbody tr, #well[data-v100sync="wait"] #accounts tbody tr { display: none !important; }
+#accounts[data-v100sync="wait"] #accnt, #well[data-v100sync="wait"] #accounts #accnt,
+#accounts[data-v100sync="wait"] #v90accBasis, #well[data-v100sync="wait"] #accounts #v90accBasis,
+#accounts[data-v100sync="wait"] #v96admAccSt, #well[data-v100sync="wait"] #accounts #v96admAccSt { display: none !important; }
+#accounts[data-v100sync="copy"] tbody tr[data-st] { opacity: .72; background-image: repeating-linear-gradient(135deg, transparent 0 8px, color-mix(in srgb, var(--warn, #b7791f) 7%, transparent) 8px 16px); }
+.v100adm-ledtop > *, .v100adm-ledfoot > * { margin: 6px 0 0; }
+.v100adm-ledsync { border: 1px dashed var(--line-2, var(--line)); border-radius: var(--r2, 8px); padding: 8px 10px; background: var(--surface-2); }
+.v100adm-ledsync p { margin: 0; font-size: 12px; line-height: 1.7; color: var(--ink-2); }
+.v100adm-ledsync[data-k="copy"] { border-color: var(--warn, #b7791f); }
+.v100adm-ledsync button { margin-top: 6px; }
+.v100adm-copycap { font-size: 11.5px; font-weight: 700; color: var(--warn, #b7791f); }
+/* No.607 重なりのまとめ */
+#accounts tbody tr.v100fold { display: none !important; }
+#accounts tbody tr.v100fold-open td:first-child { padding-left: 18px; }
+#accounts tbody tr.v100fold-open { background: var(--surface-2); }
+.v100adm-dup { border: 1px solid var(--line); border-left: 3px solid var(--or, var(--accent)); border-radius: var(--r2, 8px); padding: 8px 10px; background: var(--surface-2); }
+.v100adm-dup p { margin: 0 0 4px; font-size: 12px; line-height: 1.7; color: var(--ink-2); overflow-wrap: anywhere; }
+.v100adm-dup p.h { font-weight: 700; color: var(--ink); }
+.v100adm-grp { display: block; margin-top: 4px; font-size: 10.5px; color: var(--ink-2); line-height: 1.5; }
+.v100adm-grp .t { overflow-wrap: anywhere; }
+.v100adm-of { display: block; font-size: 10px; color: var(--ink-3); margin-bottom: 2px; }
+.v100adm-b { padding: 2px 9px; font-size: 11px; min-height: 28px; }
+/* No.606・501 */
+.v100adm-ait { display: block; font-size: 10px; color: var(--ink-3); line-height: 1.4; margin-top: 2px; white-space: normal; text-align: right; }
+.v100adm-ait.lt { color: var(--warn, #b7791f); font-weight: 700; }
+.v100adm-cumnote, .v100adm-pubnote { font-size: 11px; line-height: 1.7; color: var(--ink-3); overflow-wrap: anywhere; }
+.v100adm-pub { display: block; font-size: 10px; color: var(--ink-3); margin-top: 2px; }
+.v100adm-detcum { font-size: 11px; line-height: 1.7; margin-top: 4px; }
+.v100adm-detcum.lt { color: var(--warn, #b7791f); }
+/* No.557 */
+.v100adm-tokrow { display: inline-block; font-size: 10.5px; color: var(--ink-2); white-space: normal; line-height: 1.45; }
+.v100adm-toknote { font-size: 11px; line-height: 1.7; color: var(--ink-3); margin: 6px 0 0; overflow-wrap: anywhere; }
+/* No.528 */
+.v100adm-ibprev { margin-top: 8px; opacity: .78; border-top: 1px dashed var(--line); padding-top: 6px; }
+.v100adm-ibcap { font-size: 11.5px; font-weight: 700; color: var(--ink-2); margin: 0 0 4px; }
+.v100adm-ibstat { font-size: 11px; color: var(--ink-3); margin: 0 0 6px; }
+#adminboxOut tr.v100adm-iblid td { color: var(--ink-3); }
+@media (max-width: 600px) {
+  .v100adm-dup p, .v100adm-ledsync p { font-size: 11.5px; }
+  .v100adm-ait { text-align: left; }
+}
+.v100adm-kpidup { font-size: 11px; line-height: 1.7; color: var(--ink-2); margin: 6px 0 10px; padding: 6px 10px; border-left: 3px solid var(--or, var(--accent)); background: var(--surface-2); border-radius: var(--r2, 8px); overflow-wrap: anywhere; }
+#adminboxOut:not(.v100ib-lidopen) tr.v100adm-iblid { display: none; }
+.v100adm-ibstat .nn { margin: 0 0 4px; }
+.v100adm-ibstat button { margin-bottom: 6px; }

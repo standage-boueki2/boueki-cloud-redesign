@@ -1,0 +1,11 @@
+/* 22.00 out：日本語が残っている所（その場で直す）の箱 */
+.v100out-left{margin-top:10px;border:1px solid var(--warn,#c98a00)}
+.v100out-left h3{margin:0 0 6px;font-size:var(--fs-md,16px)}
+.v100out-ll{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.v100out-ll li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 10px;border:1px solid var(--line,#d8dde5);border-radius:var(--r2,8px);background:var(--bg-2,#fafbfc)}
+.v100out-where{font-weight:700;font-size:var(--fs-sm,14px)}
+.v100out-ja{font-size:var(--fs-sm,14px);word-break:break-all}
+.v100out-lb{flex-basis:100%;font-size:var(--fs-xs,12px);color:var(--ink-2,#555)}
+.v100out-ll input{flex:1 1 220px;min-width:0;max-width:100%;padding:6px 8px;border:1px solid var(--line,#c8ced8);border-radius:6px;font-size:var(--fs-sm,14px)}
+.v100out-ll .btn{flex:0 0 auto}
+@media (max-width:600px){.v100out-ll li{flex-direction:column;align-items:stretch}.v100out-ll input{flex:1 1 auto;width:100%}}

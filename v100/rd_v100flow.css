@@ -1,0 +1,43 @@
+/* 22.00 flow：規制の画面の「STEP 03 の進み（国ごと）」・準備点の途中の印 */
+.v100f-reg { margin: 10px 0 12px; padding: 10px 12px; border: 1px solid var(--line, #d7dde5); border-left: 4px solid var(--bl, #0064bf); border-radius: 8px; background: var(--bg, #fff); font-size: 13px; line-height: 1.6; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
+.v100f-rh { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0 0 4px; }
+.v100f-all { color: var(--ink-2, #4a5563); font-size: 12px; }
+.v100f-ch { margin: 2px 0 6px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.v100f-cok { color: var(--good, #1a7f37); font-weight: 700; }
+.v100f-cng { color: var(--warn, #9a6700); font-weight: 700; }
+.v100f-ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.v100f-ul > li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--bg-2, #f6f8fa); }
+.v100f-ul > li.ok { background: var(--good-soft, #eaf6ec); }
+.v100f-mk { font-weight: 700; min-width: 1.2em; }
+.v100f-tx { flex: 1 1 260px; min-width: 0; }
+.v100f-st { font-size: 12px; color: var(--ink-2, #4a5563); }
+.v100f-ul > li.ng .v100f-st { color: var(--warn, #9a6700); font-weight: 700; }
+.v100f-ul > li.v100f-ban .v100f-st { color: var(--crit, #c62828); }
+.v100f-bs { display: flex; flex-wrap: wrap; gap: 6px; }
+.v100f-b, .v100f-go { font-size: 12px; padding: 4px 10px; min-height: 32px; white-space: normal; text-align: left; }
+.v100f-oth { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.v100f-go.ok { border-color: var(--good, #1a7f37); }
+.v100f-how, .v100f-note { margin: 8px 0 0; font-size: 12px; color: var(--ink-2, #4a5563); }
+.k-v95-regok.v100f-ok:not(.is-done), .k-r8b-regok.v100f-ok:not(.is-done) { border-style: dashed; }
+.v71rd.v100f-part { color: var(--warn, #9a6700); }
+.v71rd small { font-weight: 400; opacity: .85; }
+@media (max-width: 600px) { .v100f-reg { padding: 8px; font-size: 12.5px; } .v100f-tx { flex-basis: 100%; } }
+/* No.534 保存の控え・No.602 PI の有効期限・相見積の確かめ */
+.v100f-saved { margin: 6px 0 8px; padding: 6px 10px; border-radius: 6px; background: var(--good-soft, #eaf6ec); color: var(--good, #1a7f37); font-weight: 700; font-size: 12.5px; overflow-wrap: anywhere; }
+.v100f-pib { font-size: 11px; padding: 3px 10px; margin-left: 4px; white-space: normal; }
+.v100f-piw { margin: 6px 0; padding: 6px 10px; border-left: 4px solid var(--warn, #9a6700); background: var(--warn-soft, #fff8e1); font-size: 12.5px; }
+.v100f-ask { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
+.v100f-askin { background: var(--bg, #fff); color: var(--ink, #1f2328); border-radius: 10px; padding: 16px 18px; max-width: 520px; width: 100%; max-height: 90vh; overflow: auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .25); font-size: 13.5px; line-height: 1.7; box-sizing: border-box; }
+.v100f-askin h3 { margin: 0 0 6px; font-size: 16px; }
+.v100f-askl { margin: 8px 0; padding-left: 1.2em; overflow-wrap: anywhere; }
+.v100f-asktr { margin: 6px 0; padding: 6px 10px; border-radius: 6px; background: var(--warn-soft, #fff8e1); font-weight: 700; }
+.v100f-askb { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+/* 前からの不具合（21.94〜）：スマホ 390・375 で「いまここ」の札が STEP の幅から左右に約5px はみ出す
+   原因：rd_v94jny.css の 400px 以下の小さい札の決まり（9px）が、後ろに書かれた 820px 以下の決まり（9.5px・左右 5px）に上書きされ、札（約57px）が STEP の幅（375px で約45px・430px で約53px）より広くなっていた（430px でも 2px はみ出していた） */
+/* アプリの「文字の最小 12px」の決まり（文字の大きさの層が小さい文字の決まりを 12px!important に写す）があるため、文字を小さくしては入らない。
+   → 480px 以下では、札の見た目を船の印だけにし、「いまここ」の文字は画面の文字・読み上げに残す（見えない形で）。見出しの「いまここ STEP nn …」はそのまま見える */
+@media (max-width: 480px) {
+  html.rd .k-jny-st .k-jny-here { padding: 1px 4px; max-width: 100%; box-sizing: border-box; overflow: hidden; white-space: nowrap; gap: 0; }
+  html.rd .k-jny-st .k-jny-here svg { display: inline-block; width: 12px; height: 12px; flex: none; }
+  html.rd .k-jny-st .k-jny-here .v100f-herel { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+}
