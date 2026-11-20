@@ -45,3 +45,6 @@
 #adminboxOut:not(.v100ib-lidopen) tr.v100adm-iblid { display: none; }
 .v100adm-ibstat .nn { margin: 0 0 4px; }
 .v100adm-ibstat button { margin-bottom: 6px; }
+/* 22.00.1 N9 */
+.v100adm-lgcnt { margin: 8px 0 0; font-size: 12px; line-height: 1.7; color: var(--ink-2); padding: 6px 10px; border-radius: var(--r2, 8px); background: var(--surface-2); border: 1px solid var(--line); overflow-wrap: anywhere; }
+.v100adm-lgcnt[data-k="lock"] { border-color: var(--warn, #b7791f); color: var(--ink); font-weight: 700; }

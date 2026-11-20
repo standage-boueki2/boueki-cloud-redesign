@@ -328,3 +328,84 @@ window.v100fAiTopKeep = v100fAiTopKeep;
     window[nm] = f;
   } catch (e) { v100fErr("topwrap", e); }
 });
+
+/* ═══ 22.00.1（11/20 検証 v3 の指摘）═══════════════════════════════════════ */
+function v100fIsTemp(r) { try { const T = v100fTrialOf(r); return !!(T && T.kind === "temp"); } catch (e) { return false; } }
+function v100fIsTempId(id) { try { const r = ((typeof FWDB !== "undefined" && FWDB && FWDB.reqs) || []).find((x) => x && x.id === id); return !!(r && v100fIsTemp(r)); } catch (e) { return false; } }
+window.v100fIsTempId = v100fIsTempId;
+/* N2：受信箱の数え方を1つに（ホームの「AI回答 N件」＝AI が見積を出した依頼＝チップ「AI回答済み」） */
+function v100fInboxCounts() {
+  const R = ((typeof FWDB !== "undefined" && FWDB && FWDB.reqs) || []).filter(Boolean);
+  const st = (r) => { try { return typeof fwdReqStatus === "function" ? String(fwdReqStatus(r) || "") : String(r.status || ""); } catch (e) { return ""; } };
+  const ai = (r) => !!(r.quote || (r.legs || []).some((l) => l && l.ok));
+  const out = { all: R.length, ai: 0, nolane: 0, lost: 0, held: 0, requote: 0, ids: { ai: [], nolane: [], lost: [] } };
+  R.forEach((r) => {
+    if (ai(r)) { out.ai++; out.ids.ai.push(r.id); } else { out.nolane++; out.ids.nolane.push(r.id); }
+    const s = st(r);
+    if (/他社に決定/.test(s)) { out.lost++; out.ids.lost.push(r.id); }
+    if (/仮押さえ/.test(s)) out.held++;
+    if (r.requote) out.requote++;
+  });
+  return out;
+}
+window.v100fInboxCounts = v100fInboxCounts;
+/* N3：案件の「荷主の共有」の数量・B/L の容積の差額から、体験用の依頼（3日で消える）を外す（体験用でない依頼が1件でもあるとき） */
+if (typeof v69fShared === "function" && !window.__v100fShared) {
+  window.__v100fShared = 1;
+  const __sh100 = v69fShared;
+  window.v69fShared = function (reqs) {
+    try {
+      const L = (reqs || []).filter(Boolean), K = L.filter((r) => !v100fIsTemp(r));
+      if (K.length && K.length < L.length) { const o = __sh100.call(this, K); try { o.v100skip = L.filter(v100fIsTemp).map((r) => r.id); } catch (e) { /* 無視 */ } v100fCnt("sharedSkip"); return o; }
+    } catch (e) { v100fErr("shared", e); }
+    return __sh100.apply(this, arguments);
+  };
+}
+if (typeof v97fVolAuto === "function" && !window.__v100fVolAuto) {
+  window.__v100fVolAuto = 1;
+  const __va100 = v97fVolAuto;
+  window.v97fVolAuto = function () {
+    const A = __va100.apply(this, arguments);
+    try { if (Array.isArray(A)) return A.filter((x) => !(x && v100fIsTempId(x.rid))); } catch (e) { v100fErr("volauto", e); }
+    return A;
+  };
+}
+/* N4：明細・確認ポイントの文に国名（同じ文が国の数だけ並ぶと、どの国の話か分からない） */
+if (typeof v82fLegNotes === "function" && !window.__v100fLegNotes) {
+  window.__v100fLegNotes = 1;
+  const __ln100 = v82fLegNotes;
+  window.v82fLegNotes = function (r, l) {
+    const out = __ln100.apply(this, arguments);
+    try {
+      if (!Array.isArray(out) || !l || !l.cty || !r || (r.legs || []).length < 2) return out;
+      const c = String(l.cty);
+      return out.map((x) => {
+        if (!Array.isArray(x) || typeof x[1] !== "string" || x[1].indexOf(c + "：") >= 0 || x[1].indexOf(c + ": ") >= 0) return x;
+        const t = x[1].replace(/^(\s*⚠\s*)?/, (m, a) => (a || "") + v100fM(c + "：", c + ": "));
+        return [x[0], t].concat(x.slice(2));
+      });
+    } catch (e) { v100fErr("legnotes", e); return out; }
+  };
+}
+/* ほか：内蔵の答えで「レーン未登録」の依頼が一部しか挙がらない → 挙がっていない分を書き足す */
+function v100fBrainNolane(o) {
+  try {
+    if (!o || typeof o.a !== "string" || /v100fb4/.test(o.a) || !/<b>RQ-|RQ-[A-Za-z0-9]+/.test(o.a)) return o;
+    if (!/未登録|未対応|レートが無|見積を出せ|依頼/.test(o.a)) return o;
+    const R = ((typeof FWDB !== "undefined" && FWDB && FWDB.reqs) || []).filter(Boolean);
+    const NL = R.filter((r) => !(r.quote || (r.legs || []).some((l) => l && l.ok)));
+    const miss = NL.filter((r) => o.a.indexOf(r.id) < 0);
+    if (!miss.length || miss.length === NL.length && !/未登録|未対応/.test(o.a)) return o;
+    const add = `<p class="v100fb4">${v100fM(`見積を出せなかった依頼（レートが無い区間）は全部で ${NL.length}件です：${NL.map((r) => `${r.id}（${r.pol || ""}→${r.cty || r.pod || ""}）`).join("・")}`, `Requests without a quote (no rate): ${NL.length}: ${NL.map((r) => r.id).join(", ")}`)}</p>`;
+    return Object.assign({}, o, { a: o.a.replace(/(<p class="nn"[^>]*>詳細は受信箱の「交渉記録」で確認できます。<\/p>)?$/, (mm) => add + mm) });
+  } catch (e) { v100fErr("nolane", e); return o; }
+}
+if (typeof fwdBrain === "function" && !window.__v100fBrain2) {
+  window.__v100fBrain2 = 1;
+  const __fb1001 = fwdBrain;
+  fwdBrain = function () { // eslint-disable-line no-global-assign
+    const o = __fb1001.apply(this, arguments);
+    try { if (o && typeof o.then === "function") return o.then(v100fBrainNolane); } catch (e) { v100fErr("brain2p", e); }
+    return v100fBrainNolane(o);
+  };
+}

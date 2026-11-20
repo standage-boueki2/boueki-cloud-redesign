@@ -763,12 +763,74 @@
   }
 
   /* ═════════ 相談の答えの進み具合と呼んだ回数（速さ）═════════ */
+  /* 22.00.1 N1：STANDAGE の AI（サーバー経由）につながる前に聞かれた質問は、内蔵の答えにせず、つながるのを待ってから AI に聞く（最長 12秒） */
+  function airPending() {
+    try {
+      if (typeof v63aCust !== "function" || !v63aCust()) return false; // eslint-disable-line no-undef
+      if (typeof V63A === "undefined" || !V63A || V63A.old) return false; // eslint-disable-line no-undef
+      if (typeof ppReady === "function" && ppReady()) return false; // eslint-disable-line no-undef
+      const on = typeof v63aIsOn === "function" && v63aIsOn(); // eslint-disable-line no-undef
+      if (on) return false;
+      return !V63A.last || !!V63A.busy; // eslint-disable-line no-undef
+    } catch (e) { return false; }
+  }
+  V.airPending = airPending;
+  V.cfg.airWaitMs = 12000;
+  async function airWait() {
+    const t0 = Date.now();
+    try { toastS(M("AI につないでいます（数秒）。つながったら、AI がお答えします", "Connecting to the AI (a few seconds). The AI will answer once connected.")); } catch (e) { /* 無視 */ }
+    try { if (typeof v63aPull === "function") await Promise.race([v63aPull(true), waitMs(V.cfg.airWaitMs)]); } catch (e) { /* つながらなければ内蔵で答える */ } // eslint-disable-line no-undef
+    while (Date.now() - t0 < V.cfg.airWaitMs && !(typeof ppReady === "function" && ppReady())) await waitMs(250); // eslint-disable-line no-undef
+    const ok = typeof ppReady === "function" && ppReady(); // eslint-disable-line no-undef
+    V.airWaited = { ms: Date.now() - t0, ok };
+    log({ k: "airWait", ms: Date.now() - t0, ok });
+    if (!ok) toastS(M("AI にまだつながっていません。登録データ（内蔵エンジン）からお答えします", "Not connected to the AI yet. Answering from your registered data (built-in engine)."));
+    return ok;
+  }
   wrap("askFree", (o) => function (q) {
-    try { V.consult = { q: String(q || "").slice(0, 80), t0: Date.now(), calls: 0, retry: 0, step: 1, done: 0 }; } catch (e) { /* 無視 */ }
-    const r = o.apply(this, arguments);
-    try { if (r && typeof r.then === "function") r.then(() => { if (V.consult) V.consult.done = Date.now(); }, () => { if (V.consult) V.consult.done = Date.now(); }); } catch (e) { /* 無視 */ }
-    return r;
+    const self = this, args = arguments;
+    const run = () => {
+      try {
+        let key = "";
+        try { key = (W.RDX && typeof RDX.curKey === "function") ? RDX.curKey() : ""; } catch (e) { key = ""; } // eslint-disable-line no-undef
+        V.consult = { q: String(q || "").slice(0, 80), t0: Date.now(), calls: 0, retry: 0, step: 1, done: 0, key }; V.lastQ = { q: String(q || ""), at: Date.now(), k: "chat" };
+      } catch (e) { /* 無視 */ }
+      // N11：質問を送った時から右下の「考え中」を出す（AI への依頼が順番待ちで遅れて始まっても、経過は送った時刻から・いまの画面のこと）
+      try {
+        const C = V.consult;
+        if (String(q || "").trim() && typeof aiThinkStart === "function" && typeof aiThinkEnd === "function") { // eslint-disable-line no-undef
+          const pid = aiThinkStart(M("ご質問の答えを準備しています", "Preparing the answer to your question"), ""); // eslint-disable-line no-undef
+          C.pid = pid;
+          const chatN = () => { try { const c = document.getElementById("chat"); return c ? c.querySelectorAll(".m").length : 0; } catch (e) { return 0; } };
+          const n0 = chatN();
+          const answered = () => {
+            try {
+              const c = document.getElementById("chat"); if (!c) return false;
+              const ms = c.querySelectorAll(".m"), last = ms.length ? ms[ms.length - 1] : null;
+              // 答えの吹き出しに中身が出たとき（考え中の空の吹き出し〈「AI」の印だけ〉では、まだ答えていない）
+              const body = String(last && last.innerText || "").replace(/^\s*AI\s*/, "").trim();
+              return ms.length >= n0 + 2 && !!last && last.classList.contains("a") && !last.querySelector(".v92ai-wait") && body.length > 8 && !(C.calls > 0 && !C.lastAt);
+            } catch (e) { return false; }
+          };
+          const tk = setInterval(() => {
+            try {
+              const items = (typeof AIT !== "undefined" && AIT && AIT.items) || []; // eslint-disable-line no-undef
+              const other = items.some((x) => x && x.id !== pid && x.at >= C.t0);
+              const ans = answered();
+              if (ans && !C.done) C.done = Date.now();
+              if (other || ans || C.lastAt || C.done || Date.now() - C.t0 > 180000 || V.consult !== C) { clearInterval(tk); if (items.some((x) => x && x.id === pid)) aiThinkEnd(pid, true); } // eslint-disable-line no-undef
+            } catch (e) { clearInterval(tk); }
+          }, 250);
+        }
+      } catch (e) { err("consultCard", e); }
+      const r = o.apply(self, args);
+      try { if (r && typeof r.then === "function") r.then(() => { if (V.consult) V.consult.done = Date.now(); }, () => { if (V.consult) V.consult.done = Date.now(); }); } catch (e) { /* 無視 */ }
+      return r;
+    };
+    if (String(q || "").trim() && airPending()) return airWait().then(run, run);
+    return run();
   });
+  wrap("fwdAsk", (o) => function (v) { try { V.lastQ = { q: String(v || ""), at: Date.now(), k: "fwd" }; } catch (e) { /* 無視 */ } return o.apply(this, arguments); });
   if (typeof W.llmAsk === "function") {
     const __lc = W.llmAsk;
     if (!__lc.__v100cnt) {
@@ -792,6 +854,173 @@
     try { const S = typeof v71obSt === "function" ? v71obSt() : null; ((S && S.runs) || []).forEach((r) => { (r.leads || []).forEach(cleanLead); if (typeof r.insight === "string") r.insight = cleanScript(r.insight); }); } catch (e) { err("obClean", e); } // eslint-disable-line no-undef
     return o.apply(this, arguments);
   });
+  /* ═════════ 22.00.1 N1：内蔵の答えの振り分け（よくある言葉だけで話題を決めない）═════════
+     detectIntent（土台）は言葉の数で話題を決め、同点なら INTENTS の前の話題が勝つ。「理由」「なぜ」「課題」だけで「失注」、
+     「相手」「候補」だけで「バイヤー」、「準備」だけで「商談の準備」などに振られ、質問とずれた内蔵の答えが出ていた。
+     → 下の話題は、その話題に固有の言葉が1つも無いときは、よくある言葉を外して選び直す（それでも決まらなければ話題なし＝AI か「答えられません」） */
+  const INT_STRONG = {
+    lost: /失注|断られ|ことわられ|負け|うまくいかな|保留|見送|止まっ|とまっ/,
+    buyer: /バイヤー|取引先|顧客|輸入者|輸入商社|ディストリビューター/i,
+    prep: /商談|想定問答|打ち合わせ|面談|質問され|聞かれ/,
+    help: /何ができ|なにができ|使い方|つかいかた|ヘルプ|help|こんにちは/i,
+    task: /タスク|進捗|スケジュール/,
+    missing: /充足|完成度|不足|足りな|埋め/,
+    strength: /強み|特徴|差別化|アピール|競合|他社|selling/i,
+    price: /いくら|価格|単価|値段|プライス|price|見積|金額|costs|何円|ドル/i,
+    order: /受注|入金|請求|支払|回収/,
+    reg: /規制|認証|届出|許可|通関|関税|税率|輸出できる|輸入できる|法規|ラベル|duties|duty|tariff|customs|regulat|certif|licen[cs]e|permit|registration|label|restriction/i
+  };
+  const INT_WEAK = {
+    lost: ["なぜ", "理由", "課題", "ボトルネック"],
+    buyer: ["相手", "候補", "紹介", "新規"],
+    prep: ["準備", "何を話"],
+    help: ["はじめ", "どんなこと", "教えて欲しい"],
+    task: ["遅れ", "期限", "いつまで", "残り"],
+    missing: ["何が必要"],
+    strength: ["売り"],
+    price: ["卸"],
+    order: ["売上"],
+    reg: ["登録"]
+  };
+  V.intStrong = INT_STRONG; V.intWeak = INT_WEAK;
+  wrap("detectIntent", (o) => function (q) {
+    let r = o.apply(this, arguments);
+    try {
+      let s = String(q == null ? "" : q);
+      for (let i = 0; i < 4 && r && INT_STRONG[r] && !INT_STRONG[r].test(s.normalize("NFKC")); i++) {
+        const k = r;
+        INT_WEAK[k].forEach((w) => { s = s.split(w).join(" "); });
+        const r2 = o.call(this, s);
+        log({ k: "intent", from: k, to: r2 || "", q: String(q).slice(0, 30) });
+        V.n.intent = (V.n.intent || 0) + 1;
+        r = r2 === k ? null : r2;
+      }
+      // 失注・保留の言葉があるのに話題が決まらないときは、失注・保留の答え（「保留になった相手は？」など）
+      if (!r && INT_STRONG.lost.test(String(q == null ? "" : q).normalize("NFKC"))) r = "lost";
+    } catch (e) { err("intent", e); }
+    return r;
+  });
+
+  /* ═════════ 22.00.1 N8：AI への指示に見える文の「場所」が、利用者が打った質問なら、そのとおりに ═════════ */
+  wrap("v68dInjWhere", (o) => function (hit) {
+    try {
+      const L = V.lastQ, h = String(hit || "").trim();
+      if (L && h && Date.now() - L.at < 5 * 60000 && L.q.indexOf(h.slice(0, 60)) >= 0)
+        return L.k === "fwd" ? "あなたが入力した質問（AI物流マン）" : "あなたが入力した質問（AI商社マンに相談）";
+    } catch (e) { err("injWhere", e); }
+    return o.apply(this, arguments);
+  });
+  wrap("v68dPlaceTr", (o) => function (s, li) {
+    try {
+      const t = String(s || "");
+      if (t === "あなたが入力した質問（AI商社マンに相談）") return ["the question you typed (chat with the AI Trade Agent)", "您输入的问题（向AI商社专员咨询）", "la pregunta que escribió (consulta al agente IA)"][li] || t;
+      if (t === "あなたが入力した質問（AI物流マン）") return ["the question you typed (AI Logistics Agent)", "您输入的问题（AI物流专员）", "la pregunta que escribió (agente logístico IA)"][li] || t;
+    } catch (e) { err("placeTr", e); }
+    return o.apply(this, arguments);
+  });
+
+  /* ═════════ 22.00.1 N11：右下の「考え中」の経過は、利用者が質問を送った時刻から。どの画面で始めたかを覚える ═════════ */
+  wrap("aiThinkStart", (o) => function () {
+    const id = o.apply(this, arguments);
+    try {
+      const it = (typeof AIT !== "undefined" && AIT && AIT.items || []).find((x) => x && x.id === id); // eslint-disable-line no-undef
+      if (it) {
+        let k = "";
+        try { k = (W.RDX && typeof RDX.curKey === "function") ? RDX.curKey() : (typeof cur !== "undefined" ? cur : ""); } catch (e) { k = ""; } // eslint-disable-line no-undef
+        it.v100key = k;
+        const C = V.consult, A = W.V99FWD && W.V99FWD.ask;
+        if (C && !C.lastAt && !C.done && Date.now() - C.t0 < 300000) it.v68at = Math.min(+it.v68at || it.at, C.t0);
+        else if (A && !A.done && Date.now() - A.t0 < 300000) it.v68at = Math.min(+it.v68at || it.at, A.t0);
+      }
+    } catch (e) { err("thinkStart", e); }
+    return id;
+  });
+  /* 1つの操作で呼んだ AI の記録（N10：何を何回呼んでいるか） */
+  V.calls = [];
+  if (typeof W.llmAsk === "function" && !W.llmAsk.__v100log) {
+    const __ll = W.llmAsk;
+    const g = async function (q, maxTok, opts) {
+      const o = opts || {}, t = Date.now();
+      const rec = { t, q: String(q || "").slice(0, 40).replace(/\s+/g, " "), sys: String(o.sys || "").slice(0, 30).replace(/\s+/g, " "), task: o.task || "", bg: isBg(q, o) ? 1 : 0, web: o.forceWeb ? 1 : o.noWeb ? 0 : -1, max: +maxTok || 0, inner: (o._retry2 ? "retry2" : o._v56askcont ? "cont" : o._noFo ? "nofo" : "") };
+      V.calls.push(rec); if (V.calls.length > 60) V.calls.shift();
+      try {
+        const r = await __ll.apply(this, arguments); rec.ms = Date.now() - t; rec.ok = 1; rec.n = (r && r.txt || "").length;
+        try {
+          rec.prov = String((r && r.prov) || ""); rec.why = String((r && r.why) || "").slice(0, 80);
+          rec.cits = (r && Array.isArray(r.cits)) ? r.cits.length : 0; rec.ext = (r && Array.isArray(r.extHits)) ? r.extHits.length : 0;
+          const P = (typeof PROV !== "undefined" && PROV && PROV[rec.prov]) || null; // eslint-disable-line no-undef
+          rec.eng = P ? P.short : rec.prov; rec.search = P ? (P.search ? 1 : 0) : -1;
+          if (o.forceWeb) V.lastWeb = Object.assign({}, rec);
+        } catch (x) { /* 記録だけ */ }
+        return r;
+      } catch (e) { rec.ms = Date.now() - t; rec.ok = 0; rec.err = String((e && e.message) || e).slice(0, 60); if (o.forceWeb) V.lastWeb = Object.assign({}, rec); throw e; }
+    };
+    g.__v100ai = 1; g.__v100log = 1; g.__v100cnt = 1;
+    W.llmAsk = g;
+  }
+
+  /* ═════════ 22.00.1 v2 N7：答えの下の「価格表から計算すると」は、質問に数量があるときだけ。単位は商品の単位で ═════════
+     21.97（v97 cty）は数量を質問から、無ければ AI の答えから拾っていた（直前の PI の 499袋 を答えが書くと、規制の質問にも計算が付く）。単位も「個」決め打ち */
+  const QTY_Q = /(\d[\d,，]*(?:\.\d+)?)\s*(個|本|枚|袋|箱|ケース|セット|缶|瓶|kg|pcs?\.?|units?|pieces?)/i;
+  function unitOfProduct() {
+    try {
+      const d = (typeof D !== "undefined" && D) || ten() || {}; // eslint-disable-line no-undef
+      const src = [String(d.moq || "")].concat(((d.priceCols || []).concat((d.priceRows || [])[0] || [])).map(String)).join(" ");
+      const m = src.normalize("NFKC").match(/\d\s*(個|本|枚|袋|箱|ケース|セット|缶|瓶|kg)/);
+      return m ? m[1] : "";
+    } catch (e) { return ""; }
+  }
+  V.unitOfProduct = unitOfProduct;
+  wrap("v84cfAnsMark", (o) => function (o2, q) {
+    const r = o.apply(this, arguments);
+    try {
+      if (r && typeof r.a === "string" && r.a.indexOf("v97calc") >= 0) {
+        // 利用者が打った質問だけを見る（答えのために足した文脈〈見本の案件・直前の PI など〉の数量は使わない）
+        const L = V.lastQ;
+        const raw = L && L.k === "chat" && Date.now() - L.at < 5 * 60000 && String(q || "").indexOf(L.q.slice(0, 20)) >= 0 ? L.q : String(q || "").split(/\n\s*【/)[0];
+        const qs = String(raw || "").normalize("NFKC");
+        const mq = qs.match(QTY_Q);
+        const r0 = r === o2 ? Object.assign({}, o2) : r;
+        if (!mq) { r0.a = r.a.replace(/<p class="v97calc[^"]*"[^>]*>[\s\S]*?<\/p>/g, ""); V.n.calcDrop = (V.n.calcDrop || 0) + 1; log({ k: "calcDrop", q: qs.slice(0, 30) }); return r0; }
+        const u = /^(個|本|枚|袋|箱|ケース|セット|缶|瓶|kg)$/.test(mq[2]) ? mq[2] : unitOfProduct();
+        if (u && u !== "個") r0.a = r.a.replace(/(<p class="v97calc[^"]*"[^>]*>[\s\S]*?)／個 × ([\d,]+)個 ＝([\s\S]*?<\/p>)/g, (m0, a, n, b2) => a + "／" + u + " × " + n + u + " ＝" + b2);
+        return r0;
+      }
+    } catch (e) { err("calcFoot", e); }
+    return r;
+  });
+
+  /* ═════════ 22.00.1 v1：国別戦略の詳細調査で Web の出どころが0件のとき、Web 検索が動いたか・なぜ出どころが無いかを記録に残す ═════════ */
+  wrap("ctyDeepAI", (o) => async function () {
+    const t0 = Date.now();
+    const r = await o.apply(this, arguments);
+    try {
+      const w = (V.calls || []).filter((x) => x && x.t >= t0 && x.web === 1).pop() || (V.lastWeb && V.lastWeb.t >= t0 ? V.lastWeb : null);
+      if (r && typeof r === "object" && w) r.v100web = { at: Date.now(), eng: w.eng || w.prov || "", search: w.search, cits: w.cits || 0, ext: w.ext || 0, why: w.why || "", ms: w.ms || 0, ok: w.ok, err: w.err || "", tries: (V.calls || []).filter((x) => x && x.t >= t0 && x.web === 1).length };
+    } catch (e) { err("deepWeb", e); }
+    return r;
+  });
+
+  /* ═════════ 22.00.1 v1 N16：バイヤーリストの業態を選ばないとき、商品に合わない業態（工業部品に 飲食・ホテル／農協 など）を条件に入れない ═════════
+     V71OB_BIZ は業種ごとに足した業態を含めた全部（21.92 の BX）で、業態を選ばないと全部がリストの条件と AI への依頼に入っていた（21.92 の BIZ_DROP は並べ替えだけ） */
+  const OB_DROP = { ind: ["horeca", "spec", "chain"], med: ["horeca", "spec"], cosme: ["horeca"], toy: ["horeca"], pet: ["horeca"], gen: [] , food: [] };
+  wrap("v71obReadForm", (o) => function () {
+    const f = o.apply(this, arguments);
+    try {
+      if (f && Array.isArray(f.biz) && !f.biz.length && typeof V71OB_BIZ !== "undefined" && Array.isArray(V71OB_BIZ)) { // eslint-disable-line no-undef
+        const T = ten() || {};
+        const k = catKey(T);
+        const s = String((T.cat || "") + " " + (T.item || "")).toLowerCase();
+        const drop = (OB_DROP[k] || []).slice();
+        if (k === "ind" && !/農|agri|tractor|肥料|園芸/.test(s)) drop.push("agrico");
+        if (k !== "ind" && !/農|agri/.test(s)) drop.push("agrico");
+        const keys = V71OB_BIZ.map((x) => x[0]).filter((x) => drop.indexOf(x) < 0); // eslint-disable-line no-undef
+        if (keys.length && keys.length < V71OB_BIZ.length) { f.biz = keys; f.v100auto = { drop, k }; } // eslint-disable-line no-undef
+      }
+    } catch (e) { err("obForm", e); }
+    return f;
+  });
+
   /* 規制・国の詳細調査の前の見積もり */
   ["regAIRun", "ctyDeepRun"].forEach((nm) => {
     wrap(nm, (o) => async function () {

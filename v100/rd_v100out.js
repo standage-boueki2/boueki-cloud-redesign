@@ -114,10 +114,33 @@
     } catch (e) { warn("dropwhy", e); }
   }
   if (V()) V().fixDropWhy = fixDropWhy;
+  /* 22.00.1 N9：営業資料の画面の「完成版（バイヤーに渡せる版）：あと 2 項目：納品品質の写真（3枚以上）」が、数は2なのに項目を1つしか書いていなかった
+     （「次は」の1項目だけを入れていた）。足りない必須の項目（dk3Gate の必須で未入力）を全部書く。日本語の画面だけ（ほかの言語は元の訳のまま） */
+  function fixCando() {
+    try {
+      const v = V(); if (!v) return;
+      if (typeof v.lang === "function" && v.lang() !== "ja") return;
+      const els = document.querySelectorAll(".k-v90cando b.ng"); if (!els.length) return;
+      let G = [];
+      try { G = (typeof dk3Gate === "function") ? (dk3Gate() || []) : []; } catch (e) { G = []; } // eslint-disable-line no-undef
+      const names = G.filter((c) => c && c.req && !c.ok).map((c) => String(c.n || "").trim()).filter(Boolean);
+      if (names.length < 2) return;
+      els.forEach((b) => {
+        const t = (b.textContent || "").trim();
+        const m = t.match(/^完成版（バイヤーに渡せる版）：あと (\d+) 項目(?:：(.+))?。入れると作れます$/);
+        if (!m || +m[1] !== names.length) return;
+        const t2 = "完成版（バイヤーに渡せる版）：あと " + names.length + " 項目：" + names.join("・") + "。入れると作れます";
+        if (t2 === t) return;
+        b.textContent = t2;
+        v.n.cando = (v.n.cando || 0) + 1;
+      });
+    } catch (e) { warn("cando", e); }
+  }
+  if (V()) V().fixCando = fixCando;
   let tm = 0;
   try {
-    new MutationObserver(() => { clearTimeout(tm); tm = setTimeout(() => { fixCover(); fixAiView(); fixDropWhy(); }, 60); }).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(() => { clearTimeout(tm); tm = setTimeout(() => { fixCover(); fixAiView(); fixDropWhy(); fixCando(); }, 60); }).observe(document.body, { childList: true, subtree: true });
   } catch (e) { warn("mo", e); }
-  try { if (window.RDX && typeof RDX.after === "function") { const prev = RDX.after; RDX.after = function () { const r = prev.apply(this, arguments); try { fixCover(); fixAiView(); fixDropWhy(); } catch (e) { warn("after", e); } return r; }; } } catch (e) { warn("afterwrap", e); } // eslint-disable-line no-undef
+  try { if (window.RDX && typeof RDX.after === "function") { const prev = RDX.after; RDX.after = function () { const r = prev.apply(this, arguments); try { fixCover(); fixAiView(); fixDropWhy(); fixCando(); } catch (e) { warn("after", e); } return r; }; } } catch (e) { warn("afterwrap", e); } // eslint-disable-line no-undef
   if (V()) V().fixCover = fixCover;
 })();

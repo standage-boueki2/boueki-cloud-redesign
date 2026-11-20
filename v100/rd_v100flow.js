@@ -131,14 +131,16 @@
 
   /* STEP 03 の進み（国ごと）の箱 */
   function itemRow(c, x) {
-    const st = x.ok ? M("済み", "Done", "已完成", "Hecho") + (x.at ? " " + x.at : "") : x.k === "self" ? M(/未調査/.test(x.lb) ? "未調査" : "要確認", /未調査/.test(x.lb) ? "Not researched" : "Unconfirmed", /未調査/.test(x.lb) ? "未调查" : "待确认", /未調査/.test(x.lb) ? "Sin investigar" : "Por confirmar") : x.k === "ban" ? M("販売不可", "Cannot sell", "不可销售", "No vendible") : M("未確認", "Not checked", "未确认", "Sin revisar");
+    const st = x.ok ? M("済み", "Done", "已完成", "Hecho") + (x.at ? " " + x.at : "") : x.k === "cond" ? M("該当するか未確認", "Not checked", "未确认", "Sin revisar") : x.k === "self" ? M(/未調査/.test(x.lb) ? "未調査" : "要確認", /未調査/.test(x.lb) ? "Not researched" : "Unconfirmed", /未調査/.test(x.lb) ? "未调查" : "待确认", /未調査/.test(x.lb) ? "Sin investigar" : "Por confirmar") : x.k === "ban" ? M("販売不可", "Cannot sell", "不可销售", "No vendible") : M("未確認", "Not checked", "未确认", "Sin revisar");
     let btn = "";
     const a = (act, lbl, extra) => `<button type="button" class="btn g v100f-b" data-v100f="${act}" data-c="${E(c)}"${extra || ""}>${E(lbl)}</button>`;
     if (x.k === "tbl") btn = x.ok ? a("untbl", M("確かめを取り消す", "Undo", "撤销确认", "Deshacer")) : a("tbl", M("表で確かめる（" + c + "）", "Review the table (" + c + ")", "查看法规表（" + c + "）", "Revisar la tabla (" + c + ")"));
     else if (x.k === "req") btn = a(x.ok ? "unreq" : "req", x.ok ? M("未対応に戻す", "Mark as not done", "恢复为未处理", "Marcar pendiente") : M("対応済みにする", "Mark as done", "标记为已处理", "Marcar hecho"), ` data-nm="${E(x.nm)}"`);
-    else if (x.k === "x") btn = a(x.ok ? "unx" : "x", x.ok ? M("未対応に戻す", "Mark as not done", "恢复为未处理", "Marcar pendiente") : M("対応済みにする", "Mark as done", "标记为已处理", "Marcar hecho"), ` data-key="${E(x.key)}"`);
+    else if (x.k === "x") btn = a(x.ok ? "unx" : "x", x.ok ? M("未対応に戻す", "Mark as not done", "恢复为未处理", "Marcar pendiente") : (x.lv === "conditional" || x.key === "sanc" ? M("確かめました（当たらない・用意する）", "Checked (not applicable / prepared)", "已确认（不适用・已准备）", "Verificado") : M("対応済みにする", "Mark as done", "标记为已处理", "Marcar hecho")), ` data-key="${E(x.key)}"`);
+    else if (x.k === "xc") btn = a(x.ok ? "unxc" : "xc", x.ok ? M("取り消す", "Undo", "撤销", "Deshacer") : M("該非判定をしました（該非判定書あり）", "Classified (classification sheet ready)", "已完成判定（有判定书）", "Clasificado"));
     else if (x.k === "self") btn = (x.ok ? a("unself", M("取り消す", "Undo", "撤销", "Deshacer")) : a("self", M("確かめました（輸入者・専門家・公的な出どころ・AI 詳細調査で）", "Checked (with the importer, an expert, an official source or the AI research)", "已确认（向进口商・专家・官方来源・AI详细调查确认）", "Verificado (con el importador, un experto, fuente oficial o IA)"))) + a("ai", M("🤖 AIで最新規制を詳細調査", "🤖 AI research", "🤖 用AI详细调查", "🤖 Investigar con IA"));
     else if (x.k === "ban") btn = "";
+    else if (x.k === "cond") { const ar = (v) => E(JSON.stringify([c, x.nm, v])); btn = `<button type="button" class="btn g v100f-b" data-act="v92ops.cond" data-args="${ar("y")}">${E(M("該当する", "Applies", "适用", "Aplica"))}</button><button type="button" class="btn g v100f-b" data-act="v92ops.cond" data-args="${ar("n")}">${E(M("対象外", "Not applicable", "不适用", "No aplica"))}</button>`; }
     return `<li class="${x.ok ? "ok" : "ng"} v100f-${x.k}"><span class="v100f-mk" aria-hidden="true">${x.ok ? "✓" : x.k === "ban" ? "⛔" : "□"}</span><span class="v100f-tx"><span class="v100f-lb">${E(x.lb)}</span> <span class="v100f-st">${E(st)}</span></span><span class="v100f-bs">${btn}</span></li>`;
   }
   function paintReg() {
@@ -158,7 +160,8 @@
       else {
         const s = S3.per[c] || V.ctyState(c);
         const doneC = s.n >= s.m && !s.ban;
-        h = head(allTxt) + `<p class="v100f-ch"><b>${E(c)}</b>：${E(M(`済んだ項目 ${s.n}/${s.m}`, `${s.n} of ${s.m} items done`, `已完成 ${s.n}/${s.m} 项`, `${s.n} de ${s.m} hechos`))}${doneC ? `<span class="v100f-cok">${E(M("この国は済み", "This country is done", "该国已完成", "País completado"))}</span>` : `<span class="v100f-cng">${E(M("この国はまだ済みではありません（下の □ が残り）", "Not done yet (□ items below remain)", "尚未完成（下方 □ 为剩余项）", "Aún no completado (quedan los □)"))}</span>`}</p>` +
+        const xc = (S3.it || []).find((y) => y.k === "xc");
+        h = head(allTxt) + (xc ? `<p class="v100f-ch"><b>${E(M("この商品（どの国にも）", "This product (any country)", "本商品（任何国家）", "Este producto (cualquier país)"))}</b></p><ul class="v100f-ul">${itemRow("_all", xc)}</ul>` : "") + `<p class="v100f-ch"><b>${E(c)}</b>：${E(M(`済んだ項目 ${s.n}/${s.m}`, `${s.n} of ${s.m} items done`, `已完成 ${s.n}/${s.m} 项`, `${s.n} de ${s.m} hechos`))}${doneC ? `<span class="v100f-cok">${E(M("この国は済み", "This country is done", "该国已完成", "País completado"))}</span>` : `<span class="v100f-cng">${E(M("この国はまだ済みではありません（下の □ が残り）", "Not done yet (□ items below remain)", "尚未完成（下方 □ 为剩余项）", "Aún no completado (quedan los □)"))}</span>`}</p>` +
           `<ul class="v100f-ul">${s.it.map((x) => itemRow(c, x)).join("")}</ul>`;
       }
       const others = ch.filter((x) => x !== c);
@@ -174,6 +177,7 @@
   }
   V.paintReg = paintReg;
   function pickC(c) { const s = ctySel(); if (!s) return; const o = Array.from(s.options).find((x) => x.value === c || (x.textContent || "").trim() === c); if (o && s.value !== o.value) { s.value = o.value; s.dispatchEvent(new Event("change", { bubbles: true })); } }
+  document.addEventListener("click", (e) => { const b = e.target && e.target.closest && e.target.closest('#v100fReg [data-act="v92ops.cond"]'); if (b) setTimeout(() => { paintReg(); repaint(); }, 400); }, false);
   document.addEventListener("click", (e) => {
     const b = e.target && e.target.closest && e.target.closest("[data-v100f]");
     if (!b) return;
@@ -187,6 +191,8 @@
       else if (act === "unself") { V.setRec(c, "self", false); toast(M(c + "：確かめた記録を取り消しました", "Undone")); }
       else if (act === "x") { V.setRec(c, "x", true, b.getAttribute("data-key")); toast(M("対応済みにしました（取り消せます）", "Marked as done (you can undo)")); }
       else if (act === "unx") { V.setRec(c, "x", false, b.getAttribute("data-key")); toast(M("未対応に戻しました", "Marked as not done")); }
+      else if (act === "xc") { V.setRec("_all", "xc", true); toast(M("該非判定をした記録を付けました（取り消せます）", "Recorded (you can undo)")); }
+      else if (act === "unxc") { V.setRec("_all", "xc", false); toast(M("該非判定の記録を取り消しました", "Undone")); }
       else if (act === "req" || act === "unreq") { const nm = b.getAttribute("data-nm"); if (typeof v54rToggle === "function") v54rToggle(c, nm); else { const S = ten() && (ten().regReq = ten().regReq || {}); S[c] = S[c] || {}; if (act === "req") S[c][nm] = new Date().toLocaleString("ja-JP"); else delete S[c][nm]; } } // eslint-disable-line no-undef
       else if (act === "ai") { if (typeof regAIRun === "function") regAIRun(c); return; } // eslint-disable-line no-undef
     } catch (x) { err("act " + act, x); }
@@ -301,6 +307,22 @@
         if (t !== nt) h.textContent = nt;
         if (!h.id) h.id = "v100fQsumH";
         c.setAttribute("role", "region"); c.setAttribute("aria-labelledby", h.id);
+        // 22.00.1（v1 N12）：AI 交渉の記録は「提案できます（¥…）」なのに、要約は「まだ届いていません」（いまのレートでは届いた見積が無い）→ 食い違いの理由を同じ箱に書く
+        try {
+          const id = ((pn.textContent || "").match(/RQ-[A-Z0-9]+/) || [])[0];
+          const rq = id && typeof FWDB !== "undefined" ? (FWDB.reqs || []).find((x) => x && x.id === id) : null; // eslint-disable-line no-undef
+          const sum = c.querySelector(".v99s-qsum");
+          const none = sum && /まだ届いていません|not received yet|还没有收到|aún no/i.test(sum.textContent || "");
+          const msgTxt = rq && Array.isArray(rq.msgs) ? rq.msgs.map((m) => String((m && (m.t || m.txt || m.html)) || "")).join(" ") : "";
+          const said = /提案でき|ご提案|¥\s?[\d,]{3,}|￥\s?[\d,]{3,}/.test(msgTxt);
+          let nt = c.querySelector(".v100f-qnote");
+          if (rq && none && said) {
+            if (!nt) { nt = document.createElement("p"); nt.className = "v100f-qnote"; nt.setAttribute("role", "note"); nt.setAttribute("data-noi18n", "1"); sum.appendChild(nt); }
+            const t = M(`下の「AI 交渉の記録」は、この依頼を作ったとき（${rq.d || ""}・${rq.pol || ""}発）のやりとりで、そのときは提案がありました。いまは${rq.status ? "「" + rq.status + "」で、" : ""}有効なレート（見積）が無いため、届いた見積には数えていません。見積を取り直すときは、国ごとの「🔁 再見積を依頼」から（送る前に確かめます）。`,
+              `The AI negotiation log below is from when this request was made (${rq.d || ""}, from ${rq.pol || ""}) and included offers then. There is no valid rate now${rq.status ? " (" + rq.status + ")" : ""}, so it is not counted as a received quote. Use “Request a new quote” to get a new one (you will be asked before sending).`);
+            if (nt.textContent !== t) nt.textContent = t;
+          } else if (nt) nt.remove();
+        } catch (e) { err("qnote", e); }
       });
     } catch (e) { err("qsum", e); }
   }
@@ -332,7 +354,8 @@
           <ul class="v100f-askl">${li(M("何を：", "What: "), P.item + (P.qty ? "・" + P.qty : "") + "・" + P.term + (P.pol ? "（" + P.pol + "）" : "") + "・" + P.mode + "・" + P.cbm + "m³" + M("（容積の目安）", " (est. volume)"))}
             ${li(M("どこへ：", "To: "), P.ctys.join("・") || M("（国が未確定）", "(no country)"))}
             ${li(M("何社に：", "How many: "), P.to ? M(P.to + "（指名）", P.to + " (named)") : P.cos ? M("貿易クラウドに参加している物流会社 " + P.cos + "社の見積受信箱", P.cos + " participating forwarders") : M("貿易クラウドに参加している物流会社", "participating forwarders"))}
-            ${P.requote ? li(M("種類：", "Type: "), M("再見積の依頼", "Request for a new quote")) : ""}</ul>
+            ${P.requote ? li(M("種類：", "Type: "), M("再見積の依頼", "Request for a new quote")) : ""}
+            ${P.resend ? li(M("種類：", "Type: "), M("送り直し（" + P.resend + " をそのまま送ります。新しい依頼は作りません）", "Resend of " + P.resend + " (no new request)")) : ""}</ul>
           ${trial() ? `<p class="v100f-asktr">${E(M("体験用の依頼です（体験用のアカウントの依頼は 3日で消えます）。体験用の物流会社の受信箱に届きます。", "This is a trial request (trial requests are deleted after 3 days). It goes to the trial forwarders’ inboxes.", "这是体验用的请求（体验账户的请求3天后删除）。", "Es una solicitud de prueba (se borra a los 3 días)."))}</p>` : ""}
           <div class="v100f-askb"><button type="button" class="btn" data-v100ask="yes">${E(M("依頼を送る", "Send request", "发送请求", "Enviar"))}</button><button type="button" class="btn g" data-v100ask="no">${E(M("やめる", "Cancel", "取消", "Cancelar"))}</button></div></div>`;
         document.body.appendChild(box);
@@ -487,4 +510,146 @@
   const a0 = RD.after;
   RD.after = function () { const r = a0.apply(this, arguments); fixItem(); return r; };
   setTimeout(fixItem, 1500);
+})();
+
+/* ══════ 22.00.1：N6 適合宣言の名前（規制の画面）・N11 PI の読み上げ・N12 進出希望国「指定なし」・N15 送り直しの知らせ ══════ */
+(function () {
+  "use strict";
+  const RD = window.RDX, V = window.V100FLOW;
+  if (!RD || !V || window.__v100flowRd4) return;
+  window.__v100flowRd4 = 1;
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const M = V.M;
+  const E = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const err = (k, e) => { try { V.e("rd4 " + k, e); } catch (x) { /* 記録だけ */ } };
+  const ten = () => { try { return typeof TEN !== "undefined" ? TEN : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const dd = () => { try { return typeof D !== "undefined" && D ? D : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const curKey = () => { try { return RD.curKey ? RD.curKey() : ""; } catch (e) { return ""; } };
+  /* N6：規制の画面の「この商品と送り先で確かめる点」の適合宣言の名前を、送り先の国の制度名に */
+  function fixConf() {
+    try {
+      const o = document.getElementById("rO"); if (!o) return;
+      const sel = document.getElementById("rC"); const c = sel ? String(sel.value || "") : "";
+      if (!c) return;
+      const cc = typeof v85docCC === "function" ? v85docCC(c) : ""; // eslint-disable-line no-undef
+      const d = dd() || {};
+      const nm = V.confName(cc, d.hs || (ten() || {}).hs || "");
+      { const tw = document.createTreeWalker(o, NodeFilter.SHOW_TEXT); let n; const hit = []; while ((n = tw.nextNode())) { if (n.nodeValue && n.nodeValue.indexOf(V.CONF_GENERIC) >= 0) hit.push(n); } hit.forEach((n) => { n.nodeValue = n.nodeValue.split(V.CONF_GENERIC).join(nm.ja); }); }
+      $$("[data-v92pts] li > b, [data-v92pts] b", o).forEach((b) => {
+        const t = (b.textContent || "").trim();
+        if (t !== V.CONF_GENERIC && !(b.dataset.v100conf && t !== nm.ja)) return;
+        if (t === nm.ja) return;
+        b.textContent = nm.ja; b.dataset.v100conf = "1";
+        if (nm.src && !b.parentElement.querySelector(".v100f-csrc")) b.insertAdjacentHTML("afterend", `<small class="v100f-csrc" data-noi18n="1">${E(M("出どころ：", "Source: ") + nm.src)}</small>`);
+      });
+    } catch (e) { err("conf", e); }
+  }
+  /* N11：「PI」「CI」「PL」の用語の印（abbr）は aria-label が文字の代わりに読まれ、読み上げのつなぎで「見積書（）」と抜けていた → 読み上げの名前は文字のまま、説明は title に */
+  function fixAbbr() {
+    try {
+      $$("abbr.k-term[aria-label]").forEach((a) => {
+        const k = String(a.dataset.kterm || a.textContent || "").trim();
+        if (!/^(PI|CI|PL|S\/I|B\/L|AWB)$/.test(k)) return;
+        const lab = a.getAttribute("aria-label"); a.removeAttribute("aria-label"); if (!a.title) a.title = lab;
+      });
+      const sv = document.getElementById("v100fSaved");
+      if (sv && !sv.querySelector("[lang=en]") && /（PI）/.test(sv.textContent || "")) { const t = sv.textContent; sv.innerHTML = E(t).replace("（PI）", '（<span lang="en">PI</span>）'); }
+    } catch (e) { err("abbr", e); }
+  }
+  /* N12：進出希望国「指定なし」の商品は、商品情報の「進出希望国 未登録」を「指定なし（AI に任せる）」に */
+  function fixNone() {
+    try {
+      const t = ten(); if (!t || !(V.targetsNone && V.targetsNone(t))) return;
+      const w = document.getElementById("well"); if (!w) return;
+      const lbl = M("指定なし（AI に任せる・「販売先国の選定」で国を選びます）", "No preference (the AI suggests countries in “Choose target markets”)", "未指定（交给 AI・在“选择销售国家”中选择）", "Sin preferencia (la IA propone países)");
+      // 「AIが使える状態か：一部・足りない情報：進出希望国」→ 指定なしと分かる言葉に（規制判定は国を確定すると使える）
+      $$("span, b, small", w).forEach((el) => {
+        if (el.dataset.v100none || el.children.length) return;
+        if ((el.textContent || "").trim() !== "進出希望国") return;
+        const pt = (el.parentElement && el.parentElement.textContent) || "";
+        if (!/足りない情報/.test(pt)) return;
+        el.textContent = M("販売先国（進出希望国は「指定なし」＝AI に任せる。「販売先国の選定」で国を確定すると規制判定が使えます）", "Target countries (no preference given; confirm countries in “Choose target markets” to enable regulation checks)", "销售国家（进出希望国为“未指定”。在“选择销售国家”中确定后可使用法规判定）", "Países de destino (sin preferencia; confírmelos para activar la revisión de normas)");
+        el.dataset.v100none = "1";
+      });
+      $$("*", w).forEach((el) => {
+        if (el.children.length > 3 || el.dataset.v100none) return;
+        const t0 = (el.textContent || "").replace(/\s+/g, "");
+        if (!/^進出希望国(必須)?$/.test(t0)) return;
+        let v = el.nextElementSibling; if (!v && el.parentElement) v = el.parentElement.nextElementSibling;
+        if (v && !v.dataset.v100none && /^(未登録|未入力|—|-|－|)$/.test((v.textContent || "").trim())) { v.textContent = lbl; v.dataset.v100none = "1"; }
+      });
+      $$("tr, li, .kv, div", w).forEach((el) => {
+        if (el.children.length > 8) return;
+        const tx = (el.textContent || "").replace(/\s+/g, "");
+        if (!/^進出希望国/.test(tx) || !/未登録|未入力/.test(tx) || tx.length > 40) return;
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n;
+        while ((n = walker.nextNode())) { if (/未登録|未入力/.test(n.nodeValue)) { n.nodeValue = n.nodeValue.replace(/必須・未登録|未登録|未入力/, lbl); el.dataset.v100none = "1"; break; } }
+      });
+    } catch (e) { err("none", e); }
+  }
+  /* N15：「もう一度開くと送り直します」→ 開いただけでは送らない（コードと本番で確かめた）。「送り直す」を押して確かめてから送る */
+  function fixDeliv() {
+    try {
+      const n = document.querySelector("#pn .v69fdeliv"); if (!n || n.dataset.v100) return;
+      if (!/送れませんでした/.test(n.textContent || "")) return;
+      n.dataset.v100 = "1";
+      const why = ((n.textContent || "").match(/（([^）]*)）/) || [])[1] || "";
+      n.innerHTML = "📬 " + E(M("この依頼は、まだ体験用の物流会社の画面に届いていません（通信：" + why + "）。この画面を開いただけでは送りません。", "This request has not reached the trial forwarder yet (" + why + "). Opening this window does not send it.", "此请求尚未送达体验用物流公司（" + why + "）。仅打开此画面不会发送。", "La solicitud aún no llegó al transitario de prueba (" + why + "). Abrir esta ventana no la envía.")) +
+        ` <button type="button" class="btn g v100f-b" data-v100resend="1">${E(M("送り直す（作った依頼をそのまま送る）", "Resend (send the same request)", "重新发送（发送同一请求）", "Reenviar (la misma solicitud)"))}</button>`;
+    } catch (e) { err("deliv", e); }
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target && e.target.closest && e.target.closest("[data-v100resend]");
+    if (!b) return;
+    e.preventDefault();
+    try {
+      const id = ((document.getElementById("pn") || {}).textContent || "").match(/RQ-[A-Z0-9]+/);
+      const rq = id && typeof FWDB !== "undefined" ? (FWDB.reqs || []).find((x) => x && x.id === id[0]) : null; // eslint-disable-line no-undef
+      let cos = 0; try { cos = typeof fwdCos === "function" ? fwdCos().length : 0; } catch (x) { cos = 0; } // eslint-disable-line no-undef
+      const P = { item: (rq && rq.item) || (dd() || {}).item || "", qty: "", term: (rq && rq.term) || "", pol: (rq && rq.pol) || "", mode: (rq && rq.mode) || "", cbm: (rq && rq.cbm) || "", ctys: String((rq && rq.cty) || "").split("・").filter(Boolean), cos, to: (rq && rq.toCo) || "", requote: false, resend: id ? id[0] : "" };
+      const ok = typeof V.fwdAsk === "function" ? await V.fwdAsk(P) : false;
+      if (!ok) { try { window.toast(M("送り直していません", "Not resent")); } catch (x) { /* 無視 */ } return; }
+      if (typeof window.v59DemoPush === "function") { await window.v59DemoPush(); try { window.toast(M("送り直しました（新しい依頼は作っていません）", "Resent (no new request was created)")); } catch (x) { /* 無視 */ } }
+    } catch (x) { err("resend", x); }
+  }, false);
+  function apply() { try { if (curKey() === "ops:reg") fixConf(); fixAbbr(); fixNone(); fixDeliv(); } catch (e) { err("apply4", e); } }
+  const a0 = RD.after;
+  RD.after = function () { const r = a0.apply(this, arguments); apply(); return r; };
+  let tm = 0;
+  try { new MutationObserver(() => { clearTimeout(tm); tm = setTimeout(apply, 300); }).observe(document.body, { childList: true, subtree: true }); } catch (e) { /* 無視 */ }
+  setTimeout(apply, 1200);
+})();
+
+/* ══════ 22.00.1（v1 N5）販売先国の分析の候補が3か国だけのとき：理由と「候補を広げて分析し直す」を出す ══════
+   「🔄 再分析」（土台の ctyRun(false)）は、いまの候補（確定した国・進出希望国だけのことがある）で分析し直す。「AI商社マンにおまかせ」（ctyRun(true)）は
+   候補を自動で選び直す（通関統計の相手国・拠点・統計の国を足して 10か国まで）。手元では、読み込み直した後の「おまかせ」は 10か国だった（再現できず）。
+   → 分析の候補が3か国以下のときは、画面に「候補が N か国だけで分析しました（…）」と、10か国に広げて分析し直すボタンを出す */
+(function () {
+  "use strict";
+  const RD = window.RDX, V = window.V100FLOW;
+  if (!RD || !V || window.__v100flowN5) return;
+  window.__v100flowN5 = 1;
+  const M = V.M;
+  const E = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const curKey = () => { try { return RD.curKey ? RD.curKey() : ""; } catch (e) { return ""; } };
+  function paint() {
+    try {
+      const old = document.getElementById("v100fFew");
+      if (curKey() !== "cty" || typeof ctyStore !== "function") { if (old) old.remove(); return; } // eslint-disable-line no-undef
+      const s = ctyStore(); // eslint-disable-line no-undef
+      const rec = Array.isArray(s.rec) ? s.rec : [];
+      if (!rec.length || rec.length > 3 || window.__ctyBusy) { if (old) old.remove(); return; }
+      const names = rec.map((x) => x && x.c).filter(Boolean);
+      const host = document.getElementById("sec-2") || document.querySelector("#well .k-card") || document.getElementById("well");
+      if (!host) return;
+      let el = old;
+      if (!el) { el = document.createElement("div"); el.id = "v100fFew"; el.className = "v100f-few"; el.setAttribute("role", "note"); el.setAttribute("data-noi18n", "1"); host.insertAdjacentElement("afterbegin", el); }
+      const h = `<b>${E(M("候補が " + names.length + "か国だけで分析しました（" + names.join("・") + "）", "Analysed with only " + names.length + " candidate countries (" + names.join(", ") + ")"))}</b> <span>${E(M("「🔄 再分析」は、いまの候補（確定した国・進出希望国）だけで分析し直します。ほかの国と比べるときは、候補を広げて分析し直してください（通関統計の相手国などを足して10か国まで）。", "“Re-analyse” only uses the current candidates. To compare with other countries, widen the candidates (up to 10 countries)."))}</span> <button type="button" class="btn g v100f-b" data-v100few="1">${E(M("候補を広げて分析し直す（10か国まで）", "Widen candidates and re-analyse (up to 10)"))}</button>`;
+      if (el.__h !== h) { el.__h = h; el.innerHTML = h; }
+    } catch (e) { try { V.e("few", e); } catch (x) { /* 記録だけ */ } }
+  }
+  document.addEventListener("click", (e) => { const b = e.target && e.target.closest && e.target.closest("[data-v100few]"); if (!b) return; e.preventDefault(); try { if (typeof ctyRun === "function") ctyRun(true); } catch (x) { /* 無視 */ } setTimeout(paint, 1500); }, false); // eslint-disable-line no-undef
+  const a0 = RD.after;
+  RD.after = function () { const r = a0.apply(this, arguments); paint(); return r; };
+  setInterval(() => { if (!document.hidden && curKey() === "cty") paint(); }, 2500);
 })();

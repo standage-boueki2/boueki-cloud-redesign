@@ -120,14 +120,68 @@
     openFwdQuote = function (id) { const o = __oq100.apply(this, arguments); try { if (fwdOn() && id && page() === "finbox") window.v100fShowReq(id); } catch (e) { err("oq", e); } setTimeout(() => { try { paintDetail(); paintVolUsed(); } catch (e) { err("oqd", e); } }, 200); setTimeout(() => { try { paintVolUsed(); } catch (e) { err("oqv", e); } }, 700); return o; }; // eslint-disable-line no-global-assign
   }
 
-  /* 見積の状況のチップ：状況の言葉が「回答済み（荷主が検討中）」「未登録の区間（荷主は非公開）」に変わったのに、チップは前の言葉（AI回答済み・レーン未登録）で探していて 0件になっていた */
-  const CHIPKW = { "AI回答済み|一部AI回答": "AI回答済み|一部AI回答|回答済み", "レーン未登録": "レーン未登録|未登録の区間" };
+  /* 見積の状況のチップ（N2・22.00.1）：
+     21.4x のチップは状況の言葉で探していた（AI回答済み＝0件・レーン未登録＝0件）。22.00 で言葉を足したが「AI回答済み」が 27件（状況が回答済みの依頼）で、
+     ホームの「AI回答 32件」（AI が見積を出した依頼＝他社に決定・仮押さえも含む）と合わなかった。「他社に決定」のチップも無かった。
+     → チップの数え方をホームと同じ1つに（v100fInboxCounts）：AI回答済み＝AI が見積を出した依頼／レーン未登録＝見積を出せなかった依頼／他社に決定。チップに件数を出す。 */
+  const CHIPS = { ai: { re: /^AI回答済み/, ids: "ai" }, nolane: { re: /^レーン未登録/, ids: "nolane" }, lost: { re: /^他社に決定/, ids: "lost" } };
+  function chipKey(b) { const t = String((b && (b.dataset.v100lab || b.textContent)) || "").trim(); return Object.keys(CHIPS).find((k) => CHIPS[k].re.test(t)) || ""; }
   function fixChips(w) {
-    w.querySelectorAll("[data-uxf][data-kw]").forEach((b) => {
-      const k = b.dataset.kw, nk = CHIPKW[k];
-      if (nk && k !== nk) { b.dataset.kw = nk; b.dataset.v100kw = k; cnt("chip"); if (b.classList.contains("on") && typeof uxApplyFilter === "function") { try { uxApplyFilter(b.closest(".c")); } catch (e) { err("chipaf", e); } } }
+    const bar = w.querySelector(".uxfb .acfilt");
+    if (!bar || typeof v100fInboxCounts !== "function") return;
+    const C = v100fInboxCounts();
+    if (!bar.querySelector('[data-v100chip="lost"]')) {
+      const b = document.createElement("button");
+      b.className = "q"; b.type = "button"; b.dataset.uxf = (bar.querySelector("[data-uxf]") || {}).getAttribute ? bar.querySelector("[data-uxf]").getAttribute("data-uxf") : "finbox";
+      b.dataset.kw = "他社に決定"; b.dataset.v100chip = "lost"; b.dataset.b = "1"; b.setAttribute("data-noi18n", "");
+      b.textContent = M("他社に決定", "Awarded to others", "已选定其他公司", "Adjudicado a otros");
+      const after = [...bar.querySelectorAll("[data-uxf]")].find((x) => /^レーン未登録/.test((x.textContent || "").trim()));
+      if (after) after.after(b); else bar.appendChild(b);
+    }
+    bar.querySelectorAll("[data-uxf]").forEach((b) => {
+      const k = chipKey(b); if (!k) return;
+      if (!b.dataset.v100lab) b.dataset.v100lab = String(b.textContent || "").trim();
+      b.dataset.v100chip = k;
+      const n = C[CHIPS[k].ids];
+      const want = b.dataset.v100lab.replace(/\s*\d+$/, "") + " " + n;
+      if (b.textContent !== want) b.textContent = want;
+      const ti = M(k === "ai" ? `AI が見積を出した依頼 ${n}件（今の状況を問わない。ホームの「AI回答 ${n}件」と同じ数え方）` : k === "nolane" ? `見積を出せなかった依頼 ${n}件（レートが無い区間・ホームの「要確認」と同じ数え方）` : `荷主が他社に決めた依頼 ${n}件`, k === "ai" ? `Requests the AI quoted: ${n}` : k === "nolane" ? `Requests without a quote: ${n}` : `Awarded to others: ${n}`);
+      if (b.title !== ti) b.title = ti;
     });
   }
+  /* チップで絞るときは、行の文字ではなく依頼の中身で決める（担当のタブ・検索の文字とも重ねる） */
+  function chipFilter(card) {
+    try {
+      const on = card.querySelector("[data-uxf].on[data-v100chip]");
+      if (!on) return false;
+      const C = v100fInboxCounts(), ids = new Set(C.ids[CHIPS[on.dataset.v100chip].ids] || []);
+      const q = String((card.querySelector("[data-uxq]") || {}).value || "").trim().toLowerCase();
+      const f = (typeof V33FW !== "undefined" && V33FW) ? String(V33FW.f || "") : "";
+      const tb = card.querySelector("table tbody"); if (!tb) return false;
+      let n = 0;
+      [...tb.rows].forEach((tr) => {
+        const id = tr.dataset.v99rid || (/RQ-[A-Za-z0-9]+/.exec(tr.textContent || "") || [""])[0];
+        const st = tr.dataset.v33st || "none", need = tr.dataset.v33rv === "1";
+        const tab = !f || (f === "rv" ? (need && st !== "done") : st === f);
+        const ok = ids.has(id) && (!q || (tr.textContent || "").toLowerCase().includes(q)) && tab;
+        if (tr.hidden !== !ok) tr.hidden = !ok;
+        if (ok) n++;
+      });
+      const c = card.querySelector("[data-uxn]"); const t = `${n}/${tb.rows.length}${M("件", "")}`;
+      if (c && c.textContent !== t) c.textContent = t;
+      if (n) { const em = card.querySelector(".v92fempty"); if (em) em.remove(); }
+      return true;
+    } catch (e) { err("chipf", e); return false; }
+  }
+  document.addEventListener("click", (ev) => {
+    try {
+      const b = ev.target && ev.target.closest && ev.target.closest('[data-v100chip="lost"]');
+      if (!b) return;
+      ev.preventDefault();
+      b.parentElement.querySelectorAll("[data-uxf]").forEach((x) => x.classList.toggle("on", x === b));
+      if (typeof uxApplyFilter === "function") uxApplyFilter(b.closest(".c"));
+    } catch (e) { err("lostchip", e); }
+  });
 
   /* ═══ 開示事項：体験用の依頼の印 ═══════════════════════════════════════ */
   function paintTrialRows(w) {
@@ -204,7 +258,7 @@
       if (!s) return;
       const l = (typeof I18N !== "undefined" && I18N && I18N.lang) || "ja";
       if (l !== "ja") return;
-      const want = "物流会社への見積依頼と仮押さえは、デモ物流株式会社（物流会社のデモ用アカウント）の受信箱に届き、サーバーに3日残ります（ログアウトしても、3日たつまで物流会社の画面からは消えません。この PC のほかの変更は、ログアウトで消えます）";
+      const want = "物流会社への見積依頼と仮押さえは、体験用の物流会社の受信箱（デモ物流株式会社と、見本のデモ物流①〜⑤のうち見積を出した会社。どれも体験用の見本の会社です）に届き、サーバーに3日残ります（ログアウトしても、3日たつまで物流会社の画面からは消えません。この PC のほかの変更は、ログアウトで消えます）";
       if (s.textContent === NOTE59) { s.textContent = want; cnt("note59"); }
     } catch (e) { err("note59", e); }
   }
@@ -224,7 +278,7 @@
     const sum = D.groups.map((g) => M(`${g.cty} ${g.rows.length}本`, `${g.cty} ${g.rows.length}`)).join("・");
     return `<div class="v100fdup" data-noi18n role="group" aria-label="${E(M("同じ国のレーンの重なり", "Same-country lanes"))}">
       <p class="v100fdupt"><b>${E(M(`同じ国のレーンが、書き方の違いで重なっています（${D.groups.length}組・${D.nRows}本：${sum}）`, `Lanes for the same country are registered under different names (${D.groups.length} groups, ${D.nRows} rows: ${sum})`, `同一国家的线路因写法不同而重复（${D.groups.length}组・${D.nRows}条）`, `Rutas del mismo país con nombres distintos (${D.groups.length} grupos)`))}</b>
-      <span>${E(M("相見積・中央値では同じ国として数えます（No.535 の母集団の「か所」も国でそろえます）。データは消したり、まとめたりしていません。下の組を開くと、どれとどれが重なっているかと、まとめ方の案が出ます。", "Counted as one country in comparisons and medians. Nothing was deleted or merged. Open a group for details and suggestions."))}</span></p>
+      <span>${E(M("相見積・運賃の中央値では同じ国として数えます（中央値の説明の「仕向地 N か所」も国でそろえて数えます）。データは消したり、まとめたりしていません。下の組を開くと、どれとどれが重なっているかと、まとめ方の案が出ます。", "Counted as one country in comparisons and medians. Nothing was deleted or merged. Open a group for details and suggestions."))}</span></p>
       ${g2}
       <p class="v100fdupb"><button type="button" class="v100fdupx${DUPF.on ? " on" : ""}" data-v100dup="on" aria-pressed="${DUPF.on}">${E(M(`重なっている行だけ表示（${D.nRows}本）`, `Show only overlapping rows (${D.nRows})`, `仅显示重复的行（${D.nRows}）`, `Solo las superpuestas (${D.nRows})`))}</button><button type="button" class="v100fdupx${DUPF.on ? "" : " on"}" data-v100dup="off" aria-pressed="${!DUPF.on}">${E(M("すべての行", "All rows", "全部", "Todas"))}</button></p></div>`;
   }
@@ -425,6 +479,132 @@
     } catch (x) { err("esc", x); }
   });
 
+  /* ═══ 22.00.1（検証 v3）═══════════════════════════════════════════════ */
+  /* N2：ホームの「AI回答 32件のうち 要確認 30件」と札「要確認 3件（レートが無い区間）」で、同じ「要確認」が別の数だった。
+     → AI の答えのほうは「出す前に確かめる」と書き分ける（21.95 の層は同じ文を書き直し続けるので、その札の文字だけ書き換え方を変える＝書き合わない） */
+  const AUTOW = (v) => String(v == null ? "" : v).replace(/^AI回答 (\d+)件のうち 要確認 (\d+)件$/, (m, a, b) => M(`AI回答 ${a}件のうち 出す前に確かめる ${b}件（期限切れ・仕出港違いのレート）`, m));
+  function paintHomeWords(w) {
+    if (!TCD || !TCD.get || !TCD.set) return;
+    w.querySelectorAll(".v95auto2").forEach((el) => {
+      if (!el.__v100aw) {
+        el.__v100aw = 1;
+        try { Object.defineProperty(el, "textContent", { configurable: true, enumerable: true, get() { return TCD.get.call(this); }, set(v) { const s = AUTOW(v); if (TCD.get.call(this) === s) return; TCD.set.call(this, s); } }); } catch (e) { err("aw", e); }
+      }
+      const cur = TCD.get.call(el), nv = AUTOW(cur);
+      if (nv !== cur) TCD.set.call(el, nv);
+      const ti = M("AI が見積を出した依頼のうち、期限切れのレートや依頼と違う仕出港のレートで組んだため、荷主に出す前に確かめる件数です（下の「要確認」＝見積を出せなかった依頼とは別の数）", "");
+      if (ti && el.title !== ti) el.title = ti;
+    });
+  }
+  /* N3：案件に体験用の依頼（3日で消える）が混ざっているとき、そうと書き、前提の行に印 */
+  function paintCase(w) {
+    if (typeof v100fIsTempId !== "function") return;
+    w.querySelectorAll("section.v33case").forEach((sec) => {
+      const ids = [...sec.querySelectorAll(".v33li b")].map((b) => (b.textContent || "").trim()).filter((x) => /^RQ-/.test(x));
+      const tmp = [...new Set(ids.filter(v100fIsTempId))];
+      const html = tmp.length ? `<p class="v100fcasetr" data-noi18n role="note"><b>${E(M(`この案件には体験用の依頼 ${tmp.join("・")} が入っています`, `This case includes trial request(s) ${tmp.join(", ")}`))}</b>${E(M("（お客様デモ用のアカウントから・受信から3日で消えます）。荷主の共有の数量・見積の前提・B/L の容積の差額は、体験用の依頼を除いて数えています。", " (from the customer demo account; removed after 3 days). Shared quantities, quote basis and B/L differences exclude them."))}</p>` : "";
+      const li = sec.querySelector(".v33li");
+      const head = li ? li.parentElement : sec.firstElementChild;
+      if (html && head && head.parentElement) put(head.parentElement, ":scope > .v100fcasetr", html, "beforebegin", head);
+      else { const o = sec.querySelector(".v100fcasetr"); if (o) o.remove(); }
+      if (!tmp.length) return;
+      sec.querySelectorAll(".v90fbasis").forEach((bx) => {
+        const tw = document.createTreeWalker(bx, NodeFilter.SHOW_TEXT); const L = [];
+        while (tw.nextNode()) { const n = tw.currentNode; const m = /^\s*(RQ-[A-Za-z0-9]+) /.exec(n.data || ""); if (m && tmp.indexOf(m[1]) >= 0) L.push(n); }
+        /* 行の終わり（次の改行 <br> の前、無ければ親の最後）に1つだけ付ける（用語の印で文字が分かれても二重にしない） */
+        L.forEach((n) => {
+          let x = n.nextSibling, last = n; const marks = [];
+          while (x && !(x.nodeType === 1 && x.tagName === "BR")) { if (x.nodeType === 1 && x.classList && x.classList.contains("v100fcasetrl")) marks.push(x); last = x; x = x.nextSibling; }
+          if (marks.length === 1 && marks[0] === last) return;
+          marks.forEach((m) => m.remove());
+          const sp = document.createElement("span"); sp.className = "v100fcasetrl"; sp.setAttribute("data-noi18n", ""); sp.textContent = M("（体験用の依頼・3日で消えます。この案件の前提には入れていません）", " (trial request; not used for this case)");
+          if (x) x.parentNode.insertBefore(sp, x); else n.parentNode.appendChild(sp);
+        });
+      });
+    });
+  }
+  /* N4：明細の「届いた見積」で、期限切れの見積に「推奨・選択中」と出さない（確認ポイントでは「推奨・仮押さえの対象外」） */
+  function paintDetailTags() {
+    document.querySelectorAll(".v99fdet table.v99fdtbl tbody tr").forEach((tr) => {
+      const exp = tr.querySelector("td.v99fexp");
+      const sm = tr.cells[1] && tr.cells[1].querySelector("small");
+      if (!exp || !sm) return;
+      if (/推奨|選択中|recommended|selected/.test(sm.textContent || "") && !sm.dataset.v100) { sm.dataset.v100 = "1"; sm.textContent = M("期限切れの見積（推奨・仮押さえの対象外）", "expired quote (not recommended / cannot hold)"); sm.classList.add("v100fexptag"); }
+    });
+  }
+  /* N5：「重なっている行だけ」と 21.99 の「価格が突出だけ」などを重ねて 0行のとき */
+  function paintNone(w) {
+    const t = rateTable(w); if (!t) return;
+    const rows = [...t.tBodies[0].rows].filter((tr) => tr.querySelector("[data-frdel]"));
+    const vis = rows.filter((tr) => !tr.classList.contains("v100fdupoff") && !tr.classList.contains("v99fwhyoff") && getComputedStyle(tr).display !== "none").length;
+    const whyB = w.querySelector('[data-v99whyf].on:not([data-v99whyf=""])');
+    const conds = [DUPF.on ? M("重なっている行だけ", "overlapping rows only") : "", whyB ? String(whyB.textContent || "").trim() : ""].filter(Boolean);
+    const html = (!vis && rows.length && conds.length) ? `<p class="v100fnone" data-noi18n role="status">${E(M(`この絞り込みに当たる行はありません（${conds.join(" × ")}）。`, `No rows match (${conds.join(" × ")}).`))}<button type="button" class="btn g" data-v100none="1">${E(M("絞り込みを外して、すべての行を表示", "Clear filters"))}</button></p>` : "";
+    const tw = t.closest(".tw") || t;
+    put(tw.parentElement, ":scope > .v100fnone", html, "afterend", tw);
+  }
+  document.addEventListener("click", (ev) => {
+    try {
+      const b = ev.target && ev.target.closest && ev.target.closest("[data-v100none]");
+      if (!b) return;
+      ev.preventDefault();
+      const w = well(); if (!w) return;
+      const off = w.querySelector('[data-v100dup="off"]'); if (off && DUPF.on) off.click();
+      const all = w.querySelector('[data-v99whyf=""]'); if (all) all.click();
+      setTimeout(() => { try { paintRates(w); paintNone(w); } catch (e) { err("nonecl", e); } }, 50);
+    } catch (e) { err("none", e); }
+  });
+  /* N14：物流会社（デモ用）の上の帯「ログアウトすると、この PC での変更は消えます」に、消えないもの（届いた依頼）を書き足す */
+  function paintFwdBar() {
+    const bar = document.getElementById("v57demobar");
+    if (!bar) return;
+    const o = bar.querySelector(".v100fdemobar");
+    if (!fwdOn()) { if (o) o.remove(); return; }
+    if (o) return;
+    const sp = document.createElement("span");
+    sp.className = "v57demo-sub v100fdemobar"; sp.setAttribute("data-noi18n", "");
+    sp.textContent = M("荷主から届いた見積依頼はサーバーにあるので、ログアウトしても消えません（体験用の依頼は、受信から3日で消えます）。", "Quote requests from shippers are on the server and stay after you log out (trial requests disappear 3 days after arrival).", "货主发来的报价请求保存在服务器上，注销后不会消失（体验用请求3天后删除）。", "Las solicitudes de los cargadores están en el servidor y no se borran al cerrar sesión.");
+    const btn = bar.querySelector("button");
+    bar.insertBefore(sp, btn || null);
+    cnt("fwdbar");
+  }
+  /* N14（本番で確かめた結果）：物流会社（FWD-2026）の画面には上の帯（#v57demobar）も 21.69 の注記も出ていなかった。
+     → 見積受信箱の「依頼一覧」の見出しの下に、ログアウトで消えるもの・消えないものを1行で（体験の世界の物流会社の画面だけ） */
+  function paintFwdLogout(w) {
+    const t = inboxTable(w); if (!t) return;
+    const card = t.closest(".c") || t.parentElement;
+    const h3 = card && card.querySelector("h3");
+    let html = "";
+    try {
+      const world = typeof v100fTrialWorld === "function" ? v100fTrialWorld() : false;
+      if (world) {
+        const demo = (typeof v69fDemo === "function") ? !!v69fDemo() : false;
+        html = `<p class="v100flogout" data-noi18n role="note"><b>${E(M("ログアウトしたとき", "When you log out", "注销时", "Al cerrar sesión"))}</b>${E(demo
+          ? M("：荷主から届いた見積依頼はサーバーにあるので、ログアウトしても消えません（体験用の依頼は、受信から3日で消えます）。この PC での変更（レート・B/L・担当と状態・依頼ページ・AI相談）は、デモ用のアカウントのためサーバーに保存されず、ログアウトするとログインのときの状態に戻ります。", ": Quote requests from shippers stay on the server after you log out (trial requests disappear 3 days after arrival). Changes on this PC are not saved for this demo account and are reset when you log out.")
+          : M("：荷主から届いた見積依頼はサーバーにあるので、ログアウトしても消えません（体験用の依頼は、受信から3日で消えます）。ここでの操作はサーバーに保存され、ほかの体験の人にも見えます。", ": Quote requests from shippers stay on the server after you log out (trial requests disappear 3 days after arrival). Your changes here are saved and visible to other trial users."))}</p>`;
+      }
+    } catch (e) { err("logout", e); }
+    if (h3) put(card, ":scope > .v100flogout", html, "afterend", h3);
+  }
+  /* N12：物流会社の画面で、刷新版の上の帯・見出しが約1.5秒ごとに同じ class・hidden を書き直す（rd_v92all.js の 1.5秒ごとの build・fixBar・finish・mark）。
+     値が同じ書き直しだけを、物流会社の画面のあいだ飛ばす（見た目・値は変わらない。違う値の書き込みは今までどおり。V100FWD_NOOP.on=false で止められる） */
+  try {
+    const NG = window.V100FWD_NOOP = window.V100FWD_NOOP || { on: true, n: 0 };
+    const DTL = DOMTokenList.prototype, ad = DTL.add, rm = DTL.remove, tg = DTL.toggle;
+    if (!DTL.__v100) {
+      DTL.__v100 = 1;
+      DTL.add = function () { if (NG.on && fwdOn() && Array.prototype.every.call(arguments, (t) => this.contains(t))) { NG.n++; return; } return ad.apply(this, arguments); };
+      DTL.remove = function () { if (NG.on && fwdOn() && !Array.prototype.some.call(arguments, (t) => this.contains(t))) { NG.n++; return; } return rm.apply(this, arguments); };
+      DTL.toggle = function (t, f) { if (NG.on && fwdOn() && arguments.length > 1 && !!f === this.contains(t)) { NG.n++; return !!f; } return tg.apply(this, arguments); };
+      const hd = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "hidden");
+      if (hd && hd.set && hd.get) Object.defineProperty(HTMLElement.prototype, "hidden", { configurable: true, enumerable: hd.enumerable, get: hd.get, set(v) { if (NG.on && fwdOn() && hd.get.call(this) === !!v) { NG.n++; return; } hd.set.call(this, v); } });
+      const sa = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function (n, v) { if (NG.on && fwdOn() && !/^(value|src|href|style)$/i.test(String(n)) && this.getAttribute(n) === String(v)) { NG.n++; return; } return sa.apply(this, arguments); };
+      const td = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "title");
+      if (td && td.set && td.get) Object.defineProperty(HTMLElement.prototype, "title", { configurable: true, enumerable: td.enumerable, get: td.get, set(v) { if (NG.on && fwdOn() && td.get.call(this) === String(v == null ? "" : v)) { NG.n++; return; } td.set.call(this, v); } });
+    }
+  } catch (e) { err("noop", e); }
+
   /* ═══ 描き直しのたびに ═══════════════════════════════════════════════ */
   function paint() {
     try { paintShipperNote(); } catch (e) { err("note", e); }
@@ -433,18 +613,22 @@
       const w = well(); if (!w) return;
       const pg = page(), k = rdKey();
       try { paintDemoNote(w); } catch (e) { err("demo", e); }
-      if (k === "fhome") { try { paintTrialTiles(w); } catch (e) { err("tiles", e); } }
+      if (k === "fhome") { try { paintTrialTiles(w); } catch (e) { err("tiles", e); } try { paintHomeWords(w); } catch (e) { err("hw", e); } }
+      try { paintFwdBar(); } catch (e) { err("fbar", e); }
       if (k === "finbox" || pg === "finbox") {
         try { fixChips(w); } catch (e) { err("chips", e); }
         try { paintTrialRows(w); } catch (e) { err("trows", e); }
         try { paintTrialInboxNote(w); } catch (e) { err("tnote", e); }
+        try { paintFwdLogout(w); } catch (e) { err("logout", e); }
         try { paintPager(w); } catch (e) { err("pager", e); }
       } else if (pg === "frates") {
         try { guardText(w); } catch (e) { err("guardp", e); }
         try { paintRates(w); } catch (e) { err("rates", e); }
+        try { paintNone(w); } catch (e) { err("nonep", e); }
         try { paintImport(); } catch (e) { err("import", e); }
       } else if (pg === "fagg") { try { paintAgg(w); } catch (e) { err("agg", e); } }
-      try { paintDetail(); } catch (e) { err("det", e); }
+      else if (pg === "fcase") { try { paintCase(w); } catch (e) { err("case", e); } }
+      try { paintDetail(); paintDetailTags(); } catch (e) { err("det", e); }
       try { paintVolUsed(); } catch (e) { err("vol", e); }
     } catch (e) { err("paint", e); }
   }
@@ -455,7 +639,7 @@
   }
   if (typeof uxApplyFilter === "function") {
     const __af100 = uxApplyFilter;
-    uxApplyFilter = function () { const o = __af100.apply(this, arguments); try { const w = well(); if (w && fwdOn() && page() === "finbox") paintPager(w); } catch (e) { err("af", e); } return o; }; // eslint-disable-line no-global-assign
+    uxApplyFilter = function (card) { const o = __af100.apply(this, arguments); try { const w = well(); if (w && fwdOn() && page() === "finbox") { if (card && card.querySelector && card.querySelector("table[data-v33fw], [data-v99rid]")) chipFilter(card); paintPager(w); } } catch (e) { err("af", e); } return o; }; // eslint-disable-line no-global-assign
   }
   try {
     let t = 0;

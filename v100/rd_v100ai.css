@@ -29,3 +29,8 @@ body.v100ai-hit #v92aiLim{display:none!important}
 .v100ai-src0 ul{margin:4px 0 8px 18px;padding:0;line-height:1.7}
 .v100ai-sh{font-weight:700}
 @media (max-width:600px){.v100ai-bar{flex-direction:column}.v100ai-bx{align-self:flex-end}.v100ai-smp{flex-direction:column;align-items:flex-start}.v100ai-btns .btn{width:100%}}
+/* 22.00.1 N11：同じ画面で始めた AI の「考え中」には「別の画面で処理中」と出さない（たたんだままでも、経過と棒は出す） */
+html.rd #aiThink.k-mini.v100ai-here .att::after{content:none!important}
+html.rd #aiThink.k-mini.v100ai-here .atm,html.rd #aiThink.k-mini.v100ai-here .atbar{display:block}
+html.rd #aiThink.k-mini.v100ai-here .atm{font-size:11px;line-height:1.5;margin-top:2px;max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:600px){html.rd #aiThink.k-mini.v100ai-here .atm{max-width:62vw}}

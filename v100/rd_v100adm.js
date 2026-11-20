@@ -383,3 +383,53 @@
     } catch (e) { err("click", e); }
   });
 })();
+
+/* ══════════ 22.00.1 N9：ログイン画面を開いた（読み直した）直後から、この端末で続けてまちがえた回数・待ち時間を出し、待ちの間はボタンを止める ══════════
+   21.97 の表示（#v97lgHelp）が回数を出しているときは重ねない。中身は logic_v2200adm.js（V100LG・v100lgLock）。 */
+(function () {
+  if (typeof V100LG === "undefined") return;
+  const M = (ja, en, zh, es) => v100admM(ja, en, zh, es);
+  const mmss = (s) => { s = Math.max(0, Math.ceil(+s || 0)); return s >= 60 ? Math.floor(s / 60) + M("分", " min ", "分", " min ") + (s % 60 ? (s % 60) + M("秒", " s", "秒", " s") : "") : s + M("秒", " s", "秒", " s"); };
+  let tmr = 0;
+  function paint() {
+    try {
+      const code = document.getElementById("lg-code"), go = document.getElementById("lg-go");
+      let el = document.getElementById("v100lgCnt");
+      const on = !!(code && go && document.body && document.body.classList.contains("locked"));
+      const L = on && typeof window.v97aiLgf === "function" ? window.v97aiLgf() : { n: 0, left: 0 };
+      if (!on || !(L.n > 0)) { if (el) el.remove(); if (tmr) { clearInterval(tmr); tmr = 0; } return; }
+      if (!tmr) tmr = setInterval(paint, 1000);
+      const lock = L.left > 0;
+      if (lock) {
+        if (!go.disabled) go.disabled = true;
+        if (go.getAttribute("aria-disabled") !== "true") go.setAttribute("aria-disabled", "true");
+        if (go.dataset.v97lock !== "1") go.dataset.v97lock = "1";
+      } else if (go.dataset.v97lock === "1") { go.disabled = false; go.removeAttribute("aria-disabled"); delete go.dataset.v97lock; }
+      const help = document.getElementById("v97lgHelp");
+      const helpShows = !!(help && help.isConnected && /まちがえ|wrong attempt|输错|intentos/.test(help.textContent || ""));
+      if (helpShows) { if (el) el.remove(); return; }
+      const to = +L.toWait || 0, nx = typeof window.v97aiWaitOf === "function" ? window.v97aiWaitOf(L.n + to) : 30;
+      const t = lock
+        ? M(`この端末で続けて ${L.n}回まちがえたため、あと ${mmss(L.left)} お待ちください（ページを読み直しても続きます）。`, `${L.n} wrong attempts in a row on this device. Please wait ${mmss(L.left)} (reloading the page does not reset this).`, `此设备已连续输错 ${L.n} 次，请等待 ${mmss(L.left)}（重新加载页面也会继续）。`, `${L.n} intentos erróneos seguidos en este equipo. Espere ${mmss(L.left)} (recargar la página no lo reinicia).`)
+        : to > 0
+          ? M(`この端末で続けて ${L.n}回まちがえています。あと ${to}回まちがえると、${mmss(nx)}お待ちいただきます（ページを読み直しても数えます。30分まちがえなければ 0 にもどります）。`, `${L.n} wrong attempt(s) in a row on this device. After ${to} more, you will need to wait ${mmss(nx)} (reloading does not reset this; it resets after 30 minutes without mistakes).`, `此设备已连续输错 ${L.n} 次。再输错 ${to} 次，需要等待 ${mmss(nx)}（重新加载也会计数；30 分钟内没有输错则归零）。`, `${L.n} intento(s) erróneo(s) seguidos en este equipo. Tras ${to} más, deberá esperar ${mmss(nx)} (recargar no lo reinicia; se reinicia tras 30 minutos sin errores).`)
+          : M(`この端末で続けて ${L.n}回まちがえています。次にまちがえると、${mmss(L.next)}お待ちいただきます（ページを読み直しても数えます）。`, `${L.n} wrong attempts in a row on this device. The next wrong attempt means a ${mmss(L.next)} wait (reloading does not reset this).`, `此设备已连续输错 ${L.n} 次。下次输错需要等待 ${mmss(L.next)}（重新加载也会计数）。`, `${L.n} intentos erróneos seguidos en este equipo. El próximo error implica esperar ${mmss(L.next)} (recargar no lo reinicia).`);
+      if (!el) { el = document.createElement("p"); el.id = "v100lgCnt"; el.className = "v100adm-lgcnt"; el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite"); el.setAttribute("data-noi18n", "1"); }
+      const mir = document.getElementById("v92e-lgerr");
+      const after = mir && mir.parentNode === go.parentNode ? mir : go;
+      if (el.previousElementSibling !== after) after.insertAdjacentElement("afterend", el);
+      if (el.getAttribute("data-k") !== (lock ? "lock" : "cnt")) el.setAttribute("data-k", lock ? "lock" : "cnt");
+      if (el.textContent !== t) el.textContent = t;
+    } catch (e) { v100admErr("rd lgPaint", e); }
+  }
+  window.v100admLgPaint = paint;
+  let pt = 0;
+  try {
+    new MutationObserver((recs) => {
+      if (!document.body || !document.body.classList.contains("locked")) return;
+      for (const r of recs) { const x = r.target; if (x && (x.id === "v100lgCnt" || (x.closest && x.closest("#v100lgCnt")))) return; }
+      if (pt) return; pt = setTimeout(() => { pt = 0; paint(); }, 120);
+    }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+  } catch (e) { v100admErr("rd lgMo", e); }
+  setTimeout(paint, 0); setTimeout(paint, 800); setTimeout(paint, 2000);
+})();

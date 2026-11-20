@@ -41,3 +41,8 @@
   html.rd .k-jny-st .k-jny-here svg { display: inline-block; width: 12px; height: 12px; flex: none; }
   html.rd .k-jny-st .k-jny-here .v100f-herel { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 }
+
+/* 22.00.1：見積の要約の食い違いの説明・適合宣言の出どころ */
+.v100f-qnote { margin: 6px 0 0; padding: 6px 10px; border-left: 4px solid var(--warn, #9a6700); background: var(--warn-soft, #fff8e1); font-size: 12.5px; line-height: 1.6; }
+.v100f-csrc { display: block; font-size: 11px; color: var(--ink-2, #4a5563); margin-top: 2px; }
+.v100f-few { margin: 8px 0; padding: 8px 10px; border-left: 4px solid var(--warn, #9a6700); background: var(--warn-soft, #fff8e1); font-size: 12.5px; line-height: 1.6; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }

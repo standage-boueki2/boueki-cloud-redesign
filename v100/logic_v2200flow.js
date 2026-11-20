@@ -69,6 +69,26 @@ window.V100FLOW = V100FLOW;
     UK_SCPN: /SCPN/, NMPA: /NMPA/, ID_BPOM: /BPOM/, FDA_DEVICE: /FDA 施設登録|510\(k\)/, AU_BICON: /BICON/, TW_TFDA: /TFDA|査験/, COA: /成分分析表|全成分表|成分表（INCI）/, GAIHI: /該非判定書/, IN_IMPORT: /FSSAI|CDSCO|BIS/, FSC_MD: /自由販売証明/, KR_MFDS: /食品等の輸入申告/,
     FCM_DOC: /食品接触|食品器具|GB 4806|溶出試験|器具・容器包装/, SAKE_CERT: /製造地証明/, ORIGIN_PREF: /産地証明書/, LABEL: /ラベル|表示|表記/, AE_REG: /ESMA/, CONFORMITY: /UKCA|CE|RoHS/ };
   const LVO = { ban: 4, required: 3, conditional: 2, check: 1 };
+  /* 22.00.1 N6：「適合宣言・製品認証（CE・UKCA・KC・CCC・SABER など）」は国によらない名前で、関係の無い制度名が並んでいた。
+     → 送り先の国（と品目）の制度名だけにする。米国の子ども向け製品（玩具 9503〜9505）は CPC（CPSC の公式ページで確かめた：
+       12歳以下向けの子ども用製品は、CPSC が認めた第三者の試験所の試験にもとづき輸入者・国内メーカーが CPC を出す〔16 CFR 1110〕・
+       玩具は ASTM F963 が義務〔16 CFR 1250〕・製品と包装に追跡ラベル。2026-11-20 確認）。確かめていない国は「要確認」 */
+  const CPSC_SRC = "CPSC『Children\u2019s Product Certificate (CPC)』『Toy Safety Business Guidance』（2026-11-20 確認）";
+  function confName(cc, hs) {
+    const h = String(hs || "").replace(/\D/g, "");
+    const toy = /^950[345]/.test(h);
+    let eu = false; try { eu = fn("v85docInGroup") ? W.v85docInGroup(cc, ["EU"]) : false; } catch (e) { eu = false; }
+    if (cc === "US" && toy) return { ja: "子ども用製品の適合証明書（CPC）：CPSC が認めた試験所の第三者試験（ASTM F963 など）・製品と包装の追跡ラベル", en: "Children's Product Certificate (CPC): third-party testing at a CPSC-accepted lab (ASTM F963 etc.), tracking labels on product and packaging", src: CPSC_SRC };
+    if (cc === "US") return { ja: "米国の適合の証明（品目しだい：無線は FCC、CPSC の規則がある製品は GCC・CPC。要確認）", en: "US conformity (depends on the product: FCC for radio devices, GCC/CPC for CPSC-regulated products; to be confirmed)" };
+    if (eu) return { ja: "EU 適合宣言・CE マーキング" + (toy ? "（玩具の安全の決まり）" : "（当たる指令・規則は品目しだい）"), en: "EU Declaration of Conformity and CE marking" + (toy ? " (toy safety)" : "") };
+    if (cc === "GB") return { ja: "UKCA（または CE）の適合宣言", en: "UKCA (or CE) Declaration of Conformity" };
+    if (cc === "CN") return { ja: "CCC 強制認証（目録に載る品目）", en: "CCC compulsory certification (listed products)" };
+    if (cc === "KR") return { ja: "KC 認証（要確認）", en: "KC certification (to be confirmed)" };
+    if (cc === "SA") return { ja: "SABER の製品適合証明（PCoC）・出荷証明（SC）", en: "SABER Product Certificate of Conformity (PCoC) and Shipment Certificate (SC)" };
+    return { ja: "適合宣言・製品認証（この国の制度名は要確認）", en: "Declaration of Conformity / product certification (scheme to be confirmed)" };
+  }
+  V100FLOW.confName = confName;
+  V100FLOW.CONF_GENERIC = "適合宣言・製品認証（CE・UKCA・KC・CCC・SABER など）";
   const SEPC = { sig: "", v: {} };
   function sepReq(c) {
     const out = [];
@@ -120,8 +140,9 @@ window.V100FLOW = V100FLOW;
       try { const K = fn("v92opsKind") ? W.v92opsKind() : null; if (K && K.meddev && !RE_MEDHS.test(hs0)) run("9018", true); } catch (e) { /* そのまま */ }
       Object.keys(rows).forEach((k) => {
         const x = rows[k];
-        if (x.lv !== "required") return;
+        if (x.lv !== "required" && x.lv !== "conditional") return;
         try { if (fn("v98regAllowed") && !W.v98regAllowed(t, x.ja)) return; } catch (e) { /* 出す */ }
+        if (k === "CONFORMITY") { const nm = confName(cc, hs0); x.ja = nm.ja; x.en = nm.en; x.src = nm.src || ""; }
         out.push(x);
       });
       SEPC.v[sig] = out;
@@ -152,11 +173,31 @@ window.V100FLOW = V100FLOW;
     const done = (st && Array.isArray(st.done)) ? st.done : [];
     req.forEach((x) => it.push({ k: "req", nm: String(x), t: c + "：" + x + M("（必要な手続き）", " (required procedure)", "（所需手续）", " (trámite obligatorio)"), ok: done.indexOf(x) >= 0, go: go([String(x), "対応済みにする", "未対応"]) }));
     const reqN = req.map(nm1);
+    // 22.00.1 N4：表のひな形の「必要なときだけの手続き」（該当するか未確認）も数える（「該当する」「対象外」を選ぶと済み）
+    const cond = (st && Array.isArray(st.cond)) ? st.cond : [];
+    cond.forEach((x) => {
+      if (x.v === "y" && !x.doc) return; // 該当する＝上の必要な手続きに入っている
+      it.push({ k: "cond", nm: String(x.nm), t: c + "：" + x.nm + M("（必要なときだけ：当たるかを確かめる）", " (only when it applies: check whether it applies)", "（仅在适用时：确认是否适用）", " (solo si aplica: verifique)"), ok: x.v === "y" || x.v === "n", at: x.v === "n" ? M("対象外", "Not applicable") : x.v === "y" ? M("該当する", "Applies") : "", go: go([String(x.nm), "該当するか未確認"]) });
+    });
     sepReq(c).forEach((x) => {
       if (reqN.some((q) => q && (q === nm1(x.ja) || q.indexOf(nm1(x.ja)) >= 0 || nm1(x.ja).indexOf(q) >= 0))) return;
+      if (cond.some((q) => nm1(q.nm) === nm1(x.ja))) return;
       const at = (R.x && R.x[x.k]) || "";
-      it.push({ k: "x", key: x.k, nm: x.ja, t: c + "：" + (lang() === "ja" ? x.ja : (x.en || x.ja)) + M("（必須・書類の判断の表）", " (required — document decision table)", "（必需・文件判断表）", " (obligatorio — tabla de documentos)"), ok: !!at, at, go: go([x.ja, "この商品と送り先で確かめる点"]) });
+      const reqd = x.lv === "required";
+      it.push({ k: "x", key: x.k, nm: x.ja, lv: x.lv, t: c + "：" + (lang() === "ja" ? x.ja : (x.en || x.ja)) + (reqd ? M("（必須・書類の判断の表）", " (required — document decision table)", "（必需・文件判断表）", " (obligatorio — tabla de documentos)") : M("（条件つき・書類の判断の表：当たるかを確かめる）", " (conditional — document decision table: check whether it applies)", "（有条件・文件判断表：确认是否适用）", " (condicional — tabla de documentos: verifique)")), ok: !!at, at, go: go([x.ja, "この商品と送り先で確かめる点"]) });
     });
+    // 22.00.1 N4：輸出の規制（制裁など）・産地による措置（規制の画面の上の枠と同じ v56regCheck）
+    try {
+      if (fn("v56regCheck") && fn("v56regCtxD")) {
+        const K = W.v56regCheck(c, r, W.v56regCtxD());
+        if (K && K.sanc) {
+          if (K.sanc.lv === "all") it.push({ k: "ban", t: c + "：" + M("日本からの輸出が禁止されている国（輸出できない）", "exports from Japan are banned"), ok: false, go: go(["輸出の禁止", "外為法"]) });
+          else it.push({ k: "x", key: "sanc", nm: "sanc", t: c + "：" + M("日本の輸出の規制（制裁など）に当たらないかを確かめる", "check Japan's export restrictions (sanctions, etc.)"), ok: !!(R.x && R.x.sanc), at: (R.x && R.x.sanc) || "", go: go(["輸出の禁止の措置", "外為法"]) });
+        }
+        ((K && K.ban) || []).concat((K && K.stop) || []).forEach((o) => it.push({ k: "ban", t: c + "：" + String(o.h || "").replace(/^[⛔⚠\uFE0F\s]+/, ""), ok: false, go: go([String(o.h || "").slice(0, 12)]) }));
+        ((K && K.doc) || []).forEach((o) => { const key = "od:" + (o.id || String(o.h || "").slice(0, 20)); it.push({ k: "x", key, nm: String(o.h || ""), t: c + "：" + String(o.h || "").replace(/^[⛔⚠\uFE0F\s]+/, ""), ok: !!(R.x && R.x[key]), at: (R.x && R.x[key]) || "", go: go([String(o.h || "").slice(0, 12)]) }); });
+      }
+    } catch (e) { err("regCheck", e); }
     const noTpl = NOTPL.test(String(r.warn || ""));
     const warnReg = !!(st && !req.length && (st.warnReg || st.medEU));
     const kind = noTpl ? "notpl" : warnReg ? "warn" : "ok";
@@ -178,7 +219,21 @@ window.V100FLOW = V100FLOW;
     const C = chosenOf(t);
     const it = [], per = {};
     if (!C.conf) it.push({ k: "conf", t: M("先に販売先国を確定する（STEP 02）", "Confirm the target countries first (STEP 02)", "请先确定销售国（STEP 02）", "Confirme primero los países (STEP 02)"), ok: false, go: { k: "cty", find: ["確定", "おすすめ"] } });
-    else C.chosen.forEach((c) => { const s = ctyState(c); per[c] = s; s.it.forEach((x) => it.push(Object.assign({ cty: c }, x))); });
+    else {
+      // 22.00.1 N4：輸出管理（該非判定）は国によらず商品に1つ（規制の画面の「該非判定の結果しだいで、輸出許可が要ります」）
+      try {
+        if (fn("v56regXc") && fn("v56regCtxD")) {
+          const ctx = W.v56regCtxD();
+          const need = C.chosen.some((c) => d && d.regs && d.regs[c] && W.v56regXc(c, d.regs[c], ctx));
+          if (need) {
+            const R0 = rec("_all");
+            const tx = M("輸出管理（該非判定）：該非判定をして該非判定書を用意する（リスト規制に当たれば、どの国に送るときも経済産業大臣の輸出許可が要る）", "Export control: classify the product and prepare the classification sheet (an export licence is needed for any country if it is a listed item)", "出口管制（是否符合判定）：进行判定并准备判定书（如属清单管制，出口到任何国家都需要许可）", "Control de exportaciones: clasifique el producto (si está en la lista, necesita licencia para cualquier país)");
+            it.push({ k: "xc", cty: "", t: tx, lb: tx, ok: !!R0.xc, at: R0.xc || "", go: { k: "ops:reg", cty: C.chosen[0], find: [tx, "輸出管理（該非判定）"] } });
+          }
+        }
+      } catch (e) { err("xc", e); }
+      C.chosen.forEach((c) => { const s = ctyState(c); per[c] = s; s.it.forEach((x) => it.push(Object.assign({ cty: c }, x))); });
+    }
     const n = it.filter((x) => x.ok).length;
     const core = !!(C.conf && C.chosen.length && C.chosen.every((c) => d && d.regs && d.regs[c]));
     return {
@@ -192,7 +247,7 @@ window.V100FLOW = V100FLOW;
   V100FLOW.step3 = step3;
   /* 国ごとの要約（準備点・はじめの設定・成長度で使う）：'done'（全部済み）・'part'（表は確かめた・残りあり）・'none'（未確認）・'nores'（表なし） */
   function ctyLevel(c) {
-    try { const s = ctyState(c); if (!s.m || s.kind === "none") return { lv: "nores", s }; if (s.n >= s.m && !s.ban) return { lv: "done", s }; const tb = s.it.find((x) => x.k === "tbl"); return { lv: tb && tb.ok ? "part" : "none", s }; } catch (e) { err("ctyLevel", e); return { lv: "none", s: null }; }
+    try { const s = ctyState(c); if (!s.m || s.kind === "none") return { lv: "nores", s }; const xc = step3().it.find((x) => x.k === "xc"); if (s.n >= s.m && !s.ban && !(xc && !xc.ok)) return { lv: "done", s }; const tb = s.it.find((x) => x.k === "tbl"); return { lv: tb && tb.ok ? "part" : "none", s }; } catch (e) { err("ctyLevel", e); return { lv: "none", s: null }; }
   }
   V100FLOW.ctyLevel = ctyLevel;
 
@@ -434,6 +489,89 @@ window.V100FLOW = V100FLOW;
         else if (V0.why === "30" && X.pu && X.pu > X.d30 && !fr) { X.why = "price-def"; X.until = X.pu; X.en = "Until " + X.pu + " (price list validity)"; }
         return X;
       } catch (e) { V.e("piValid", e); return V0; }
+    };
+  }
+})();
+
+/* ══════ 22.00.1 N12：進出希望国に「指定なし」と答えた商品は、進出希望国を「答えた」に数える ══════
+   21.99 cty が「指定なし」を国として登録せず TEN.targetsNone に控える。確定するまで「進出希望国 必須・未登録」・充足度 20/21・はじめの設定 0/6 だった。
+   → 商品情報の充足（v92prodFill。旅程の STEP 01・はじめの設定・取り込みの % が使う）で、targetsNone のときは進出希望国を入っているに数える */
+(function () {
+  "use strict";
+  const W = window, V = W.V100FLOW;
+  if (!V || W.__v100flowTn) return;
+  W.__v100flowTn = 1;
+  const none = (t) => !!(t && t.targetsNone && !(Array.isArray(t.targets) && t.targets.length));
+  V.targetsNone = none;
+  if (typeof v92prodFill === "function") { // eslint-disable-line no-undef
+    const __pf = v92prodFill; // eslint-disable-line no-undef
+    v92prodFill = function (t) { // eslint-disable-line no-global-assign
+      const K = __pf.apply(this, arguments);
+      try {
+        const tt = t === undefined ? (typeof TEN !== "undefined" ? TEN : null) : t; // eslint-disable-line no-undef
+        if (K && none(tt) && Array.isArray(K.missKeys) && K.missKeys.indexOf("targets") >= 0) {
+          K.missKeys = K.missKeys.filter((k) => k !== "targets");
+          K.okKeys = (K.okKeys || []).concat(["targets"]);
+          K.c = K.okKeys.length;
+          K.pct = K.d ? Math.round((K.c / K.d) * 100) : 0;
+          try { const req = NEED.filter((x) => x.w >= 5); if (req.some((x) => x.k === "targets")) K.a = Math.min(K.b, (K.a || 0) + 1); } catch (e) { /* そのまま */ } // eslint-disable-line no-undef
+          K.full = K.c === K.d; K.allDone = K.full && !((K.optMiss || []).length);
+          K.v100none = 1;
+        }
+      } catch (e) { V.e("fillNone", e); }
+      return K;
+    };
+  }
+  if (typeof v92itemMiss === "function") { // eslint-disable-line no-undef
+    const __im = v92itemMiss; // eslint-disable-line no-undef
+    v92itemMiss = function () { // eslint-disable-line no-global-assign
+      const L = __im.apply(this, arguments);
+      try { const t = typeof TEN !== "undefined" ? TEN : null; if (Array.isArray(L) && none(t)) return L.filter((x) => !(x && x.k === "targets")); } catch (e) { V.e("missNone", e); } // eslint-disable-line no-undef
+      return L;
+    };
+  }
+})();
+
+/* ══════ 22.00.1 N6：英語などの営業資料の「Import Requirements by Market」（書類のページ）に、規制の画面で必須の書類を渡す ══════
+   原因：資料の国ごとの書類（土台の dk3DataSrc）は、表のひな形（regsFor）の書類だけ（Invoice・Packing List・Certificate of Origin）で、
+         規制の画面の「書類の判断の表」で必須の書類（米国の子ども向け製品の CPC・EU の適合宣言 など）が入っていなかった。
+   直し：資料の国ごとに、書類の判断の表の「必須」を足す（名前は国ごとの制度名＝confName。英語などの訳は決まった訳語の表 V97DK_TERMS に足す）。 */
+(function () {
+  "use strict";
+  const W = window, V = W.V100FLOW;
+  if (!V || W.__v100flowDk) return;
+  W.__v100flowDk = 1;
+  const ten = () => { try { return typeof TEN !== "undefined" ? TEN : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  function addTerm(ja, en) {
+    try {
+      if (typeof V97DK_TERMS === "undefined" || !Array.isArray(V97DK_TERMS) || !ja || !en) return; // eslint-disable-line no-undef
+      if (V97DK_TERMS.some((r) => r && r[0] === ja)) return; // eslint-disable-line no-undef
+      V97DK_TERMS.unshift([ja, en, en, en, en, en]); // eslint-disable-line no-undef
+    } catch (e) { V.e("term", e); }
+  }
+  V.addTerm = addTerm;
+  if (typeof dk3DataSrc === "function") { // eslint-disable-line no-undef
+    const __ds = dk3DataSrc; // eslint-disable-line no-undef
+    dk3DataSrc = function (T) { // eslint-disable-line no-global-assign
+      const d = __ds.apply(this, arguments);
+      try {
+        if (!d || !Array.isArray(d.markets) || (T && T !== ten())) return d;
+        d.markets.forEach((m) => {
+          if (!m || !m.c) return;
+          const rows = (V.sepReq(m.c) || []).filter((x) => x.lv === "required");
+          if (!rows.length) return;
+          const docs = Array.isArray(m.docs) ? m.docs.slice() : [];
+          rows.forEach((x) => {
+            const ja = String(x.ja || "");
+            if (!ja || docs.some((y) => String(y) === ja)) return;
+            docs.push(ja);
+            addTerm(ja, x.en || "");
+          });
+          m.docs = docs.slice(0, 7);
+          m.v100req = rows.map((x) => x.k);
+        });
+      } catch (e) { V.e("dk3DataSrc", e); }
+      return d;
     };
   }
 })();

@@ -348,3 +348,62 @@ document.addEventListener("click", (ev) => {
     const t = setInterval(() => { n++; const ok = w && w.querySelector(`[data-v84sec="${k}"]`); if (ok || n > 15) { clearInterval(t); if (ok && typeof v84AdmGo === "function") v84AdmGo(k); } }, 200);   // eslint-disable-line no-undef
   } catch (e) { v100admErr("ghostClick", e); }
 }, true);
+
+/* ══════════ 22.00.1 N9（独立の検証 v3）：誤ったアクセスコードの回数・待ち時間 ══════════
+   調べたこと：同期サーバー（GAS v2.29secf1_d95）は、端末ごと・コードごとの誤りの回数を数えていない。数えているのは「台帳に無いコードでの
+   lookup・login が 10分に何回あったか」の全体の数だけ（loginFail_：LOGIN_BURST 回でセキュリティの記録と持ち主へのメール、超えたら1回ごとに
+   1秒待たせる）。答えに回数・待ち時間は入らない。画面の「続けて N回・あと N回で 30秒」は 21.97 の端末の記録（localStorage の rd_v97lgf）。
+   22.00 で起きていたこと（手元で再現）：①読み直した直後の画面に回数が出ず、初めてと同じに見える（次にまちがえると「2回」と出る＝数は残っている）
+   ②待ちの間にページを読み直すと、ボタンの止めと「お待ちください」が出ないことがある（描く時刻しだい。問い合わせは 21.97 の v56authLgGo の
+   止めで送られない）③localStorage が使えない端末では、回数が増えず待ちにならない。
+   直し：待ちの間の問い合わせの止めを、21.97 の止めに加えて window の capture でも先にかける（二重の止め）。回数は localStorage に加えて
+   sessionStorage・この画面の記憶にも控える（どれかが使えれば数える）。画面の表示は rd_v100adm.js。同期サーバーで数える案は「決めてほしいこと」。 */
+var V100LG = window.V100LG = { mem: null, block: 0, key: "rd_v100lgf" };
+function v100lgFresh(m) { return !!m && (+m.n > 0) && ((Date.now() - (+m.last || 0)) <= 30 * 60000 || (+m.until || 0) > Date.now()); }
+if (typeof v97aiLgfGet === "function" && typeof v97aiLgfSet === "function" && !v97aiLgfGet.__v100adm) {   // eslint-disable-line no-undef
+  const __g100 = v97aiLgfGet, __s100 = v97aiLgfSet;   // eslint-disable-line no-undef
+  const g = function () {
+    const r = __g100.apply(this, arguments);
+    try {
+      if (r && r.n > 0) return r;
+      let m = V100LG.mem;
+      if (!v100lgFresh(m)) { try { m = JSON.parse(sessionStorage.getItem(V100LG.key) || "null"); } catch (e) { m = null; } }
+      if (v100lgFresh(m)) return { n: +m.n || 0, last: +m.last || 0, until: +m.until || 0 };
+    } catch (e) { v100admErr("lgfGet", e); }
+    return r;
+  };
+  const s = function (o) {
+    let r;
+    try { r = __s100.apply(this, arguments); } catch (e) { v100admErr("lgfSet0", e); }
+    try {
+      if (!o || !o.n) { V100LG.mem = null; try { sessionStorage.removeItem(V100LG.key); } catch (e) { /* 無視 */ } }
+      else { V100LG.mem = { n: +o.n || 0, last: +o.last || 0, until: +o.until || 0 }; try { sessionStorage.setItem(V100LG.key, JSON.stringify(V100LG.mem)); } catch (e) { /* 無視 */ } }
+    } catch (e) { v100admErr("lgfSet", e); }
+    return r;
+  };
+  g.__v100adm = 1; s.__v100adm = 1;
+  v97aiLgfGet = g;   // eslint-disable-line no-global-assign
+  v97aiLgfSet = s;   // eslint-disable-line no-global-assign
+}
+window.v100lgLock = function () { try { const L = typeof window.v97aiLgf === "function" ? window.v97aiLgf() : null; return (L && L.left > 0) ? L : null; } catch (e) { return null; } };
+/* 待ちの間は、ボタンを押しても Enter でも問い合わせない（ほかの層より先に＝window の capture） */
+function v100lgGuard(ev) {
+  try {
+    if (!document.body || !document.body.classList.contains("locked")) return;
+    const t = ev.target;
+    if (!t || !t.closest) return;
+    const hit = ev.type === "keydown"
+      ? (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229 && (t.id === "lg-code" || t.id === "lg-name"))
+      : !!t.closest("#lg-go");
+    if (!hit) return;
+    const L = window.v100lgLock();
+    if (!L) return;
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    V100LG.block++;
+    try { if (typeof window.v100admLgPaint === "function") window.v100admLgPaint(); } catch (e) { v100admErr("lgPaint", e); }
+  } catch (e) { v100admErr("lgGuard", e); }
+}
+window.addEventListener("click", v100lgGuard, true);
+window.addEventListener("keydown", v100lgGuard, true);
+/* ログインできている端末：控えも 0 から（21.97 の boot と同じ） */
+try { const s0 = v100admSes(); if (s0 && s0.t) { V100LG.mem = null; try { sessionStorage.removeItem(V100LG.key); } catch (e) { /* 無視 */ } } } catch (e) { v100admErr("lgBoot", e); }

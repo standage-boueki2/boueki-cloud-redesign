@@ -40,3 +40,13 @@
   .v100pgb { flex: 1 1 auto; }
   .v100fdupp { white-space: normal; }
 }
+/* 22.00.1：N13 中央値の説明の「FCL」が1行に分かれる（英字の部分だけが block になっていた）・N3 案件の体験用の印・N4・N5 */
+.v97fmednote .v90no, .v97fbasis .v90no, .v100fdup .v90no, .v99fwhybar .v90no { display: inline !important; }
+.v100fcasetr { margin: 6px 0; padding: 6px 10px; border-left: 4px solid #f5a623; background: #fffaf2; font-size: 12.5px; line-height: 1.7; }
+.v100fcasetr b { color: #8a4b00; }
+.v100fcasetrl { color: #8a4b00; font-weight: 700; font-size: 11px; }
+.v100fexptag { color: #b42318 !important; font-weight: 700; }
+.v100fnone { margin: 8px 0; padding: 8px 10px; border: 1px dashed #c9d3de; border-radius: 8px; font-size: 12.5px; line-height: 1.7; }
+.v100fnone .btn { margin-left: 8px; }
+.v100fdemobar { display: block; font-weight: 700; }
+.v100flogout { margin: 4px 0 6px; padding: 6px 10px; border-left: 4px solid #0064bf; background: #f3f8fd; font-size: 12.5px; line-height: 1.7; }

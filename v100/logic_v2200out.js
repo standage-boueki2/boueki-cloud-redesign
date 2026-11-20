@@ -690,3 +690,533 @@ var V100OUT = window.V100OUT = { v: "22.00", err: null, errs: [], n: {} };
     }
   } catch (e) { err("i18n", e); }
 })();
+
+/* ═══ v22.00.1 out（22.00 公開後の検証 v2 の N2・N9・N8・N14・518 の残り） ═══
+   N2（高）作る前に「✓ 確認済み：資料に入ります」と出た写真が、作った後に外れる（G：作る前の窓「資料に入る写真は 2枚」→ 出来上がり 1枚、
+         H：差し替えた写真が「資料に入ります」のまま入らない）。
+     原因：資料を作る途中（素材を確認する段）で AI が写真の役割を見立て（dk3RoleAI）、「図・文字が中心（infographic）」とした写真を
+           その場で外していた（v97 の外す理由 info）。作る前の窓・写真の箱の「入ります」は、この見立ての前の判定。
+     直し：作り始めた時に「入ります」の写真（作る前の窓・写真の箱の判定〔V99PHOTO.inDeck〕・ロゴと同じ画像を除く）を控え、その作成の間は
+           後の見立てで外さない（dkPhGood・dk3Role）。作った後、後から理由が付いた写真は「このまま使う（作る前に入ると出ていた写真）」にして
+           （利用者がいつでも「使わない」にできる）、最終チェックに「後から AI が見立てた理由」と選び直し方を出す。差し替えた写真も同じ。
+   N9 写真の数が場所ごとに違う：作る段の「写真 N枚」を、資料に実際に入った商品写真の数（写真の箱の「資料に入った写真」と同じ数え方）にそろえる。
+   N8 E の ④「滅菌の有無」「医療用／一般用の別」が「未登録」なのに ③ に「滅菌｜なし」：「なし」を空欄扱いにしていた（v68pPlace）。
+      ④ のこの2つは ③ の表・本人の答え（否定を含む）を読んで出す。
+   N14 切り取った後も日本語の文字が残る：加工のあと AI がもう一度確かめて日本語が残ると言ったら、知らせて、最終チェックに出す（もう一度囲む・使わない）。
+   518 の残り：医療機器ではない商品の資料の「Medical and hygiene」を衛生用品の言い方（Hygiene products）に。 */
+(function () {
+  "use strict";
+  const W = window;
+  const V = W.V100OUT || (W.V100OUT = { n: {}, errs: [] });
+  const err = (k, e) => { try { if (typeof V.errf === "function") V.errf("v1001 " + k, e); } catch (x) { /* 記録だけ */ } };
+  const cnt = (k, d) => { try { V.n[k] = (V.n[k] || 0) + (d == null ? 1 : d); } catch (e) { /* 数えるだけ */ } };
+  const M = (ja, en, zh, es) => { try { return V.M ? V.M(ja, en, zh, es) : ja; } catch (e) { return ja; } };
+  const ten = () => { try { return (typeof TEN !== "undefined" && TEN) ? TEN : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const G = () => { try { return (typeof DK3G !== "undefined" && DK3G) ? DK3G : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const pkey = (t) => { try { return typeof dk3PKey === "function" ? dk3PKey(t) : (t && t.uid) || ""; } catch (e) { return ""; } }; // eslint-disable-line no-undef
+  const decOf = (o) => { try { return typeof v96dkDec === "function" ? (v96dkDec(o) || "") : ""; } catch (e) { return ""; } }; // eslint-disable-line no-undef
+  const whyKeys = (o) => { try { return typeof v97dkWhyKeys === "function" ? (v97dkWhyKeys(o) || []) : []; } catch (e) { return []; } }; // eslint-disable-line no-undef
+  const phFp = (o) => { try { const s = String((o && o.b64) || ""); let h = 0; for (let k = 0; k < s.length; k += 61) h = (h * 31 + s.charCodeAt(k)) >>> 0; return s.length + ":" + h; } catch (e) { return ""; } };
+  const WHY = { info: ["図・文字が中心の可能性", "possibly mainly a diagram or text", "可能以图表或文字为主", "posiblemente sobre todo diagrama o texto"], ng: ["商品写真に向かない可能性", "possibly not suited as a product photo", "可能不适合作商品照片", "posiblemente no apta"], jp: ["日本語の文字が目立つ可能性", "Japanese text may stand out", "日文文字可能显眼", "puede destacar texto en japonés"], low: ["ぼやけの可能性", "possibly blurry", "可能模糊", "posiblemente borrosa"], small: ["小さい", "small", "尺寸小", "pequeña"], ratio: ["横長・縦長", "banner shape", "横幅形状", "forma de banner"] };
+
+  /* ════ N2：作り始めた時に「入ります」の写真を控え、作った後も外さない ════
+     作る途中で AI が「図・文字が中心（infographic）」と見立てても、控えた写真には印（v100keep・写真の中身の指紋つき）を付けて、
+     この見立てを外す理由にしない。写真の箱・作る前の窓・作った後の画面・最終チェック・PPTX は、みな v97dkWhyKeys で数えるので、
+     ここで1か所そろえれば数がそろう。印は利用者の選択（use）にはしない（「選んだ」と出さない）。「使わない」を選べば外れる。 */
+  let PROM = null;
+  const rawWhy = (typeof v97dkWhyKeys === "function") ? v97dkWhyKeys : null; // eslint-disable-line no-undef
+  const whyRaw = (o) => { try { return rawWhy ? (rawWhy(o) || []) : []; } catch (e) { return []; } };
+  function promiseNow(T) {
+    const set = new Set(); const idx = [];
+    try {
+      const A = (T && T.assets) || {}; const lb = (A.logo && A.logo.b64) || "";
+      const inDeck = (W.V99PHOTO && typeof W.V99PHOTO.inDeck === "function") ? W.V99PHOTO.inDeck : (o) => (typeof dkPhGood === "function" ? !!dkPhGood(o) : true); // eslint-disable-line no-undef
+      (A.ph || []).forEach((o, i) => { if (!o || !o.b64 || o.other) return; if (lb && o.b64 === lb) return; if (decOf(o) === "no") return; if (inDeck(o)) { set.add(phFp(o)); idx.push(i); } });
+    } catch (e) { err("promise", e); }
+    return { key: pkey(T), set, idx, at: Date.now(), active: false };
+  }
+  V.promiseNow = promiseNow;
+  const promised = (o) => {
+    try {
+      if (!PROM || !o || !o.b64 || !PROM.set.size) return false;
+      const T = ten();
+      if (!T || pkey(T) !== PROM.key) return false;
+      return PROM.set.has(phFp(o)) && decOf(o) !== "no";
+    } catch (e) { return false; }
+  };
+  V.promised = promised;
+  const keepOk = (o) => { try { const k = o && o.v100keep; return !!(k && k.fp && k.fp === phFp(o) && decOf(o) !== "no"); } catch (e) { return false; } };
+  V.keepOk = keepOk;
+  if (rawWhy) {
+    v97dkWhyKeys = function (o) { // eslint-disable-line no-global-assign
+      const r = rawWhy.apply(this, arguments);
+      try { if (Array.isArray(r) && r.indexOf("info") >= 0 && (keepOk(o) || promised(o))) return r.filter((k) => k !== "info"); } catch (e) { /* そのまま */ }
+      return r;
+    };
+  }
+  if (typeof dkPhGood === "function") { // eslint-disable-line no-undef
+    const __pg1001 = dkPhGood; // eslint-disable-line no-undef
+    dkPhGood = function (o) { try { if ((promised(o) || keepOk(o)) && !whyRaw(o).some((k) => k !== "info")) return true; } catch (e) { /* 次へ */ } return __pg1001.apply(this, arguments); }; // eslint-disable-line no-global-assign
+  }
+  if (typeof dk3Role === "function") { // eslint-disable-line no-undef
+    const __rl1001 = dk3Role; // eslint-disable-line no-undef
+    dk3Role = function (o) { const r = __rl1001.apply(this, arguments); try { if (r === "infographic" && (promised(o) || keepOk(o))) return "product"; } catch (e) { /* そのまま */ } return r; }; // eslint-disable-line no-global-assign
+  }
+  /* 作る途中：控えた写真に AI が「図・文字が中心」と見立てたら印を付ける */
+  function markKeep() {
+    let n = 0;
+    try {
+      if (!PROM || !PROM.active) return 0;
+      const T = ten(); if (!T || pkey(T) !== PROM.key) return 0;
+      ((T.assets || {}).ph || []).forEach((o) => {
+        if (!o || !o.b64 || !PROM.set.has(phFp(o)) || decOf(o) === "no") return;
+        if (whyRaw(o).indexOf("info") < 0 || keepOk(o)) return;
+        o.v100keep = { fp: phFp(o), ks: ["info"], at: new Date().toISOString().slice(0, 10) };
+        n++;
+      });
+    } catch (e) { err("mark", e); }
+    if (n) cnt("promiseKept", n);
+    return n;
+  }
+  V.markKeep = markKeep;
+  /* 資料に入った商品写真の数（写真の箱の「資料に入った写真」と同じ数え方） */
+  function deckUsed(deck) {
+    try {
+      if (W.V99PHOTO && typeof W.V99PHOTO.deckPhotos === "function") return W.V99PHOTO.deckPhotos(deck);
+      const used = new Set(); (deck.slides || []).forEach((S) => (S.els || []).forEach((e) => { if (e && e.k === "img" && e.m !== "logo") { const m = String(e.m).replace(/c$/, "").match(/^p0:(\d+)$/); if (m) used.add(+m[1]); } })); return used;
+    } catch (e) { return null; }
+  }
+  const deckPhotoN = (deck) => { const u = deckUsed(deck); return u ? u.size : -1; };
+  V.deckPhotoN = deckPhotoN;
+  /* 印の付いた写真のうち、この資料に入っているもの */
+  function keptInDeck(deck) {
+    const out = [];
+    try {
+      const T = ten(); const A = (T && T.assets) || {}; const used = deckUsed(deck);
+      if (!used) return out;
+      (A.ph || []).forEach((o, i) => { if (o && o.b64 && keepOk(o) && whyRaw(o).indexOf("info") >= 0 && used.has(i)) out.push({ i, ks: ["info"] }); });
+    } catch (e) { err("kept", e); }
+    return out;
+  }
+  V.keptInDeck = keptInDeck;
+  const promiseText = (K) => "作る前に「資料に入ります」と出ていた写真 " + K.length + "枚は、そのまま資料に入れました（あとで AI が見立てた理由：" + K.map((x) => "商品写真" + (x.i + 1) + "＝" + x.ks.map((k) => (WHY[k] || [k])[0]).join("・")).join("／") + "）。入れたくないときは「写真・ロゴの使い方」で「使わない」を選び、もう一度作ってください";
+  /* N9：作る段の「写真 N枚」を、資料に入った商品写真の数に */
+  function fixSteps(deck) {
+    try {
+      const g = G(); const n = deckPhotoN(deck);
+      if (!g || n < 0) return;
+      (g.steps || []).forEach((s) => { if (s && typeof s.d === "string" && /写真 \d+枚/.test(s.d)) { const d2 = s.d.replace(/写真 \d+枚/, "写真 " + n + "枚"); if (d2 !== s.d) { s.d = d2; cnt("stepN"); } } });
+    } catch (e) { err("steps", e); }
+  }
+  function afterGen() {
+    const g = G(); if (!g || g.run || !g.deck || !PROM) return;
+    const T = ten(); if (!T || pkey(T) !== PROM.key) return;
+    const n0 = markKeep(); // 最終チェックを通らなかったときの控え
+    fixSteps(g.deck);
+    const K = keptInDeck(g.deck);
+    if (K.length && g.check) {
+      g.check.warn = g.check.warn || [];
+      if (!g.check.warn.some((w) => w && w.k === "v100promise")) g.check.warn.unshift({ k: "v100promise", t: promiseText(K) });
+    }
+    if (n0) { try { if (typeof saveTen === "function") saveTen(); } catch (e) { /* 次の保存で */ } } // eslint-disable-line no-undef
+    V.lastPromise = { idx: PROM.idx.slice(), kept: K.map((x) => x.i), inDeck: deckPhotoN(g.deck) };
+    try { if (typeof dk3Paint === "function") dk3Paint(); } catch (e) { /* 次へ */ } // eslint-disable-line no-undef
+  }
+  if (typeof dk3Generate === "function") { // eslint-disable-line no-undef
+    const __gen1001 = dk3Generate; // eslint-disable-line no-undef
+    dk3Generate = async function () { // eslint-disable-line no-global-assign
+      let mine = false;
+      try { const g = G(); const T = ten(); if (g && !g.run && T) { PROM = promiseNow(T); PROM.active = true; mine = true; cnt("promise"); } } catch (e) { err("gen0", e); }
+      try { return await __gen1001.apply(this, arguments); }
+      finally {
+        if (mine) { try { afterGen(); } catch (e) { err("gen1", e); } try { PROM.active = false; } catch (e) { /* 無視 */ } }
+      }
+    };
+  }
+
+  /* ════ N14：切り取った後も日本語の文字が残る ════ */
+  function editJaCheck() {
+    try {
+      const T = ten(); const A = T && T.assets; if (!A) return;
+      (A.ph || []).forEach((o, i) => {
+        if (!o || !o.b64 || !o.v96edit || !o._dq) return;
+        const fp = phFp(o);
+        if (o._dq.jp) {
+          if (!o.v100editJa || o.v100editJa.fp !== fp) {
+            o.v100editJa = { fp, at: Date.now() };
+            try { if (typeof saveTen === "function") saveTen(); } catch (e) { /* 次の保存で */ } // eslint-disable-line no-undef
+            try { if (typeof toast === "function") toast(M("商品写真" + (i + 1) + "：切り取った後も、日本語の文字が残っている可能性があります（AI の見立て）。「切り取る・隠す」で帯を広げてもう一度囲むか、「使わない」を選んでください", "Photo " + (i + 1) + ": Japanese text may still remain after cropping (AI's view). Select a wider area with “Crop or hide” again, or choose “Don't use”", "商品照片" + (i + 1) + "：裁剪后可能仍有日文文字（AI 的看法）。请用“裁剪・遮盖”扩大范围重新选择，或选择“不使用”", "Foto " + (i + 1) + ": puede quedar texto en japonés tras recortar (opinión de la IA). Vuelva a seleccionar un área más amplia o elija «No usar»")); } catch (e) { /* 次へ */ } // eslint-disable-line no-undef
+            cnt("editJa");
+          }
+        } else if (o.v100editJa) { delete o.v100editJa; }
+      });
+    } catch (e) { err("editja", e); }
+  }
+  V.editJaCheck = editJaCheck;
+  if (typeof dkImgAudit === "function") { // eslint-disable-line no-undef
+    const __au1001 = dkImgAudit; // eslint-disable-line no-undef
+    dkImgAudit = async function () { const r = await __au1001.apply(this, arguments); try { editJaCheck(); } catch (e) { err("audit", e); } return r; }; // eslint-disable-line no-global-assign
+  }
+
+  /* ════ 518 の残り：医療機器ではない商品の資料の「Medical and hygiene」 ════ */
+  function hygLabel(deck) {
+    let n = 0;
+    try {
+      const g = G(); const T = (g && g.ten) || ten();
+      if (!deck || !Array.isArray(deck.slides) || !deck.lang || /^ja/.test(deck.lang) || typeof V.nonMed !== "function" || !V.nonMed(T)) return 0;
+      deck.slides.forEach((S) => (S.els || []).forEach((e) => {
+        if (!e || e.k !== "text" || !Array.isArray(e.ps)) return;
+        e.ps.forEach((p) => (p.r || []).forEach((r) => {
+          if (!r || typeof r.t !== "string" || !/medical\s*(?:and|&)\s*hygiene/i.test(r.t)) return;
+          r.t = r.t.replace(/medical\s*(?:and|&)\s*hygiene(\s+(?:products|supplies|goods|category))?/ig, (m, s2) => (/^M/.test(m) ? "Hygiene" : "hygiene") + (s2 || " products"));
+          n++;
+        }));
+      }));
+    } catch (e) { err("hyg", e); }
+    if (n) cnt("hygLabel", n);
+    return n;
+  }
+  V.hygLabel = hygLabel;
+  if (typeof dk3Model === "function") { // eslint-disable-line no-undef
+    const __dm1001 = dk3Model; // eslint-disable-line no-undef
+    dk3Model = function () { const r = __dm1001.apply(this, arguments); try { if (r && Array.isArray(r.slides)) hygLabel(r); } catch (e) { err("model", e); } return r; }; // eslint-disable-line no-global-assign
+  }
+  if (typeof dk3Check === "function") { // eslint-disable-line no-undef
+    const __ck1001 = dk3Check; // eslint-disable-line no-undef
+    dk3Check = function (deck) { // eslint-disable-line no-global-assign
+      try { hygLabel(deck); } catch (e) { err("ck0", e); }
+      try { markKeep(); } catch (e) { err("ck2", e); } // N2：写真の見立てを数える前に印を付ける
+      const r = __ck1001.apply(this, arguments);
+      try {
+        if (r) {
+          r.warn = r.warn || [];
+          const K = keptInDeck(deck);
+          if (K.length && !r.warn.some((w) => w && w.k === "v100promise")) r.warn.unshift({ k: "v100promise", t: promiseText(K) });
+          if (PROM && PROM.active) fixSteps(deck);
+          const T = ten(); const A = (T && T.assets) || {};
+          const L = (A.ph || []).map((o, i) => ({ o, i })).filter((x) => x.o && x.o.b64 && x.o.v100editJa && x.o.v100editJa.fp === phFp(x.o) && decOf(x.o) !== "no");
+          if (L.length && !r.warn.some((w) => w && w.k === "v100editja")) r.warn.unshift({ k: "v100editja", t: "切り取った後も日本語の文字が残っている可能性がある写真（AI の見立て）：" + L.map((x) => "商品写真" + (x.i + 1)).join("・") + "。「写真・ロゴの使い方」の「切り取る・隠す」で帯を広げてもう一度囲むか、「使わない」を選んでください" });
+        }
+      } catch (e) { err("ck1", e); }
+      return r;
+    };
+  }
+
+  /* ════ N8：④ の「滅菌の有無」「医療用／一般用の別」は、③ の表・本人の答え（「なし」「医療機器ではありません」）を読む ════ */
+  const N8F = { mdSterile: /滅菌|sterili/i, mdUse: /医療用|一般用|分類|医療機器|クラス/ };
+  function n8Val(t, k) {
+    try {
+      const rows = (t && Array.isArray(t.compRows)) ? t.compRows : [];
+      const hit = rows.find((r) => Array.isArray(r) && N8F[k].test(String(r[0] || "")) && String(r[1] == null ? "" : r[1]).trim());
+      if (hit) return { v: String(hit[1]).trim(), src: M("③ の表から", "From table ③", "来自③表", "De la tabla ③") };
+      if (k === "mdUse" && typeof V98REG !== "undefined" && V98REG && typeof V98REG.md === "function") { // eslint-disable-line no-undef
+        const md = V98REG.md(t); // eslint-disable-line no-undef
+        if (md && md.v === "no" && /ans|btn|text/.test(String(md.why || ""))) return { v: M("医療機器ではありません（登録の答え）", "Not a medical device (your answer)", "不是医疗器械（登记的回答）", "No es un dispositivo médico (su respuesta)"), src: M("登録の答えから", "From your answer", "来自登记的回答", "De su respuesta") };
+      }
+    } catch (e) { err("n8", e); }
+    return null;
+  }
+  V.n8Val = n8Val;
+  if (typeof v68pFieldRow === "function") { // eslint-disable-line no-undef
+    const __fr1001 = v68pFieldRow; // eslint-disable-line no-undef
+    v68pFieldRow = function (t, f) { // eslint-disable-line no-global-assign
+      const r = __fr1001.apply(this, arguments);
+      try {
+        if (!f || !N8F[f.k] || typeof r !== "string" || r.indexOf('class="mute"') < 0) return r;
+        let x = null;
+        const v0 = typeof v68pGet === "function" ? v68pGet(t, f) : ""; // eslint-disable-line no-undef
+        if (v0 && String(v0).trim()) x = { v: String(v0).trim(), src: M("登録の値", "Registered value", "登记的值", "Valor registrado") }; // 「なし」も登録の値として出す
+        if (!x) x = n8Val(t, f.k);
+        if (!x) return r;
+        cnt("n8");
+        const E = V.E || ((s) => String(s));
+        return `<tr data-v68f="${E(f.k)}" data-v100n8="1"><td class="k">${E(typeof v68pFL === "function" ? v68pFL(f.k) : f.k)}</td><td>${E(x.v)}</td><td class="v68psrc">${E(x.src)}</td></tr>`; // eslint-disable-line no-undef
+      } catch (e) { err("fr", e); return r; }
+    };
+  }
+
+  /* 英・中・西の画面の言葉 */
+  try {
+    if (typeof I18N !== "undefined" && I18N && Array.isArray(I18N.pat)) { // eslint-disable-line no-undef
+      const li = (l) => (l === "zh" ? 2 : l === "es" ? 3 : 1);
+      const kn = (s, l) => String(s).replace(/商品写真(\d+)/g, l === "zh" ? "商品照片$1" : l === "es" ? "Foto $1" : "Photo $1").replace(/図・文字が中心の可能性/g, WHY.info[li(l)]).replace(/商品写真に向かない可能性/g, WHY.ng[li(l)]).replace(/日本語の文字が目立つ可能性/g, WHY.jp[li(l)]).replace(/ぼやけの可能性/g, WHY.low[li(l)]).replace(/小さい/g, WHY.small[li(l)]).replace(/横長・縦長/g, WHY.ratio[li(l)]).replace(/・/g, l === "zh" ? "・" : ", ").replace(/＝/g, ": ").replace(/／/g, "; ");
+      I18N.pat.unshift({ re: /^作る前に「資料に入ります」と出ていた写真 (\d+)枚は、そのまま資料に入れました（あとで AI が見立てた理由：(.+)）。入れたくないときは「写真・ロゴの使い方」で「使わない」を選び、もう一度作ってください$/, // eslint-disable-line no-undef
+        en: (m) => m[1] + " photo(s) shown as “goes in the deck” before making were kept in the deck (reason the AI found later: " + kn(m[2], "en") + "). To leave one out, choose “Don't use” in “How to use photos and logo” and make the deck again",
+        zh: (m) => "制作前显示“放入资料”的 " + m[1] + " 张照片已照常放入资料（AI 之后的看法：" + kn(m[2], "zh") + "）。如不想放入，请在“照片・标志的用法”中选择“不使用”后重新制作",
+        es: (m) => "Se mantuvieron en la presentación " + m[1] + " foto(s) que antes se indicaban como «entra en la presentación» (motivo que la IA vio después: " + kn(m[2], "es") + "). Para quitar una, elija «No usar» y vuelva a crear la presentación" });
+      I18N.pat.unshift({ re: /^切り取った後も日本語の文字が残っている可能性がある写真（AI の見立て）：(.+)。「写真・ロゴの使い方」の「切り取る・隠す」で帯を広げてもう一度囲むか、「使わない」を選んでください$/, // eslint-disable-line no-undef
+        en: (m) => "Photos that may still show Japanese text after cropping (AI's view): " + kn(m[1], "en") + ". Select a wider area with “Crop or hide” again, or choose “Don't use”",
+        zh: (m) => "裁剪后可能仍有日文文字的照片（AI 的看法）：" + kn(m[1], "zh") + "。请用“裁剪・遮盖”扩大范围重新选择，或选择“不使用”",
+        es: (m) => "Fotos que pueden seguir mostrando texto en japonés tras recortar (opinión de la IA): " + kn(m[1], "es") + ". Seleccione un área más amplia o elija «No usar»" });
+    }
+  } catch (e) { err("i18n", e); }
+})();
+
+/* ═══ v22.00.1 out（検証 v1 の N1・N2・N3・N13：英語資料の写真の行き止まり・成分のページの項目名・INCI 表のページ・荷姿の項目名の重なり） ═══
+   N1（高）D：写真を3枚とも「使う」にして作っても、資料は同じ写真1枚しか使わず、最終チェックが「写真が 1枚しか使えていません」で止まる
+         （同じ画面のチェック表は「納品品質の写真（3枚以上）入力済み」）。
+     原因：①資料の写真の選び方（dk3PickPhotos）は、役割が「その他（other）」「図・文字が中心（infographic）」の写真や、良し悪しの判定が false の写真を
+           どの枠にも入れない。「このまま使う」を選んだ写真や、作る前に「入ります」と出た写真も、作る途中で AI が役割を見立てると外れた。
+           ②「小さい・横長」などの理由のある写真は、「このまま使う」を選んでも使えない作り（v96dkPhSt の bad）なのに、作る前の窓とチェック表は数に入れていた。
+     直し：「このまま使う」を選んだ写真と、作る前に「入ります」と出た写真は、必ず資料の商品写真の枠の候補に入れる（役割が other・infographic なら商品写真として、
+           良し悪しの判定より本人の選択を優先）。チェック表・作る前の窓・資料・最終チェックが同じ写真を数える。
+           それでも3枚に足りずに最終チェックで止めるときは、止める文の中に、資料に入った写真と入らなかった写真（理由つき）と、次にどこで何をすれば進めるかを出す。
+   N2（高）A：成分のページの KEY INGREDIENT が「Allergen」、成分の札に項目名（Allergen precautionary statement）が並び、原材料（有機大豆・有機米・食塩）が出ない。
+     直し：項目名（原材料・アレルゲン・注意書き・備考など）は KEY INGREDIENT・成分の札に出さない。値の無い行で、名前が項目名でないもの（有機大豆など）は原材料として札に出す。
+   N3（高）D：INCI 表のページ（和名の列つき）が出ない・米発酵液が成分の一覧から抜ける。
+     原因：①成分のページが全成分の行を札として覆うと、全成分表のページを作らない作り（ingrCovers）。②「コメ発酵液(Rice Ferment Filtrate (Sake))」のように
+           INCI 名が和名のかっこの中にあり INCI の欄が空の行を、INCI 表から落としていた。
+     直し：INCI のある化粧品（546 の和名の列を出すとき）は、全成分表のページを必ず作る。和名（INCI 名）の形の行は INCI 名を読み取って表に入れる。
+           資料の文に「INCI の登録が無い」など登録の不備（社内向けの言葉）が入ったら、その文は外す。
+   N13（低）荷姿のページの「Master carton: Outer carton: 10 bags」の項目名の重なりを1つに。 */
+(function () {
+  "use strict";
+  const W = window;
+  const V = W.V100OUT || (W.V100OUT = { n: {}, errs: [] });
+  const err = (k, e) => { try { if (typeof V.errf === "function") V.errf("v1001b " + k, e); } catch (x) { /* 記録だけ */ } };
+  const cnt = (k, d) => { try { V.n[k] = (V.n[k] || 0) + (d == null ? 1 : d); } catch (e) { /* 数えるだけ */ } };
+  const ten = () => { try { return (typeof TEN !== "undefined" && TEN) ? TEN : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const decOf = (o) => { try { return typeof v96dkDec === "function" ? (v96dkDec(o) || "") : ""; } catch (e) { return ""; } }; // eslint-disable-line no-undef
+  const whyKeys = (o) => { try { return typeof v97dkWhyKeys === "function" ? (v97dkWhyKeys(o) || []) : []; } catch (e) { return []; } }; // eslint-disable-line no-undef
+  const NF = (s) => { s = String(s == null ? "" : s); try { return s.normalize("NFKC"); } catch (e) { return s; } };
+  const JA = /[ぁ-ゖァ-ヺ一-龯々]/;
+
+  /* ════ N1：本人が「使う」と決めた写真・作る前に「入ります」と出た写真は、資料の写真の候補から外さない ════ */
+  const chosen = (o) => {
+    try {
+      if (!o || !o.b64 || o.other) return false;
+      const d = decOf(o); if (d === "no") return false;
+      if (d === "use") return true;
+      return !!((typeof V.promised === "function" && V.promised(o)) || (typeof V.keepOk === "function" && V.keepOk(o)));
+    } catch (e) { return false; }
+  };
+  V.chosen = chosen;
+  if (typeof dkPhGood === "function") { // eslint-disable-line no-undef
+    const __pgB = dkPhGood; // eslint-disable-line no-undef
+    dkPhGood = function (o) { try { if (o && o.b64 && !o.other && decOf(o) === "use") return true; } catch (e) { /* 次へ */ } return __pgB.apply(this, arguments); }; // eslint-disable-line no-global-assign
+  }
+  if (typeof dk3PickPhotos === "function") { // eslint-disable-line no-undef
+    const __pkB = dk3PickPhotos; // eslint-disable-line no-undef
+    dk3PickPhotos = function (deck, P) { // eslint-disable-line no-global-assign
+      const want = [];
+      try {
+        const md = (deck && deck.media) || {}; const T = ten(); const ph = (T && T.assets && T.assets.ph) || [];
+        ((P && P.byProd && P.byProd[0]) || []).forEach((k) => {
+          const m = String(k).match(/^p0:(\d+)$/); if (!m) return;
+          if (!chosen(ph[+m[1]])) return;
+          want.push(k);
+          [k, k + "c"].forEach((kk) => { const x = md[kk]; if (!x) return; if (x.good === false) { x.good = true; cnt("pickGood"); } if (x.role === "infographic" || x.role === "other") { x.role = "product"; cnt("pickRole"); } });
+        });
+      } catch (e) { err("pick0", e); }
+      const r = __pkB.apply(this, arguments);
+      try {
+        if (r && want.length) {
+          // ページの写真の枠が使う候補：表紙（hero）・商品写真の先頭2枚（商品のページ・概要・仕様の枠は prod[0]・prod[1] しか見ない）・
+          // 情景（scene：会社概要・使い方・連絡先などの枠）・社屋・人物・原料。ここに無い写真はどの枠にも入らない
+          const reach = new Set();
+          const add = (x) => { if (typeof x === "string" && x) reach.add(x.replace(/c$/, "")); };
+          [r.hero, r.building, r.people, r.ceo, r.expert, r.material].forEach(add); // hero2 は見せ方によっては使われないため数えない
+          (Array.isArray(r.prod) ? r.prod.slice(0, 2) : []).forEach(add);
+          (Array.isArray(r.scene) ? r.scene : []).forEach(add);
+          if (!Array.isArray(r.prod)) r.prod = [];
+          if (!Array.isArray(r.scene)) r.scene = [];
+          V.lastPick = { want: want.slice(), hero: r.hero || null, prod: (r.prod || []).slice(), scene: (r.scene || []).slice() };
+          want.forEach((k) => {
+            if (reach.has(k)) return;
+            if (r.prod.length < 2 && r.prod.indexOf(k) < 0) { r.prod.push(k); reach.add(k); cnt("pickAdd"); return; }
+            if (r.scene.indexOf(k) < 0) { r.scene.push(k); reach.add(k); cnt("pickScene"); }
+          });
+        }
+      } catch (e) { err("pick1", e); }
+      return r;
+    };
+  }
+  /* 最終チェックで写真が足りずに止めるとき：止める文の中に、入った写真・入らなかった写真（理由）・次にすること */
+  const WHYJ = { info: "図・文字が中心の可能性", ng: "商品写真に向かない可能性", jp: "日本語の文字が目立つ可能性", low: "ぼやけの可能性", small: "小さい", ratio: "横長・縦長" };
+  function photoHow(deck) {
+    try {
+      const T = ten(); const A = (T && T.assets) || {};
+      const used = (W.V99PHOTO && typeof W.V99PHOTO.deckPhotos === "function") ? W.V99PHOTO.deckPhotos(deck) : new Set();
+      const reg = (A.ph || []).map((o, i) => ({ o, i })).filter((x) => x.o && x.o.b64 && !x.o.other);
+      const out = reg.filter((x) => !used.has(x.i)).map((x) => {
+        const d = decOf(x.o); const ks = whyKeys(x.o);
+        const why = d === "no" ? "「使わない」を選んだ" : ks.length ? ks.map((k) => WHYJ[k] || k).join("・") : "ページの数の都合";
+        return "商品写真" + (x.i + 1) + "（" + why + "）";
+      });
+      let t = "資料に入った写真 " + used.size + "枚（登録 " + reg.length + "枚）";
+      if (out.length) t += "・入らなかった写真：" + out.join("・");
+      const need = Math.max(0, 3 - used.size);
+      t += "。進め方：" + (out.length ? "「写真・ロゴの使い方」で入らなかった写真の「このまま使う」を押すか、" : "") + "「写真を上げる」で写真をあと " + need + "枚以上足して、「↻ もう一度作る」を押してください（今のままでも下書きとしては使えます）";
+      return t;
+    } catch (e) { err("how", e); return ""; }
+  }
+  V.photoHow = photoHow;
+
+  /* ════ N2：成分のページの KEY INGREDIENT・札に項目名を出さない／値の無い原材料の行は原材料として出す ════ */
+  const LABRE = /^(?:ingredients?|ingredient list|raw materials?|composition|contents|allergens?|allergen information|allergy information|allergens? statement|(?:allergen )?precautionary (?:allergen )?statement|allergen (?:note|warning|caution|precaution)s?|cross[- ]contamination|may contain|notes?|remarks?|warnings?|cautions?|原材料名?|原材料|成分|全成分|成分表|アレルゲン|アレルギー|アレルゲンの注意書き|注意書き|注意事項|備考|特定原材料|配料表?|过敏原|過敏原|过敏原信息|注意事项|备注|ingredientes|alérgenos?|información (?:sobre )?alérgenos|advertencias?|notas?|observaciones)$/i;
+  const isLabel = (s) => {
+    const t = NF(s).trim().replace(/[:：]\s*$/, "").replace(/\s+/g, " ").toLowerCase();
+    if (!t) return true;
+    if (LABRE.test(t)) return true;
+    return /^(?:allergens?|alérgenos?|过敏原|過敏原|アレルゲン|アレルギー)(?:\s|$|の|信息|情報)/i.test(t) && t.split(/\s+/).length <= 4;
+  };
+  V.isIngLabel = isLabel;
+  const empt = (v) => { const s = NF(v).trim(); return !s || /^[—\-–－ー・.]+$/.test(s); };
+  const ING = { en: "Ingredients", zh: "配料", es: "Ingredientes", fr: "Ingrédients", de: "Zutaten", ko: "원재료" };
+  function ingrGuard(M, data, lang) {
+    let ch = 0;
+    try {
+      const ing = M && M.ingr; if (!ing) return 0;
+      const pd = (data && Array.isArray(data.prods) && data.prods[0]) || {};
+      const rows = ((pd.comp && pd.comp.rows) || []).filter(Array.isArray);
+      // 原材料：「原材料名｜有機大豆、有機米、食塩」の行の値の1つ1つ（21.99 で値の無い原材料の行は1行にまとめる）と、値の無い行で名前が項目名でないもの
+      const bare = [];
+      const INGL = (typeof V99DK_INGLAB !== "undefined" && V99DK_INGLAB) ? V99DK_INGLAB : /^(?:ingredients?|ingredient list|raw materials?|原材料名?|配料表?|配料|ingredientes)$/i; // eslint-disable-line no-undef
+      rows.forEach((r) => {
+        const lab = NF(r[0] == null ? "" : r[0]).trim(); if (!lab) return;
+        if (INGL.test(lab)) {
+          const val = r.slice(1).filter((x) => !empt(x)).join(" · ");
+          let it = [];
+          try { it = typeof v99dkIngrItems === "function" ? v99dkIngrItems(lab, val) : String(val).split(/[,、，]/).map((x) => x.trim()).filter(Boolean); } catch (e) { it = []; } // eslint-disable-line no-undef
+          it.forEach((x) => { if (x && !isLabel(x) && bare.indexOf(x) < 0) bare.push(x); });
+        } else if (!isLabel(lab) && r.slice(1).every(empt) && bare.indexOf(lab) < 0) bare.push(lab);
+      });
+      if (ing.hero && isLabel(ing.hero.name)) { ing.hero = bare[0] ? { name: bare[0], v: "", u: "", d: "" } : null; ch++; }
+      const gs = Array.isArray(ing.groups) ? ing.groups : [];
+      gs.forEach((g) => { if (!g || !Array.isArray(g.items)) return; const n0 = g.items.length; g.items = g.items.filter((x) => !isLabel(x)); ch += n0 - g.items.length; });
+      const shown = new Set(); gs.forEach((g) => (g.items || []).forEach((x) => shown.add(NF(x).trim().toLowerCase())));
+      if (ing.hero && ing.hero.name) shown.add(NF(ing.hero.name).trim().toLowerCase());
+      const add = bare.filter((n) => !shown.has(n.toLowerCase()) && ![...shown].some((s) => s.indexOf(n.toLowerCase()) === 0));
+      if (add.length) { gs.unshift({ name: ING[String(lang || "en").slice(0, 2)] || ING.en, ic: (gs[0] && gs[0].ic) || "leaf", items: add.slice(0, 12) }); ch++; }
+      ing.groups = gs.filter((g) => g && g.name && (g.items || []).length);
+      if (!ing.hero && !ing.groups.length) M.ingr = null;
+    } catch (e) { err("ingr", e); }
+    if (ch) cnt("ingrGuard", ch);
+    return ch;
+  }
+  V.ingrGuard = ingrGuard;
+
+  /* ════ N3：INCI 表 ════ */
+  // 「和名(INCI 名)」の形で INCI の欄が空の行も、INCI 名を読み取って表に入れる（例：コメ発酵液(Rice Ferment Filtrate (Sake))）
+  const JAPAREN = /^(.*?[ぁ-ゖァ-ヺ一-龯々].*?)\s*[(（]\s*([A-Za-z][A-Za-z0-9 ,.\-'&+/]*(?:\s*\([A-Za-z0-9 ,.\-'&+]+\))?)\s*[)）]\s*$/;
+  if (typeof v99dkInciRows === "function") { // eslint-disable-line no-undef
+    const __irB = v99dkInciRows; // eslint-disable-line no-undef
+    v99dkInciRows = function (t) { // eslint-disable-line no-global-assign
+      const r = __irB.apply(this, arguments);
+      try {
+        if (!r || !t || !Array.isArray(t.compRows)) return r;
+        const cols = (t.compCols || []).map((c) => String(c == null ? "" : c));
+        const iI = cols.findIndex((c, i) => i > 0 && /INCI/i.test(c));
+        if (iI <= 0) return r;
+        let rec = 0; const rows = [];
+        t.compRows.forEach((row) => {
+          if (!Array.isArray(row)) return;
+          const c0 = NF(row[0] == null ? "" : row[0]).trim(), inc = NF(row[iI] == null ? "" : row[iI]).trim();
+          if (inc) { const h = r.find((x) => x && NF(x[0]).trim().toLowerCase() === inc.toLowerCase()); rows.push(h || [inc, JA.test(c0) ? c0 : ""]); return; }
+          const m = c0.match(JAPAREN);
+          if (m) { rows.push([m[2].trim(), m[1].trim()]); rec++; }
+        });
+        if (rec && rows.length > r.length) {
+          try { if (typeof V99DK_JAOK !== "undefined") rows.forEach((x) => { if (x[1]) V99DK_JAOK.add(x[1]); }); } catch (e) { /* 控えは無くてよい */ } // eslint-disable-line no-undef
+          cnt("inciParen", rec);
+          return rows;
+        }
+      } catch (e) { err("inciParen", e); }
+      return r;
+    };
+  }
+  const jaColOn = (T) => { try { return typeof v99dkJaColOn === "function" && !!v99dkJaColOn(T); } catch (e) { return false; } }; // eslint-disable-line no-undef
+  if (typeof dk3Model === "function") { // eslint-disable-line no-undef
+    const __dmB = dk3Model; // eslint-disable-line no-undef
+    dk3Model = function (lang0, plan, data, ph, deck, src, T) { // eslint-disable-line no-global-assign
+      const M = __dmB.apply(this, arguments);
+      try {
+        if (M && lang0 && !/^ja/.test(String(lang0))) {
+          ingrGuard(M, data, lang0);
+          // INCI のある化粧品（和名の列を出すとき）は、成分のページが札で覆っても、全成分表のページを必ず作る
+          const sp = M.specsP1;
+          if (sp && jaColOn(T || ten()) && Array.isArray(sp.hdr) && /INCI/i.test(String(sp.hdr[0] || ""))) {
+            M.specsList = [sp].concat(M.specsList || []); M.specsP1 = null; M.ingrCovers = 0; cnt("inciPage");
+          }
+        }
+      } catch (e) { err("model", e); }
+      return M;
+    };
+  }
+
+  /* ════ 資料の文の直し（作った資料・最終チェックの前）：N3 の登録の不備の文・N13 の項目名の重なり ════ */
+  const META = /\b(?:no INCI (?:entry|name|names|data)(?: is| was| are| were)? (?:supplied|provided|registered|given|available|listed)|INCI (?:field|entry|name|column)(?: is| was)? (?:blank|empty|missing|not (?:supplied|provided|registered))|registered INCI field|not (?:yet )?(?:registered|provided) in the (?:product )?record)\b/i;
+  const CART = "(?:master carton|outer carton|shipping carton|export carton|carton|case|外箱|外装箱|外装|外包装|箱|caja (?:maestra|exterior|master|de envío)|cart[oó]n (?:maestro|exterior)|caisse|karton)";
+  const DBL = new RegExp("^(\\s*" + CART + "\\s*[:：]\\s*)" + CART + "\\s*[:：]\\s*", "i");
+  const HEAD2 = new RegExp("^\\s*" + CART + "\\s*[:：]\\s*$", "i");
+  const STRIP2 = new RegExp("^\\s*" + CART + "\\s*[:：]\\s*", "i");
+  function deckTextFix(deck) {
+    let n = 0;
+    try {
+      if (!deck || !Array.isArray(deck.slides) || !deck.lang || /^ja/.test(deck.lang)) return 0;
+      deck.slides.forEach((S) => (S.els || []).forEach((e) => {
+        if (!e || e.k !== "text" || !Array.isArray(e.ps)) return;
+        e.ps.forEach((p) => {
+          const R = (p && p.r) || [];
+          R.forEach((r, j) => {
+            if (!r || typeof r.t !== "string") return;
+            if (DBL.test(r.t)) { r.t = r.t.replace(DBL, "$1"); n++; cnt("cartonDbl"); }
+            else if (j > 0 && R[j - 1] && typeof R[j - 1].t === "string" && /[:：]\s*$/.test(R[j - 1].t) && new RegExp(CART + "\\s*[:：]\\s*$", "i").test(R[j - 1].t) && STRIP2.test(r.t)) { r.t = r.t.replace(STRIP2, ""); n++; cnt("cartonDbl"); }
+            if (META.test(r.t)) {
+              const parts = r.t.split(/(?<=[.;])\s+/);
+              const keep = parts.filter((s) => !META.test(s)).map((s) => s.replace(/;\s*$/, ".")).join(" ").trim();
+              r.t = keep; n++; cnt("metaDrop");
+            }
+          });
+          void HEAD2;
+        });
+      }));
+    } catch (e) { err("text", e); }
+    return n;
+  }
+  V.deckTextFix = deckTextFix;
+  if (typeof dk3Check === "function") { // eslint-disable-line no-undef
+    const __ckB = dk3Check; // eslint-disable-line no-undef
+    dk3Check = function (deck) { // eslint-disable-line no-global-assign
+      try { deckTextFix(deck); } catch (e) { err("ck0", e); }
+      const r = __ckB.apply(this, arguments);
+      try {
+        if (r && Array.isArray(r.crit)) {
+          const c = r.crit.find((x) => x && x.k === "photo" && /^写真が \d+枚しか使えていません（納品品質の写真を3枚以上）$/.test(String(x.t || "")));
+          if (c) { const h = photoHow(deck); if (h) { c.t = c.t + "：" + h; cnt("photoHow"); } }
+        }
+        // ロゴと同じ画像を「このまま使う」で写真として入れたときは、そう知らせる（数え方は同じ・入れたくなければ「使わない」）
+        if (r && Array.isArray(r.warn)) {
+          const T = ten(); const A = (T && T.assets) || {}; const lb = (A.logo && A.logo.b64) || "";
+          const used = (lb && W.V99PHOTO && typeof W.V99PHOTO.deckPhotos === "function") ? W.V99PHOTO.deckPhotos(deck) : null;
+          const L = used ? (A.ph || []).map((o, i) => ({ o, i })).filter((x) => x.o && x.o.b64 === lb && used.has(x.i)) : [];
+          if (L.length && !r.warn.some((w) => w && w.k === "v100logoph")) r.warn.push({ k: "v100logoph", t: L.map((x) => "商品写真" + (x.i + 1)).join("・") + "はロゴと同じ画像です。「このまま使う」を選んだため、写真としても資料に入れています。入れたくないときは「写真・ロゴの使い方」で「使わない」を選び、もう一度作ってください" });
+        }
+      } catch (e) { err("ck1", e); }
+      return r;
+    };
+  }
+
+  /* 英・中・西の画面の言葉 */
+  try {
+    if (typeof I18N !== "undefined" && I18N && Array.isArray(I18N.pat)) { // eslint-disable-line no-undef
+      const ph = (s, l) => String(s).replace(/商品写真(\d+)/g, l === "zh" ? "商品照片$1" : l === "es" ? "Foto $1" : "Photo $1")
+        .replace(/「使わない」を選んだ/g, l === "zh" ? "已选择“不使用”" : l === "es" ? "eligió «No usar»" : "you chose “Don't use”")
+        .replace(/ページの数の都合/g, l === "zh" ? "页数原因" : l === "es" ? "por el número de páginas" : "number of pages")
+        .replace(/図・文字が中心の可能性/g, l === "zh" ? "可能以图表或文字为主" : l === "es" ? "posiblemente sobre todo diagrama o texto" : "possibly mainly a diagram or text")
+        .replace(/商品写真に向かない可能性/g, l === "zh" ? "可能不适合作商品照片" : l === "es" ? "posiblemente no apta" : "possibly not suited as a product photo")
+        .replace(/日本語の文字が目立つ可能性/g, l === "zh" ? "日文文字可能显眼" : l === "es" ? "puede destacar texto en japonés" : "Japanese text may stand out")
+        .replace(/ぼやけの可能性/g, l === "zh" ? "可能模糊" : l === "es" ? "posiblemente borrosa" : "possibly blurry")
+        .replace(/小さい/g, l === "zh" ? "尺寸小" : l === "es" ? "pequeña" : "small").replace(/横長・縦長/g, l === "zh" ? "横幅形状" : l === "es" ? "forma de banner" : "banner shape")
+        .replace(/（/g, " (").replace(/）/g, ")").replace(/・/g, ", ");
+      I18N.pat.unshift({ re: /^(.+)はロゴと同じ画像です。「このまま使う」を選んだため、写真としても資料に入れています。入れたくないときは「写真・ロゴの使い方」で「使わない」を選び、もう一度作ってください$/, // eslint-disable-line no-undef
+        en: (m) => ph(m[1], "en") + ": the same image as the logo. Because you chose “Use as it is”, it is also in the deck as a photo. To leave it out, choose “Don't use” in “How to use photos and logo” and make the deck again",
+        zh: (m) => ph(m[1], "zh") + "与标志是同一图片。因选择了“直接使用”，也作为照片放入了资料。如不想放入，请在“照片・标志的用法”中选择“不使用”后重新制作",
+        es: (m) => ph(m[1], "es") + ": es la misma imagen que el logo. Como eligió «Usar tal cual», también está en la presentación como foto. Para quitarla, elija «No usar» y vuelva a crearla" });
+      I18N.pat.unshift({ re: /^写真が (\d+)枚しか使えていません（納品品質の写真を3枚以上）：資料に入った写真 (\d+)枚（登録 (\d+)枚）(?:・入らなかった写真：(.+?))?。進め方：(「写真・ロゴの使い方」で入らなかった写真の「このまま使う」を押すか、)?「写真を上げる」で写真をあと (\d+)枚以上足して、「↻ もう一度作る」を押してください（今のままでも下書きとしては使えます）$/, // eslint-disable-line no-undef
+        en: (m) => "Only " + m[1] + " photo(s) could be used (3 or more delivery-quality photos are needed): " + m[2] + " photo(s) in the deck (" + m[3] + " registered)" + (m[4] ? "; not in the deck: " + ph(m[4], "en") : "") + ". Next: " + (m[5] ? "press “Use as it is” for the photos not in the deck in “How to use photos and logo”, or " : "") + "add " + m[6] + " or more photos with “Upload photos”, then press “↻ Create again” (you can still use it as a draft)",
+        zh: (m) => "只能使用 " + m[1] + " 张照片（需要 3 张以上交付品质照片）：放入资料的照片 " + m[2] + " 张（已登记 " + m[3] + " 张）" + (m[4] ? "；未放入：" + ph(m[4], "zh") : "") + "。下一步：" + (m[5] ? "在“照片・标志的用法”中对未放入的照片点击“直接使用”，或" : "") + "用“上传照片”再添加 " + m[6] + " 张以上，然后点击“↻ 重新制作”（目前也可作为草稿使用）",
+        es: (m) => "Solo se pudieron usar " + m[1] + " foto(s) (se necesitan 3 o más de calidad): " + m[2] + " en la presentación (" + m[3] + " registradas)" + (m[4] ? "; no incluidas: " + ph(m[4], "es") : "") + ". Siguiente: " + (m[5] ? "pulse «Usar tal cual» en las fotos no incluidas, o " : "") + "añada " + m[6] + " o más fotos con «Subir fotos» y pulse «↻ Crear de nuevo» (ya puede usarla como borrador)" });
+    }
+  } catch (e) { err("i18n", e); }
+})();

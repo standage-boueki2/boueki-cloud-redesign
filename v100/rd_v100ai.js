@@ -162,17 +162,25 @@
   }
   function chkLine(run) {
     if (!run || run.how === "smp" || run.v100smp) return "";
-    const L = (run.leads || []).filter((l) => !l.smp);
-    if (!L.length) return "";
+    const all = (run.leads || []).filter((l) => !l.smp);
+    // 22.00.1 v2 N10：見出しの社数（届かない会社を外した表の数）と同じ数で数える。外した会社・URL の無い会社は別に書く
+    const L = all.filter((l) => !l.v79x);
+    const gone = all.length - L.length;
+    if (!L.length && !gone) return "";
     const ok = (l) => !!(l && l.v79u && /^(ok|redir|dead)$/.test(l.v79u.st));
-    const c = run.v100chk || { done: L.filter(ok).length, total: L.length, capped: !!(run.v79chk && run.v79chk.why === "cap"), reuse: L.filter((l) => l.v100reuse).length };
-    const done = L.filter(ok).length, rest = L.length - done, reuse = L.filter((l) => l.v100reuse).length;
+    const c = run.v100chk || { capped: !!(run.v79chk && run.v79chk.why === "cap") };
     if (!run.v79chk && !run.v100chk) return "";
-    const capped = c.capped && rest > 0;
+    const done = L.filter(ok).length;
+    const noUrl = L.filter((l) => !ok(l) && !String(l.url || "").trim()).length;
+    const rest = L.length - done - noUrl;
+    const reuse = L.filter((l) => l.v100reuse).length;
+    const capped = !!c.capped && rest > 0;
     let t = F(M("公式サイトの確認：{a}/{n}社", "Website check: {a}/{n}"), { a: done, n: L.length });
+    if (gone) t += F(M("（ほかに、公式サイトに届かず外した {g}社）", " (plus {g} removed: website unreachable)"), { g: gone });
     if (reuse) t += F(M("（うち {r}社は前に確かめた結果を使いました・確かめた日を各行に書いています）", " ({r} reused from earlier checks; date on each row)"), { r: reuse });
     if (capped) t += "。" + F(M("今日の確かめの上限のため、残り {k}社はまだ確かめていません。0時（日本時間）以降に「確かめ直す」で続きから確かめられます。まだの会社は「要確認」のままです。", " The daily check limit was reached, so {k} companies are not checked yet. Use “Check again” after midnight JST to continue. Unchecked rows stay “to be confirmed”."), { k: rest });
     else if (rest) t += "。" + F(M("{k}社はまだ確かめていません（「要確認」のまま）。", " {k} companies not checked yet (still “to be confirmed”)."), { k: rest });
+    if (noUrl) t += (rest || capped ? "" : "。") + F(M("公式サイトの URL が無い {u}社は確かめられません（「要確認」のまま・会社名で調べてください）。", " {u} companies have no website URL and cannot be checked (still “to be confirmed”)."), { u: noUrl });
     return `<div class="v100ai-chk${capped ? " cap" : ""}" data-v100chk="1" role="status" data-noi18n="1"><span>🔎 ${E(t)}</span>${rest ? `<button type="button" class="btn g" data-v79chk="1" data-v100chkbtn="1">${E(F(M("確かめ直す（まだの {k}社）", "Check again ({k} left)"), { k: rest }))}</button>` : ""}</div>`;
   }
   if (typeof W.v79obCheckHtml === "function" && !W.v79obCheckHtml.__v100ai) {
@@ -233,6 +241,37 @@
     g.__v100ai = 1; W.v71obInner = g;
   }
 
+  /* ═════════ 22.00.1 v2 N7：相談の答えの「いまの段階」で、下書きの資料を「できた」と言わない（資料の状態は flow の v100deckState）═════════ */
+  function deckStateOf(t) {
+    try { if (typeof W.v100deckState === "function") return W.v100deckState(t); } catch (e) { /* 自分で数える */ }
+    try {
+      const d3 = t && t.deck3, last = d3 && d3.last;
+      const part = d3 && d3.v100partial && Object.keys(d3.v100partial).map((k) => d3.v100partial[k]).filter(Boolean)[0];
+      if (part) return { state: "partial" };
+      if (last) return { state: last.pass ? "final" : (+last.n ? "draft" : "failed") };
+    } catch (e) { /* 無視 */ }
+    return { state: "none" };
+  }
+  V.deckStateOf = deckStateOf;
+  if (typeof W.v92aiRoadHtml === "function" && !W.v92aiRoadHtml.__v100ai) {
+    const __rh = W.v92aiRoadHtml;
+    const g = function () {
+      let h = String(__rh.apply(this, arguments) || "");
+      try {
+        if (/data-v92ai-road="4"/.test(h)) {
+          const st = deckStateOf(ten()).state;
+          const lab = st === "draft" ? M("外国語の営業資料の下書き（要修正）がある", "Sales deck draft exists (needs fixing)")
+            : st === "partial" ? M("外国語の営業資料の基本の下書きがある（AI の仕上げは未実施）", "Basic sales deck draft exists (AI finishing not done)")
+              : st === "failed" ? M("外国語の営業資料は作成に失敗（作り直しが必要）", "Sales deck generation failed (needs to be redone)")
+                : st === "none" ? M("外国語の営業資料はまだない", "No sales deck yet") : "";
+          if (lab) h = h.replace(/<b>(?:外国語の営業資料ができた|Sales deck ready)<\/b>/, "<b>" + E(lab) + "</b>");
+        }
+      } catch (e) { err("road", e); }
+      return h;
+    };
+    g.__v100ai = 1; W.v92aiRoadHtml = g;
+  }
+
   /* ═════════ No.550 出どころの無い詳細調査（国別戦略）═════════ */
   function srcFacts(c) {
     const out = [];
@@ -248,6 +287,22 @@
     return out.filter((x) => x[0] && !/：\s*$/.test(x[0]));
   }
   V.srcFacts = srcFacts;
+  /* Web 検索が動いたか・なぜ出どころが無いか（22.00.1 v1） */
+  function webWhy(DP) {
+    const w = DP && DP.v100web;
+    if (!w) return M("Web 検索が動いたかどうかの記録は、この調査には残っていません。「出どころを探し直す」で調べ直すと、理由をここに出します。", "This record does not say whether web search ran. Search again to see the reason here.");
+    const eng = w.eng || M("AI", "AI");
+    let t;
+    if (!w.ok) t = F(M("Web 検索つきの調査が終わりませんでした（{e}）。", "The web search did not finish ({e})."), { e: V.niceText(w.err || "") || M("理由不明", "unknown") });
+    else if (w.search === 1) t = F(M("Web 検索のできる AI（{g}）で調べましたが、出どころ（URL）が返ってきませんでした（{n}件）。", "Searched with a web-capable AI ({g}), but no source URLs came back ({n})."), { g: eng, n: w.cits });
+    else if (w.search === 0) t = w.ext ? F(M("Web 検索のできない AI（{g}）で答えました。Web の検索結果 {x}件を渡しましたが、答えに出どころ（URL）が付きませんでした。", "Answered by an AI without web search ({g}); {x} web results were provided but the answer had no source URLs."), { g: eng, x: w.ext })
+      : F(M("Web 検索のできない AI（{g}）で答え、Web の検索結果も取れませんでした。", "Answered by an AI without web search ({g}), and no web results could be fetched."), { g: eng });
+    else t = F(M("Web 検索の結果（出どころの URL）が返ってきませんでした（使った AI：{g}）。", "No web results (source URLs) came back (AI used: {g})."), { g: eng });
+    if (/Web検索なし|Web 検索なし/.test(w.why || "")) t += F(M("AI への依頼は Web 検索なしで送られていました（経路：{y}）。", " The request was sent without web search (route: {y})."), { y: w.why });
+    if (/自動切替|エラーのため/.test(w.why || "")) t += M("Web 検索のできる AI がエラーだったため、ほかの AI に切り替わっていました。", " The web-capable AI failed, so it switched to another AI.");
+    return M("Web 検索について：", "About web search: ") + t + (w.tries > 1 ? F(M("（{n}回試しました）", " ({n} tries)"), { n: w.tries }) : "");
+  }
+  V.webWhy = webWhy;
   if (typeof W.ctyDeepView === "function" && !W.ctyDeepView.__v100ai) {
     const __dv = W.ctyDeepView;
     const g = function (c) {
@@ -260,6 +315,7 @@
           const busy = W.__ctyDeepBusy === c;
           const box = `<div class="c v100ai-src0" data-v100src0="1" role="note" data-noi18n="1"><p><b>⚠ ${E(M("出どころが見つかりませんでした（この調査の結論は確かめられていません）", "No sources were found (the conclusions below are not verified)"))}</b></p>
             <p>${E(F(M("この調査（{e}・{a}）では Web 検索の結果が返らず、下の AI の答えは AI の一般の知識による下書きです（信頼度 低）。確かな結論として使わず、下の「アプリの中の出どころで言えること」と確かめ先で確かめてください。", "This research ({e}, {a}) returned no web results; the AI answer below is a draft from general knowledge (low confidence). Do not use it as a firm conclusion; check against the in-app sources below."), { e: DP.eng || "AI", a: DP.at || "" }))}</p>
+            <p class="nn" data-v100webwhy="1">${E(webWhy(DP))}</p>
             ${S.length ? `<p class="v100ai-sh">${E(M("アプリの中の出どころで言えること", "What the app's own sources say"))}</p><ul>${S.map((x) => `<li>${E(x[0])}<span class="nn">（${E(M("出どころ：", "Source: ") + x[1])}）</span></li>`).join("")}</ul>` : `<p class="nn">${E(M("アプリの中にも、この国について出どころのあるデータはありませんでした。", "The app has no sourced data for this country either."))}</p>`}
             <button type="button" class="btn" data-v100act="deepre" data-c="${E(c)}" ${busy ? "disabled" : ""}>${E(M("出どころを探し直す（Web 検索つきで調べ直す）", "Search again for sources (with web search)"))}</button></div>`;
           const k = '<div class="c" style="margin-bottom:11px;border-color:var(--or)">';
@@ -367,6 +423,23 @@
       if (a === "deepre") { ev.preventDefault(); const c = b.getAttribute("data-c"); if (c && typeof ctyDeepRun === "function") ctyDeepRun(c, true); return; } // eslint-disable-line no-undef
     } catch (e) { err("click", e); }
   }, true);
+  /* 22.00.1 N11：右下の「考え中」が、いまの画面で始めた AI なら「別の画面で処理中」と出さない（rd_uat は最初に出た画面と比べてたたむ） */
+  function thinkHere() {
+    try {
+      const d = document.getElementById("aiThink");
+      if (!d) return;
+      if (!d.classList.contains("on")) { d.classList.remove("v100ai-here"); return; }
+      const items = (typeof AIT !== "undefined" && AIT && AIT.items) || []; // eslint-disable-line no-undef
+      const k = curKey();
+      const C = V.consult;
+      const here = items.some((x) => x && x.v100key && x.v100key === k) || !!(C && C.key && C.key === k && !C.lastAt && !C.done && Date.now() - C.t0 < 300000);
+      d.classList.toggle("v100ai-here", here);
+      // 経過の秒をこまめに描き直す（重い画面で 1秒ごとの描き直しが遅れても、送った時刻からの秒がずれないように）
+      if (typeof v68tPaint === "function" && !d.classList.contains("done")) v68tPaint(); // eslint-disable-line no-undef
+    } catch (e) { err("thinkHere", e); }
+  }
+  setInterval(thinkHere, 300);
+  V.thinkHere = thinkHere;
   function paintAll() { paintBar(); deckBox(); notesDom(); }
   W.v100aiPaintAll = paintAll;
   if (typeof W.render === "function" && !W.render.__v100ai) {

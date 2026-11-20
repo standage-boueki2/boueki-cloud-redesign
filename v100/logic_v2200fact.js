@@ -213,6 +213,22 @@
       var r = oCP.apply(this, arguments);
       try {
         if (!r || !Array.isArray(r.rows)) return r;
+        /* 22.00.1 N13：「水性塗料（食品衛生法の試験済み）」の試験の名前を落とさない（備考が「試験済み」だけになり、英語で「tested」だけになっていた） */
+        try {
+          var sraw = NF(raw);
+          r.rows.forEach(function (row) {
+            if (!Array.isArray(row) || !/試験済み|試験の対象/.test(String(row[2] || ""))) return;
+            var k0 = NF(row[0] || ""); if (!k0) return;
+            var i0 = sraw.indexOf(k0); if (i0 < 0) return;
+            var seg = sraw.slice(i0, i0 + 80).split(/[／\/\n]/)[0];
+            var pm = seg.match(/[（(]([^）)]*(?:試験|検査|適合)[^）)]*)[）)]/);
+            if (!pm) return;
+            var tname = pm[1].replace(/(?:の)?(?:試験|検査)(?:済み?|に合格|適合)?$/, "").replace(/^\s+|\s+$/g, "");
+            if (!tname || tname.length > 24 || /^(?:規格|材質|安全性)?$/.test(tname)) return;
+            row[2] = String(row[2]).replace(/試験済み/, "試験済み（" + tname + "）").replace(/試験の対象/, "試験の対象（" + tname + "）");
+            cnt("testName");
+          });
+        } catch (e) { err("testname", e); }
         var s = NF(raw);
         var segs = splitTop(s.replace(/^[^:]{1,20}:\s*/, ""));
         var glob = splitTop(s).some(function (x) { return FOOD_NEG_CL.test(" " + x) && !/^[^:]{1,20}:\s*[^、,]+$/.test(x.replace(FOOD_NEG_CL, "")); }) || segs.some(function (x) { return FOOD_NEG_CL.test(" " + x); });
@@ -273,7 +289,13 @@
       try {
         if (j && cu && raw && !cu.x) {
           var k = String(cu.k || "");
-          if (j.kind === "answer" && j.value != null && String(j.value) !== raw) {
+          if (j.kind === "answer" && k === "cat") {
+            var cf = catFix(raw, String(j.value == null ? "" : j.value), cu.chips);
+            if (cf) { lg({ k: "catRaw", raw: raw.slice(0, 60), ai: String(j.value).slice(0, 40), to: cf }); j.value = cf; cnt("catFix"); }
+          } else if (k === "cat" && j.kind !== "answer" && j.kind !== "edit") {
+            var cf2 = catFix(raw, "", cu.chips);
+            if (cf2) { j.kind = "answer"; j.value = cf2; cnt("catFix"); }
+          } else if (j.kind === "answer" && j.value != null && String(j.value) !== raw) {
             var why = negKeep(raw, String(j.value), "");
             if (why.length) { lg({ k: "triageRaw", f: k, raw: raw.slice(0, 80), ai: String(j.value).slice(0, 80), why: why.join("・") }); j.value = raw; j.v100raw = why; cnt("triageRaw"); }
           } else if (j.kind === "skip" && /^(compRows|dimRows|shelf|cert|store)$/.test(k) && v100neg(raw).neg && !/わから|分から|不明|未定/.test(raw)) {
@@ -321,6 +343,16 @@
     var oGA = window.llmGapAnalyze;
     window.llmGapAnalyze = async function () {
       var res = await oGA.apply(this, arguments);
+      try {
+        var T1 = (typeof TEN !== "undefined") ? TEN : null;
+        var cn = cmpNotes(T1);
+        if (res && cn.length) {
+          res.insights = (res.insights || []).concat(cn.filter(function (x) { return (res.insights || []).indexOf(x) < 0; }));
+          cn.forEach(function (x) { var q0 = (x.match(/「([^」]+)」/) || [])[1] || ""; if (q0 && !(res.questions || []).some(function (y) { return y && String(y.q).indexOf(q0) >= 0; })) res.questions = (res.questions || []).concat([{ q: "「" + q0 + "」は、何に比べての数字・言い方ですか？ どの試験（条件・測った所）の結果ですか？", why: "比べる相手が無い数字は海外の買い手に誤解される" }]); });
+          res.questions = (res.questions || []).slice(0, 4);
+          cnt("cmpGap", cn.length);
+        }
+      } catch (e) { err("gapcmp", e); }
       try {
         var T0 = (typeof TEN !== "undefined") ? TEN : null; var F = factsOf(T0);
         if (res && F.negs.length) {
@@ -576,6 +608,7 @@
     var out = [];
     (notes || []).forEach(function (n0) {
       var n = NF(n0);
+      if (n.indexOf("(比較の相手)") >= 0 || n.indexOf("（比較の相手）") >= 0) return; /* 22.00.1 N5：比べる相手の無い数字は見出しだけ（cmpMatchers） */
       var qs = []; n.replace(/[「“"『]([^」”"』]{1,30})[」”"』]/g, function (m, a) { qs.push(a); return m; });
       var bases = qs.length ? qs : [n];
       bases.forEach(function (q) {
@@ -615,13 +648,16 @@
       try {
         var TT = T || curT();
         if (!r || !r.plan || !lang || lang === "ja" || !TT) return r;
-        var F = factsOf(TT), M = noteMatchers(F.unres), drops = [];
+        addCmpNotes(TT);
+        var F = factsOf(TT), M = noteMatchers(F.unres), MH = headMatchers(F.unres, F), drops = [];
         var leaves = fn("dk3Leaves") ? dk3Leaves(r.plan) : [];
         leaves.forEach(function (c) {
           if (!c || !c.txt) return;
           var why = "";
           var hit = M.filter(function (m) { return m.re.test(c.txt); })[0];
           if (hit) why = "未解決の気づき「" + NF(hit.note).slice(0, 50) + "」があるため、解決するまで資料に載せません（追加ヒアリングで答えると載せられます）";
+          var hh = !why && /^(?:hero|stats|spotlight)\./.test(String(c.path || "")) && MH.filter(function (m) { return m.re.test(c.txt); })[0];
+          if (hh) why = hh.kind === "note" ? "未解決の気づき「" + NF(hh.note).slice(0, 40) + "」の数値（" + String(hh.lab).slice(0, 12) + "）は、答えが出るまで表紙・見出しに使いません（追加ヒアリングで答えると使えます）" : "比べる相手・試験の条件が登録に無い言い方（「" + String(hh.lab).slice(0, 20) + "」）は、答えるまで表紙・見出しに使いません（追加ヒアリングで答えると使えます）";
           var cn = !why && contraOf(c.txt, F);
           if (cn) why = cn.src === "warr" ? cn.text : "入力と食い違う主張（登録は「" + cn.text.slice(0, 40) + "」）";
           if (why) { drops.push({ path: c.path, txt: c.txt, why: why, v100: 1 }); }
@@ -648,6 +684,7 @@
           var SP = TT.deck3 && TT.deck3.plans && TT.deck3.plans[lang];
           if (SP && Array.isArray(SP.dropped) && r.dropped.length > SP.dropped.length) { SP.dropped = r.dropped.map(function (d) { return { path: d.path, txt: d.txt, why: d.why }; }); cnt("dropSync"); }
         } catch (e) { err("dropsync", e); }
+        try { V.dropBy = V.dropBy || {}; V.dropBy[String(TT.uid || "") + "|" + lang] = (r.dropped || []).map(function (d) { return String((d && d.txt) || ""); }).filter(function (t) { return t.length >= 12; }); } catch (e) { /* 無視 */ }
         /* 外した主張（規制名）を控える：表・ノートでも同じ扱いにする（No.601） */
         V.dropRegs = [];
         (r.dropped || []).forEach(function (d) { claimKeysOfDropped(d).forEach(function (g) { if (V.dropRegs.indexOf(g) < 0) V.dropRegs.push(g); }); });
@@ -691,6 +728,8 @@
     j.v.forEach(function (x) {
       var txt = cl[+x.n]; if (!x || !txt) return;
       if (x.ok === false) {
+        var fd = foundOk(txt, blocks);
+        if (fd) { x.okAI = false; x.whyAI = x.why; x.ok = true; x.blk = fd.id; x.ev = fd.t; x.why = ""; ch++; lg({ k: "verifyFound", txt: txt.slice(0, 60), ev: fd.t }); return; }
         var cs = freeCons(txt);
         if (!cs.length) return;
         var rest = txt; cs.forEach(function (c) { rest = rest.replace(new RegExp(c.re.source, "gi"), " "); });
@@ -701,6 +740,29 @@
           ch++; lg({ k: "verifyUndrop", txt: txt.slice(0, 60), ev: x.ev.slice(0, 60) });
         }
       } else if (x.ok === true) {
+        /* 22.00.1 N1：引用「BFE99%（第三者試験）」の 99 を数字として読ませる（英字の直後の数字は品番と読まれ「引用に数字が含まれていない」で外れていた）。照合の原文は空白を除いて比べるので引用の照らしは変わらない */
+        if (typeof x.ev === "string" && /[A-Za-z][-‐]?\d/.test(x.ev) && /\d/.test(txt)) { var ev2 = x.ev.replace(/([A-Za-z])([-‐]?)(\d)/g, "$1$2 $3"); if (ev2 !== x.ev) { x.ev = ev2; ch++; cnt("evNum"); } }
+        /* 引用に主張の数字が無く、根拠の原文には英字にくっついた形（BFE99%）で書かれているときは、その行を引用に足す */
+        try {
+          if (/\d/.test(txt) && fn("dk3NumsIn")) {
+            var cn0 = dk3NumsIn(txt, "en").filter(function (n) { return n && n.k !== "yr" && n.k !== "year"; });
+            var evS = String(x.ev || "").replace(/([A-Za-z])([-‐]?)(\d)/g, "$1$2 $3");
+            var evN0 = dk3NumsIn(evS, "ja");
+            var miss0 = cn0.filter(function (n) { return !evN0.some(function (e) { return Math.abs(e.full - n.full) <= Math.max(1e-6, Math.abs(n.full) * 0.001); }); });
+            if (miss0.length) {
+              var ids0 = String(x.blk || "").split(/[,\s、]+/).filter(Boolean), add0 = [];
+              miss0.forEach(function (n) {
+                var order = ids0.concat(Object.keys(blocks).filter(function (id) { return ids0.indexOf(id) < 0; }));
+                for (var oi = 0; oi < order.length; oi++) {
+                  var bt = String(blocks[order[oi]] || ""); if (!/[A-Za-z][-‐]?\d/.test(bt)) continue;
+                  var ln = bt.split(/\n|。/).map(function (z) { return z.trim(); }).filter(function (z) { return z.length >= 4 && /[A-Za-z][-‐]?\d/.test(z); }).find(function (z) { return dk3NumsIn(z.replace(/([A-Za-z])([-‐]?)(\d)/g, "$1$2 $3"), "ja").some(function (e) { return Math.abs(e.full - n.full) <= Math.max(1e-6, Math.abs(n.full) * 0.001); }); });
+                  if (ln) { add0.push(ln.slice(0, 58).replace(/([A-Za-z])([-‐]?)(\d)/g, "$1$2 $3")); if (ids0.indexOf(order[oi]) < 0) ids0.push(order[oi]); break; }
+                }
+              });
+              if (add0.length) { x.ev = [evS].concat(add0).filter(Boolean).join("｜"); x.blk = ids0.join(","); ch++; cnt("evAdd"); }
+            }
+          }
+        } catch (e) { err("evadd", e); }
         var hit = M.filter(function (m) { return m.re.test(txt); })[0];
         var cn = !hit && contraOf(txt, F);
         if (hit) { x.ok = false; x.why = "未解決の気づき（" + String(hit.lab).slice(0, 14) + "）"; ch++; }
@@ -730,6 +792,8 @@
       var E = oEv.apply(this, arguments);
       try {
         if (!E || !E.cons || E.__v100) return E;
+        /* 22.00.1 N1：英字にくっついた数字（BFE99%）・年齢（3歳以上）も根拠の数字に */
+        try { if (Array.isArray(E.nums) && fn("dk3NumsIn")) { var ex = numExtra(E.tx || ""); if (ex.length) dk3NumsIn(ex.join(" ／ "), "ja").forEach(function (n) { if (n && isFinite(+n.full)) E.nums.push({ k: n.k, full: +(+n.full).toFixed(4) }); }); } } catch (e) { err("evnum", e); }
         var F = factsOf(curT());
         Object.keys(E.cons).forEach(function (k) {
           if (E.cons[k] !== false) return;
@@ -817,6 +881,37 @@
           log.push({ si: si + 1, a: full.slice(0, 70), b: x.t.slice(0, 70), why: x.why }); ch = true;
         });
         if (ch) { try { delete e.mh; } catch (z) { /* 無視 */ } }
+      });
+      /* 22.00.1：外した文言と同じ文が資料のほかの所に残らない（N3）・比べる相手の無い数字は表紙に使わない（N5）・英文の細かい誤り（N13） */
+      var DL = (V.dropBy && V.dropBy[String((T && T.uid) || "") + "|" + lang]) || [];
+      var DN = DL.map(function (t) { return String(t).toLowerCase().replace(/[^a-z0-9%]+/g, " ").trim(); }).filter(function (t) { return t.length >= 12; });
+      var MH = si === 0 ? headMatchers(F.unres, F) : [];
+      els.forEach(function (e) {
+        if (e.name === "foot" || e.name === "pno") return;
+        var ch2 = false;
+        e.ps.forEach(function (p) {
+          var rs = (p.r || []).filter(function (r) { return r && typeof r.t === "string"; });
+          if (!rs.length) return;
+          var full = rs.map(function (r) { return r.t; }).join("");
+          if (!full.trim()) return;
+          var parts = sents(full), keep = [], why = [];
+          parts.forEach(function (x) {
+            var nx = String(x).toLowerCase().replace(/[^a-z0-9%]+/g, " ").trim();
+            if (nx.length >= 12 && DN.indexOf(nx) >= 0) { why.push("外した文言と同じ文"); return; }
+            var hh = MH.filter(function (m) { return m.re.test(x); })[0];
+            if (hh) { why.push("比べる相手の無い数字を表紙に（「" + String(hh.lab).slice(0, 16) + "」）"); return; }
+            keep.push(x);
+          });
+          var out = why.length ? keep.join(" ") : full;
+          if (/^(en|es|fr|de|it|pt|id|ms|vi)$/.test(String(lang))) { var itf = intFix(out); if (itf) { out = itf.t; why.push(itf.why); } }
+          var capOnly = false;
+          if (/^(en|es|fr|de|it|pt|id|ms|vi)$/.test(String(lang))) { var ef = engFix(out); if (ef) { capOnly = !why.length && ef.why === "文頭の小文字"; out = ef.t; why.push(ef.why); } }
+          if (out === full) return;
+          if (capOnly) { var r1 = rs.filter(function (r) { return /\S/.test(r.t); })[0]; if (r1) r1.t = r1.t.replace(/^(\s*)([a-z])/, function (m0, a, b) { return a + b.toUpperCase(); }); }
+          else { rs[0].t = out; for (var i = 1; i < rs.length; i++) rs[i].t = ""; }
+          log.push({ si: si + 1, a: full.slice(0, 70), b: out.slice(0, 70), why: why.join("・") }); ch2 = true;
+        });
+        if (ch2) { try { delete e.mh; } catch (z) { /* 無視 */ } }
       });
       /* 項目名と値が別の枠のとき：「Shelf life」の隣が保証の文 →「Warranty」／「Sterilization」の隣が空 → 入力の値 */
       els.forEach(function (e) {
@@ -915,14 +1010,14 @@
     var oAA = window.applyAnswer;
     window.applyAnswer = function (t, k, raw) {
       var ok = oAA.apply(this, arguments);
-      try { if (ok && t && k === "compRows") moveNegRows(t); if (ok && t && FLD_LAB[k]) stripLabels(t); } catch (e) { err("aa", e); }
+      try { if (ok && t && k === "compRows") { moveNegRows(t); ingrFix(t); } if (ok && t && FLD_LAB[k]) stripLabels(t); if (ok && t && k === "hs" && /\d{4}\s*[.．]?\s*\d{2}/.test(NF(raw))) { t.hsGuess = false; t.v100hsBy = "利用者の答え"; } } catch (e) { err("aa", e); }
       return ok;
     };
   }
   if (fn("saveTen")) {
     var oST = window.saveTen;
     window.saveTen = function () {
-      try { var T0 = (typeof TEN !== "undefined") ? TEN : null; if (T0) { stripLabels(T0); if (Array.isArray(T0.compRows) && T0.compRows.length) moveNegRows(T0); } } catch (e) { err("save", e); }
+      try { var T0 = (typeof TEN !== "undefined") ? TEN : null; if (T0) { stripLabels(T0); if (Array.isArray(T0.compRows) && T0.compRows.length) { moveNegRows(T0); ingrFix(T0); } addCmpNotes(T0); } } catch (e) { err("save", e); }
       return oST.apply(this, arguments);
     };
   }
@@ -946,6 +1041,8 @@
 
   /* ══════════ 外した理由の訳（英・中・西）：この層が書く理由 ══════════ */
   var WHY_TR = [
+    [/^未解決の気づき「([\s\S]*?)」の数値（([\s\S]*?)）は、答えが出るまで表紙・見出しに使いません（追加ヒアリングで答えると使えます）$/, { en: "the figure in the open AI note “$1” is not used on the cover or headlines until it is answered (answer it in the follow-up questions)", zh: "未解决的提示“$1”中的数字在得到回答前不用于封面和标题（在追加询问中回答即可）", es: "la cifra de la nota pendiente «$1» no se usa en la portada ni en los titulares hasta responderla (responda en las preguntas de seguimiento)" }],
+    [/^比べる相手・試験の条件が登録に無い言い方（「([\s\S]*?)」）は、答えるまで表紙・見出しに使いません（追加ヒアリングで答えると使えます）$/, { en: "“$1” has no comparison basis or test conditions registered, so it is not used on the cover or headlines until answered (answer it in the follow-up questions)", zh: "“$1”未登记比较对象和检测条件，回答前不用于封面和标题（在追加询问中回答即可）", es: "«$1» no tiene base de comparación ni condiciones de ensayo registradas; no se usa en portada ni titulares hasta responder (responda en las preguntas de seguimiento)" }],
     [/^未解決の気づき「([\s\S]*?)」があるため、解決するまで資料に載せません（追加ヒアリングで答えると載せられます）$/, { en: "open AI note “$1”: not shown until it is resolved (answer it in the follow-up questions)", zh: "AI 提示“$1”尚未解决：解决前不放入资料（在追加询问中回答即可）", es: "nota de la IA pendiente «$1»: no se incluye hasta resolverla (responda en las preguntas de seguimiento)" }],
     [/^入力と食い違う主張（登録は「([\s\S]*?)」）$/, { en: "contradicts your input (registered as “$1”)", zh: "与输入不符（登记为“$1”）", es: "contradice lo registrado («$1»)" }],
     [/^登録の「([\s\S]*?)」と合わない主張$/, { en: "does not match the registered “$1”", zh: "与登记的“$1”不符", es: "no coincide con lo registrado «$1»" }],
@@ -958,6 +1055,261 @@
   if (fn("i13Why")) {
     var oIW = window.i13Why;
     window.i13Why = function (w, l) { try { var x = whyTr(w, l); if (x != null) return x; } catch (e) { err("whytr", e); } return oIW.apply(this, arguments); };
+  }
+
+  /* ══════════ 22.00.1 N1（高）入力した数字を「根拠に無い数字」として外さない（BFE99%・3歳以上） ══════════
+     土台の数字の読み取り（dk3NumsIn）は、英字のすぐ後の数字を品番として読み飛ばす（BFE99% の 99 が根拠の数字に入らない）。
+     「3歳以上」は「3 years and up」と同じ数字・単位と読めない。根拠の数字の表（C.N）に、英字にくっついた単位つきの数字と、
+     年齢（歳）を英語の言い方で足す（品番の数字は単位が無いので足さない）。 */
+  var NX_UNIT = "%|mm|cm|μm|um|nm|kg|mg|g|ml|mL|L|Pa|kPa|MPa|dB|°C|℃|V|W|kW|mAh|Wh|N";
+  function numExtra(txt) {
+    var s = NF(txt), out = [];
+    try {
+      s.replace(new RegExp("([A-Za-z])(\\d+(?:\\.\\d+)?)\\s*(" + NX_UNIT + ")(?![A-Za-z])", "g"), function (m, a, n, u) { out.push(n + u); return m; });
+      s.replace(/(\d+(?:\.\d+)?)\s*(?:歳|才)\s*(以上|から|〜|~|\+)?/g, function (m, n, up) { out.push(n + " years" + (up ? " and up" : "")); out.push(n + " years old"); out.push("対象 " + n); return m; });
+      /* N11（v1）：型番・規格番号の数字（KB-6204 の 6204・ISO 9001 の 9001・JIS B 1518）も根拠の数字に（英文で「the 6204」と書いても外さない） */
+      s.replace(/\b([A-Z]{1,6})[-‐ ]?([A-Z]?\s?)(\d{3,6})\b/g, function (m, a, b2, n) { out.push("型番 " + n); return m; });
+    } catch (e) { err("numx", e); }
+    return out;
+  }
+  V.numExtra = numExtra;
+  function mergeN(N, N2) {
+    try {
+      ["kv", "vals", "cnts", "ranks", "years"].forEach(function (k) { if (N2[k] && N[k]) N2[k].forEach(function (x) { N[k].add(x); }); });
+      if (N2.gen) { N.gen = N.gen || new Set(); N2.gen.forEach(function (x) { N.gen.add(x); }); }
+    } catch (e) { err("mergeN", e); }
+  }
+  if (fn("dk3Corpus")) {
+    var oCO = window.dk3Corpus;
+    window.dk3Corpus = function (T) {
+      var C = oCO.apply(this, arguments);
+      try {
+        if (C && C.N && Array.isArray(C.blocks) && fn("dk3NumBank")) {
+          var ex = numExtra(C.blocks.filter(function (b) { return b && b.trust !== "D"; }).map(function (b) { return b.txt; }).join("\n"));
+          if (ex.length) { mergeN(C.N, dk3NumBank(ex.join("\n"), T || curT())); C.v100nx = ex.slice(0, 20); cnt("numExtra", ex.length); }
+        }
+      } catch (e) { err("corpus", e); }
+      return C;
+    };
+  }
+
+  /* ══════════ 22.00.1 N3 創業地・沿革を根拠として読む（「Founded in Gifu」を「創業地の記載なし」で外さない） ══════════ */
+  function foundOk(txt, blocks) {
+    try {
+      if (!/\b(?:founded|established|started|began|set up|since)\b/i.test(txt) || !fn("dk3Places")) return null;
+      var P = dk3Places(txt); if (!P.size) return null;
+      var yrs = (txt.match(/\b(1[89]\d\d|20\d\d)\b/g) || []);
+      var rest = txt.replace(/\b(?:founded|established|started|began|set up|since|in|as|a|an|the|our|company|business|we|were|was|is|of|and|at|prefecture|city|japan|by|from)\b/gi, " ").replace(/\b(1[89]\d\d|20\d\d)\b/g, " ");
+      P.forEach(function (p) { rest = rest.replace(new RegExp("\\b" + p + "\\b", "gi"), " "); });
+      if (rest.replace(/[^A-Za-z]+/g, " ").trim().split(/\s+/).filter(function (w) { return w.length > 2; }).length > 4) return null;
+      var hit = null;
+      Object.keys(blocks).forEach(function (id) {
+        if (hit) return;
+        var b = String(blocks[id] || "");
+        var lines = b.split(/\n/).filter(function (l) { return /創業|設立|創立|founded|established/i.test(l); });
+        lines.forEach(function (l) {
+          if (hit) return;
+          var LP = dk3Places(l), ok = true;
+          P.forEach(function (p) { if (!LP.has(p)) ok = false; });
+          if (ok && yrs.every(function (y) { return l.indexOf(y) >= 0; })) hit = { id: id, t: l.trim().slice(0, 58) };
+        });
+      });
+      return hit && hit.t.length >= 6 ? hit : null;
+    } catch (e) { err("found", e); return null; }
+  }
+  V.foundOk = foundOk;
+
+  /* ══════════ 22.00.1 N5 比べる相手・試験の条件が無い「〜%減・〜倍・純正同等」は AI の気づきに載せ、答えが出るまで表紙・見出しにしない ══════════ */
+  var CMP_NUM = /(\d+(?:\.\d+)?)\s*(?:%|％|割)\s*(?:減|削減|低減|カット|ダウン|アップ|向上|増|改善|長持ち|長寿命|軽量化|省エネ)|(\d+(?:\.\d+)?)\s*倍/;
+  var CMP_EQ = /(純正|他社|従来品?|一般品|競合|OE|OEM)\s*(?:品)?\s*(?:同等|並み|以上|比|クラス)/;
+  var CMP_REF = /比べ|比較|対比|に対し|より|vs\.?|従来比|当社比|他社比|純正比|比で|品比|社比|比\s*[−-]?\d/;
+  var CMP_TEST = /試験|テスト|測定|JIS|ISO|EN\s?\d|ASTM|第三者|社内|規格|条件|データ|実測/;
+  var CMP_TAG = "（比較の相手）";
+  function cmpNotes(T) {
+    var out = [];
+    try {
+      if (!T) return out;
+      var L = [];
+      (Array.isArray(T.strengths) ? T.strengths : []).forEach(function (s) { if (Array.isArray(s)) L.push([s[0], s[1]].filter(Boolean).join("：")); else if (s) L.push(String(s)); });
+      if (T.desc) L.push(String(T.desc));
+      L.forEach(function (raw) {
+        splitTop(NF(raw)).forEach(function (c) {
+          if (!(CMP_NUM.test(c) || CMP_EQ.test(c))) return;
+          if (CMP_REF.test(c) || CMP_TEST.test(c)) return;
+          var n = "「" + c.slice(0, 24) + "」は、何に比べての数字・言い方か" + CMP_TAG + "と試験の条件が登録にありません。追加ヒアリングで答えてください（答えるまで資料の表紙・見出しには使いません）";
+          if (out.indexOf(n) < 0) out.push(n);
+        });
+      });
+    } catch (e) { err("cmp", e); }
+    return out;
+  }
+  V.cmpNotes = cmpNotes;
+  function addCmpNotes(T) {
+    try {
+      if (!T) return 0;
+      var add = cmpNotes(T); if (!add.length) return 0;
+      T.aiNotes = Array.isArray(T.aiNotes) ? T.aiNotes : [];
+      var n = 0;
+      add.forEach(function (x) { if (T.aiNotes.indexOf(x) < 0) { T.aiNotes.push(x); n++; } });
+      if (n) cnt("cmpNote", n);
+      return n;
+    } catch (e) { err("addcmp", e); return 0; }
+  }
+  V.addCmpNotes = addCmpNotes;
+  function cmpMatchers(notes) {
+    var out = [];
+    (notes || []).forEach(function (n0) {
+      var n = NF(n0); if (n.indexOf(CMP_TAG.normalize("NFKC")) < 0 && n.indexOf(CMP_TAG) < 0) return;
+      var q = (n.match(/「([^」]{1,30})」/) || [])[1] || "";
+      var m = q.match(/(\d+(?:\.\d+)?)\s*(?:%|％|割)/);
+      if (m) out.push({ note: n0, re: new RegExp("\\b" + m[1].replace(".", "\\.") + "\\s?%|\\b" + m[1].replace(".", "\\.") + " percent", "i"), lab: q, head: 1 });
+      var x = q.match(/(\d+(?:\.\d+)?)\s*倍/);
+      if (x) out.push({ note: n0, re: new RegExp(MULT[+x[1]] || ("\\b" + x[1] + "\\s?(?:x|times)"), "i"), lab: q, head: 1 });
+      if (CMP_EQ.test(q)) out.push({ note: n0, re: /\bequivalent to (?:the |an? )?(?:original|OE|OEM|genuine)\b|\bOE[- ]?(?:equivalent|level|quality)\b|\bOEM[- ]?(?:equivalent|level|quality)\b|\bsame as (?:the )?(?:original|genuine)\b/i, lab: q, head: 1 });
+    });
+    return out;
+  }
+  V.cmpMatchers = cmpMatchers;
+
+  /* ══════════ 22.00.1 N13 英文の細かい誤り（文頭の小文字・1件なのに複数・試験の名前が落ちる） ══════════ */
+  var CAP_SKIP = /^(?:iphone|ipad|ipod|imac|ebay|e-\w+|ph|ml|mg|kg|km|mm|cm|x|vs|etc|e\.g|i\.e)$/i;
+  function engFix(s) {
+    var t = String(s == null ? "" : s), why = [];
+    var m = t.match(/^(\s*)([a-z])([a-z]+)(\b[\s\S]*)$/);
+    if (m && !CAP_SKIP.test(m[2] + m[3]) && t.trim().split(/\s+/).length >= 3) { t = m[1] + m[2].toUpperCase() + m[3] + m[4]; why.push("文頭の小文字"); }
+    var t2 = t.replace(/\b1 (required |missing |more )?items\b/g, "1 $1item").replace(/(\b1 (?:required |missing |more )?item\b[^.]*?),\s*so they are\b/g, "$1, so it is").replace(/(\b1 (?:required |missing |more )?item\b[^.]*?)\bthey are marked\b/g, "$1it is marked");
+    if (t2 !== t) { t = t2; why.push("1件なのに複数"); }
+    return why.length ? { t: t, why: why.join("・") } : null;
+  }
+  V.engFix = engFix;
+
+  /* ══════════ 22.00.1（検証役 v1）N2 原材料・N3 INCI の登録の形を正しく／N17 買い手向けの文に登録の不備・内部の言葉を書かない ══════════ */
+  var SPEC_LAB = /^(?:内容量|正味量|賞味期限|消費期限|使用期限|保存方法|原産国|原産地|製造国|サイズ|寸法|重量|重さ|入数|材質|素材|容量|規格|型番|品番|色|カラー|形状|対象年齢|栄養成分|エネルギー|熱量|たんぱく質|脂質|炭水化物|食塩相当量|ナトリウム|アレルゲン|アレルギー|特定原材料|アレルゲンの注意書き|補足|備考|原材料名?|全成分|成分)$/;
+  function ingrFix(t) {
+    var ch = 0;
+    try {
+      if (!t || !Array.isArray(t.compRows) || t.compRows.length < 1) return 0;
+      var cols = Array.isArray(t.compCols) ? t.compCols.map(NF) : [];
+      var foodish = /food|liquor|supp|pet/.test(String(t.catKey || "")) || /食品|ペット|飲料|酒|サプリ|菓子|調味|味噌|茶/.test(NF(t.cat || "") + NF(t.item || "")) || t.compRows.some(function (r) { return Array.isArray(r) && /^(?:アレルゲン|アレルギー|特定原材料)/.test(NF(r[0] || "")); });
+      /* N3：化粧品の表（表示名称｜INCI）で、1つ目の欄に「和名（INCI 名 (別名)）」「INCI 名/和名」が入り INCI の欄が空 → 分ける */
+      var ii = cols.findIndex(function (c) { return /INCI/i.test(c); });
+      var ni = cols.findIndex(function (c, k) { return k !== ii && /表示名称|和名|成分/.test(c); });
+      if (ii >= 0) {
+        if (ni < 0) ni = ii === 0 ? 1 : 0;
+        t.compRows = t.compRows.map(function (r) {
+          if (!Array.isArray(r)) return r;
+          var a = r.slice(), nm = NF(a[ni] || "").trim(), inci = NF(a[ii] || "").trim();
+          if (inci || !nm) return a;
+          var m = nm.match(/^([^()（）]+?)\s*[（(]\s*(.*[A-Za-z].*)\s*[）)]\s*$/);
+          if (m && /[ぁ-ゖァ-ヺ一-龯]/.test(m[1])) { a[ni] = m[1].trim(); a[ii] = m[2].trim(); ch++; return a; }
+          var s2 = nm.split(/\s*[\/／]\s*/);
+          if (s2.length === 2) { var en = s2.filter(function (x) { return /^[A-Za-z]/.test(x); })[0], ja = s2.filter(function (x) { return /[ぁ-ゖァ-ヺ一-龯]/.test(x); })[0]; if (en && ja) { a[ni] = ja; a[ii] = en; ch++; } }
+          return a;
+        });
+      } else if (foodish && cols.length <= 3) {
+        /* N2：食品の成分表で、原材料が「値の無い行」に分かれて登録されている（有機大豆（国産）｜—｜—）→「原材料名｜有機大豆（国産）、有機米（国産）、食塩」の1行に */
+        var empty = function (v) { var x = NF(v == null ? "" : v).trim(); return !x || /^(?:—|-|ー|－|―)$/.test(x); };
+        var ing = [], keep = [], hasIngRow = t.compRows.some(function (r) { return Array.isArray(r) && /^原材料名?$/.test(NF(r[0] || "").trim()) && !empty(r[1]); });
+        t.compRows.forEach(function (r) {
+          if (Array.isArray(r) && r[0] && r.slice(1).every(empty) && !SPEC_LAB.test(NF(r[0]).trim()) && !/[:：]/.test(String(r[0])) && NF(r[0]).length <= 30) ing.push(String(r[0]).trim());
+          else keep.push(r);
+        });
+        if (ing.length && !hasIngRow) { var row = ["原材料名", ing.join("、")]; while (row.length < Math.max(2, cols.length)) row.push(""); t.compRows = [row].concat(keep); ch += ing.length; }
+      }
+      if (ch) { cnt("ingrFix", ch); lg({ k: "ingrFix", n: ch }); }
+    } catch (e) { err("ingrfix", e); }
+    return ch;
+  }
+  V.ingrFix = ingrFix;
+  /* 買い手向けの文に、登録の不備・未入力・アプリの内部の言葉を書かない（N3「no INCI entry is supplied」・N17「The registered product information states…」） */
+  var INT_DROP = /\bno\s+[A-Za-z][A-Za-z ()-]{0,30}?\s+(?:is|are|was|were|has been|have been)\s+(?:supplied|provided|entered|registered|available|given)\b|\b(?:is|are)\s+not\s+(?:yet\s+)?(?:supplied|provided|entered|registered)\b|\bnot\s+(?:yet\s+)?(?:registered|entered)\s+in\s+the\s+(?:app|system|platform|registration)\b|\b(?:is|are)\s+registered\s+(?:in|under)\s+the\s+[A-Za-z ]{1,30}\s+category\b|未登録|未入力|登録されていません/i;
+  function intFix(s) {
+    var t = String(s == null ? "" : s), o = t, why = [];
+    t = t.replace(/(^|[.!?]\s+)(?:The\s+)?registered\s+(?:product\s+)?(?:information|data|details|record)\s+(?:states|shows|indicates|says|lists)\s+(?:that\s+)?([a-z])/gi, function (m, a, c) { why.push("登録の読み上げ調"); return a + c.toUpperCase(); });
+    t = t.replace(/(^|[.!?]\s+)(?:As\s+)?registered,\s*/gi, function (m, a) { why.push("登録の読み上げ調"); return a; });
+    t = t.replace(/\bRegistered\s+(trade terms|payment terms|lead time|MOQ|minimum order quantity|origin|port of loading)\s+(are|is)\b/g, function (m, a, b) { why.push("登録の読み上げ調"); return a.charAt(0).toUpperCase() + a.slice(1) + " " + b; });
+    t = t.replace(/(^|[.!?]\s+)Registered\s+as\s+([a-z])/g, function (m, a, c) { why.push("登録の読み上げ調"); return a + c.toUpperCase(); });
+    var parts = sents(t), keep = [];
+    parts.forEach(function (x) {
+      if (!INT_DROP.test(x)) { keep.push(x); return; }
+      var cl = x.split(/\s*;\s*/);
+      var ok2 = cl.filter(function (c) { return !INT_DROP.test(c); });
+      if (ok2.length && ok2.length < cl.length) { keep.push(ok2.join("; ").replace(/[,;\s]+$/, "") + (/[.!?]$/.test(ok2[ok2.length - 1]) ? "" : ".")); why.push("登録の不備の言葉"); }
+      else why.push("登録の不備の言葉");
+    });
+    t = keep.join(" ");
+    if (t === o) return null;
+    return { t: t.replace(/\s{2,}/g, " ").trim(), why: why.join("・") };
+  }
+  V.intFix = intFix;
+
+  /* ══════════ 22.00.1 N6 商材カテゴリの答えを入力どおりに（「日用品・衛生用品」を AI が「医療・衛生用品」に決め直さない） ══════════ */
+  function catFix(raw, val, chips) {
+    var R = NF(raw), Vv = NF(val || "");
+    var list = Array.isArray(chips) && chips.length ? chips : ["食品", "化粧品", "工業部品", "日用雑貨", "中古車", "酒類", "アパレル", "医療・衛生用品", "その他"];
+    var exact = list.filter(function (c) { return R.indexOf(NF(c)) >= 0; }).sort(function (a, b) { return b.length - a.length; })[0];
+    if (exact) return exact === Vv ? null : exact;
+    if (/医療・衛生用品/.test(Vv) && !/医療|医薬|病院|医師|クリニック|医療機器|メディカル/.test(R) && /日用|生活|家庭|雑貨|衛生|除菌|清掃|洗剤/.test(R) && list.indexOf("日用雑貨") >= 0) return "日用雑貨";
+    return null;
+  }
+  V.catFix = catFix;
+
+  /* ══════════ 22.00.1 N10 問いに合わない追加ヒアリングの答えで、AI の気づきを「解決済み」にしない ══════════ */
+  function kw(s) { return (NF(s).match(/[ァ-ヶー]{3,}|[一-龠々]{2,}|[A-Za-z]{3,}\d*|\d+(?:\.\d+)?/g) || []).map(function (w) { return w.toLowerCase(); }); }
+  function answerFits(note, q, a) {
+    try {
+      var A = NF(a).trim(); if (!A) return false;
+      var needNum = /温度|℃|条件|数値|何\s*[%％度日年時分]|何か月|期間|時間|濃度|割合|比率|何回|容量|重さ|寸法|試験の結果|測定|どのくらい|いくつ/.test(NF(note) + NF(q));
+      var hasNum = /\d/.test(A);
+      var K = kw(note + " " + q).filter(function (w) { return !/^\d/.test(w) && !/^(?:ありま|ください|ですか|確認|資料|商品|記載|必要|記録|情報|登録|可能|対応|場合)$/.test(w); });
+      var KA = kw(A);
+      var share = KA.some(function (w) { return K.some(function (k) { return k.length >= 2 && (k.indexOf(w) >= 0 || w.indexOf(k) >= 0); }); });
+      if (needNum) return hasNum && share;
+      return share || (A.length >= 12 && !/^(?:はい|いいえ|ok|了解|特になし|なし)$/i.test(A));
+    } catch (e) { return true; }
+  }
+  V.answerFits = answerFits;
+  if (fn("v68pNotes")) {
+    var oPN = window.v68pNotes;
+    window.v68pNotes = function (t) {
+      var L = oPN.apply(this, arguments);
+      try {
+        (L || []).forEach(function (x) {
+          if (x && x.done && x.by === "追加ヒアリング" && x.qa && !answerFits(x.n, x.qa.q, x.qa.a)) { x.done = false; x.by = ""; x.v100unfit = 1; cnt("noteUnfit"); }
+        });
+      } catch (e) { err("pnotes", e); }
+      return L;
+    };
+  }
+  /* N8：未解決の気づきに挙がった数値（「…除菌99.9%表示が難しい」「0.8mm/s の測定条件」）は、表紙・見出し・数字のカード・1枚の紹介に使わない */
+  function headMatchers(notes, F) {
+    var out = cmpMatchers(notes);
+    /* 入力に試験の根拠ごと書かれた数字（BFE99%（第三者試験））は、気づきに挙がっていても見出しに使ってよい（N5：試験の根拠がある数字を優先） */
+    var tested = [];
+    try { ((F && F.texts) || []).forEach(function (x) { splitTop(x.text).concat([x.text]).forEach(function (c) { if (CMP_TEST.test(c)) (c.match(/\d+(?:\.\d+)?/g) || []).forEach(function (v) { tested.push(v); }); }); }); } catch (e) { /* 無視 */ }
+    (notes || []).forEach(function (n0) {
+      var n = NF(n0);
+      if (n.indexOf("(比較の相手)") >= 0 || n.indexOf("（比較の相手）") >= 0) return;
+      (n.match(/\d+(?:\.\d+)?\s*(?:%|mm\/s|mm|cm|kg|g|ml|mL|℃|°C|dB|μm|倍|か月|年)/g) || []).forEach(function (q) {
+        var v = (q.match(/\d+(?:\.\d+)?/) || [""])[0];
+        /* 試験の根拠がある数字でも、気づきが規制・表示の問題（EPA 登録なしで表示が難しい など）なら表紙に使わない */
+        var regIssue = /EPA|FDA|登録なし|登録が(?:必要|要)|表示(?:が|は)?(?:難し|できな)|規制|違反|許可|届出|承認|認可|法令|薬機|景品表示/.test(n);
+        if (!v || /^(?:19|20)\d\d$/.test(v) || (tested.indexOf(v) >= 0 && !regIssue)) return;
+        var u = q.replace(v, "").trim();
+        var src = "\\b" + v.replace(".", "\\.") + "\\s?" + (u === "%" ? "%" : u === "倍" ? "(?:x|times)" : u.replace("/", "\\/"));
+        out.push({ note: n0, re: new RegExp(src, "i"), lab: q, head: 1, kind: "note" });
+      });
+    });
+    return out;
+  }
+  V.headMatchers = headMatchers;
+  /* N11・N14：型番・規格番号（KB-6204・ISO 9001）の数字を、照合で「根拠に無い数字」としない／案内文の番号（Reply with 1, 2 or 3）を数えない */
+  if (fn("v86dkElText")) {
+    var oET = window.v86dkElText;
+    window.v86dkElText = function (e) {
+      var t = oET.apply(this, arguments);
+      try { return String(t || "").replace(/\b\d{1,2}(?:\s*,\s*\d{1,2})*\s*,?\s*(?:or|and|y|o|ou|et|oder|und|或|或者|还是)\s*\d{1,2}\b/gi, " ").replace(/(^|\n)\s*\d{1,2}[.)]\s+/g, "$1"); } catch (x) { return t; }
+    };
   }
 
   /* ══════════ 資料の中の食い違いを見つける検査（試験の道具・画面からも呼べる） ══════════ */
