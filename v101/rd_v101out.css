@@ -1,0 +1,15 @@
+/* v22.01 out（見せ方）：加工した写真の知らせ・納品版の不足の案内 */
+.v101out-ed{border-color:var(--warn,#d97706)}
+.v101out-ed.ok{border-color:var(--good,#16a34a)}
+.v101out-ed h3,.v101out-gate h3{margin:0 0 6px;font-size:14px;line-height:1.5}
+.v101out-row{gap:8px;margin-top:8px;flex-wrap:wrap}
+.v101out-gate{border-color:var(--bl,#2563eb)}
+.v101out-gl{margin:6px 0 0;padding:0;list-style:none}
+.v101out-gl li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:6px 0;border-bottom:1px dashed var(--line-2,#ddd)}
+.v101out-gl li b{font-size:12.5px}
+.v101out-gl li .nn{flex:1 1 220px;font-size:11.5px;color:var(--ink-2,#555);min-width:0;overflow-wrap:anywhere}
+.v101out-gl li .btn{font-size:11.5px;padding:3px 10px}
+.v101out-cgo{margin:6px 0 0;font-size:12px}
+@media (max-width:600px){.v101out-gl li{display:block}.v101out-gl li .nn{display:block}.v101out-gl li .btn{margin-top:4px}.v101out-row .btn,.v101out-cgo{max-width:100%;white-space:normal}}
+.v101out-p{margin:4px 0 0;font-size:12.5px;line-height:1.7;color:var(--ink-2,#444);overflow-wrap:anywhere}
+.v101out-ed.ok .v101out-p{color:var(--good,#15803d);font-weight:700}

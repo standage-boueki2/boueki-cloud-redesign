@@ -1,0 +1,56 @@
+/* v22.01 fwd（第14回 UAT No.625〜628・期待以上）物流会社の画面の見せ方 */
+/* No.625 受信箱：貴社の回答状況・見積合計（貴社の金額を先に） */
+.v101famt{display:inline-flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.35}
+.v101famt b{font-weight:700;white-space:nowrap}
+.v101famt.none b{color:var(--rd-ink-2,#4b5563);font-weight:600}
+.v101famt small{font-size:10px;color:var(--rd-ink-3,#6b7280);font-weight:400;white-space:normal}
+.v101fsts{display:block;font-size:10px;color:var(--rd-ink-3,#6b7280);margin-top:2px;line-height:1.35}
+.v101fothd{display:block;font-size:9.5px;color:var(--rd-ink-3,#6b7280)}
+.v101fnote{margin:8px 0 4px;padding:8px 10px;border-radius:8px;background:var(--rd-bg-2,#f5f7fa);border:1px solid var(--rd-line,#e5e7eb);font-size:12px;line-height:1.6;color:var(--rd-ink-2,#374151)}
+.v101fnote b{color:var(--rd-ink,#111827)}
+.v101fchip.on{background:var(--rd-pri,#2563eb);color:#fff;border-color:var(--rd-pri,#2563eb)}
+/* 明細の窓 */
+.v101fstw{background:#fff3e0 !important;color:#9a4a00 !important;border-color:#f3c58a !important}
+.v101fownd{margin:8px 0;padding:9px 11px;border-radius:8px;border:1px solid #f3c58a;background:#fff8ee;font-size:12.5px;line-height:1.65;color:#3b2a12}
+.v101fownd.own{border-color:#bfe3c7;background:#f1faf3;color:#173b22}
+.v101fownd b{display:block;margin-bottom:2px}
+.v101fblx,.v101fdocs{margin:6px 0;font-size:11.5px;line-height:1.6;color:var(--rd-ink-2,#374151)}
+.v101fblx ul,.v101fvolsrc ul{margin:4px 0 0 1.1em;padding:0}
+.v101fblx li,.v101fvolsrc li{margin:1px 0}
+/* No.626 案件：容積の出どころ */
+.v101fvolsrc{margin:8px 0;padding:9px 11px;border-radius:8px;border:1px solid var(--rd-line,#e5e7eb);background:var(--rd-bg-2,#f8fafc);font-size:12px;line-height:1.6}
+.v101fvolsrc .ok{color:#15803d;font-weight:600}
+.v101fvolsrc .ng{color:#b45309;font-weight:600}
+.v101fvolbarx{display:block;margin-top:3px;font-size:11.5px;line-height:1.55;font-weight:400}
+.v101fcasedocs{margin:6px 0 10px;font-size:12px;line-height:1.6;color:var(--rd-ink-2,#374151)}
+/* ホーム：自動回答が少ない理由と次の一手 */
+.v101fhide99 .v99fwhyn{display:none !important}
+.v101fwhy{display:block;font-size:10.5px;line-height:1.45;color:var(--rd-ink-2,#374151);margin-top:2px}
+.v101fnext{margin:12px 0;padding:12px 14px;border-radius:10px;border:1px solid var(--rd-line,#e5e7eb);background:var(--rd-bg,#fff)}
+.v101fnext h3{margin:0 0 6px;font-size:14px}
+.v101fnext ol{margin:4px 0 0 1.2em;padding:0}
+.v101fnext li{margin:6px 0;font-size:12.5px;line-height:1.6}
+.v101fnext li button{margin:3px 0 0;display:inline-block}
+.v101fnext p{margin:6px 0 0;font-size:11.5px;color:var(--rd-ink-3,#6b7280);line-height:1.55}
+/* No.627 相見積：同じ国・同じ港は1行 */
+tr.v101faggoff{display:none !important}
+.v101faggm{margin-top:4px;font-size:10px;line-height:1.5;color:var(--rd-ink-2,#4b5563);font-weight:400}
+.v101faggm span{display:block}
+.v101faggb{display:block;margin-top:3px;font-size:9.5px;line-height:1.45;color:var(--rd-ink-3,#6b7280)}
+.v101faggon .v100faggdup{display:none !important}
+td.v101ftd > small.v97ttest{display:none !important}
+b.v101ftt{display:block;font-weight:700}
+.v101ftt0{display:block;font-size:9.5px;color:var(--rd-ink-3,#6b7280);font-weight:400}
+/* No.628 レート管理：区間のレートで答える */
+.v101fspot{margin:6px 0 4px;padding:7px 10px;border-radius:8px;background:#fff8ee;border:1px solid #f3c58a;font-size:11.5px;line-height:1.6;color:#3b2a12}
+.v101fpre{margin:4px 0;padding:6px 10px;border-radius:8px;background:#eef5ff;border:1px solid #c7dcf7;font-size:11.5px;line-height:1.6;color:#13315c}
+@media (prefers-color-scheme: dark){
+  .v101fownd{background:#2b2111;border-color:#7a5a24;color:#f6e7cf}
+  .v101fownd.own{background:#12261a;border-color:#2f6b40;color:#d5f0dc}
+  .v101fspot{background:#2b2111;border-color:#7a5a24;color:#f6e7cf}
+  .v101fpre{background:#0f2236;border-color:#2c4f78;color:#d6e6fb}
+}
+@media (max-width:600px){
+  .v101famt{align-items:flex-start}
+  .v101fnext li button{display:block;width:100%;white-space:normal}
+}

@@ -1,0 +1,839 @@
+/* 22.01 hear：中身（データ・判定・AI の扱い）。見せ方は rd_v101hear.css／rd_v101hear.js（刷新版）。2026-11-22 第14回 UAT〔22.00.1〕の直し
+   No.610（中）寸法・重量：資料に無い商品で「出荷案件・見積書を作るには…足りないのは 寸法・重量です」で書類が作れない。
+     「不明（資料に記載なし）」と入れると通り、数字でない値が寸法・重量として登録され、STEP01 の充足度にも数えられた。
+     原因：①書類の画面の「寸法・重量を入れる」は、何の表か分からない2列の表（項目／内容）を開くだけ。保存（tblSave）は中身を確かめずに
+           寸法の行として登録し、値があるかだけで数える充足度（v92prodFill・scoreOf）も「入っている」に数えた。
+           ②寸法が無いと出荷案件（buildShip）を作らないので、寸法が要らない見積書・請求書まで作れなかった（v68 の案内の箱だけになる）。
+     直し：・window.v101num(v)（数字として読めるか）・window.v101numVal(v)・window.v101dims(ten)（取り決め：外装〔カートン〕と単品を分けて読む）
+           ・「不明」「わからない」「資料に記載なし」などは、寸法・価格・MOQ・リードタイム・入数の値として登録しない（TEN.v101hunk に「未確認」として控える）。
+             ほかの欄（産地・認証・期限など）も、その言葉だけの値は充足度に数えない（値は消さない）
+           ・足りないときの案内に、単品／外装（カートン）の寸法・重さ・入数を単位つきで入れる欄と「まだ分からない」を出す（rd 側）。
+             「まだ分からない」を選ぶと、見積書・PI・請求書は作れる（出荷案件は寸法「未確認」で作る）。梱包明細・船積依頼書（S/I）・運賃の見積は「要確認」にして、寸法を入れるまで止める。
+   No.612（低）件数：「あとで、にした4項目」なのに5つに見える（項目名の中の「・」と区切りの「・」が同じ）。「AI追加ヒアリング4件」なのに質問は3問
+           （成分の答えから移した「不使用の主張」〔v100 fact〕まで数えていた）。→ 項目は「」で1つずつ囲む。件数は並べた項目・実際の質問から数える。
+   No.613（低）強み：1通にまとめて送ると「1件」、残りを個別に送ると同じ内容が2回ずつ。→ まとめた強みを分けて数え、重なり（同じ・含む）は登録しない。
+   No.614（低）材質表：1行目が「原材料名／RoHS・REACH 対応は資料に記載なし」。→ 規制の注記（RoHS・REACH・記載なし など）は表の行にせず、表の注記（TEN.v101regNote）へ。
+           工業部品などの表の項目名に「原材料名」を使わない。
+   No.518 の残り：「医療機器ではない」と答えたのに、任意項目に「医療機器のクラス分類」、AI も「どのクラス（Class I／II）ですか」。
+           → 否定の答え（医療機器ではない・食品に触れない・電池なし・滅菌なし・防腐剤なし・保証なし・アレルゲンなし）のあとは、
+             それを前提にした問い（AI の追加ヒアリング・任意項目）を出さない。
+   失敗しても画面が止まらないよう try/catch。最後のエラーは window.V101HEAR.err。 */
+var V101HEAR = window.V101HEAR || { err: null, errs: [], ver: "22.01-hear", n: {}, log: [] };
+window.V101HEAR = V101HEAR;
+(function () {
+  "use strict";
+  const W = window, V = V101HEAR;
+  if (W.__v101hearLogic) return;
+  W.__v101hearLogic = 1;
+  const err = (k, e) => { try { const s = k + ": " + String((e && (e.stack || e.message)) || e).slice(0, 300); V.err = s; V.errs.push(s); if (V.errs.length > 40) V.errs.shift(); } catch (x) { /* 記録だけ */ } };
+  V.e = err;
+  const cnt = (k, n) => { V.n[k] = (V.n[k] || 0) + (n || 1); };
+  const lg = (o) => { try { V.log.push(Object.assign({ at: Date.now() }, o)); if (V.log.length > 60) V.log.shift(); } catch (e) { /* 無視 */ } };
+  const ten = () => { try { return typeof TEN !== "undefined" ? TEN : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const fillO = () => { try { return typeof FILL !== "undefined" && FILL ? FILL : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const dd = () => { try { return typeof D !== "undefined" && D ? D : null; } catch (e) { return null; } }; // eslint-disable-line no-undef
+  const fn = (n) => { try { const f = W[n]; return typeof f === "function" ? f : null; } catch (e) { return null; } };
+  const lang = () => { try { const el = document.getElementById("lang"); const v = String((el && el.value) || (W.I18N && W.I18N.lang) || document.documentElement.lang || "ja"); return /^en/.test(v) ? "en" : /^zh/.test(v) ? "zh" : /^es/.test(v) ? "es" : "ja"; } catch (e) { return "ja"; } };
+  const M = (ja, en, zh, es) => { const l = lang(); return l === "en" ? (en || ja) : l === "zh" ? (zh || en || ja) : l === "es" ? (es || en || ja) : ja; };
+  const E = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const NF = (s) => { let x = String(s == null ? "" : s); try { x = x.normalize("NFKC"); } catch (e) { /* そのまま */ } return x; };
+  const userT = (t) => !!(t && (t.src === "upload" || t.src === "sample2"));
+  const save = () => { try { if (typeof saveTen === "function") saveTen(); } catch (e) { err("save", e); } }; // eslint-disable-line no-undef
+  const toast = (m) => { try { if (typeof W.toast === "function") W.toast(m); } catch (e) { /* 無視 */ } };
+  V.M = M; V.E = E; V.NF = NF; V.lang = lang; V.cnt = cnt;
+  // 包む（同じ関数を何度包んでも二重にかからないよう、印を付ける）
+  function wrap(name, mk) {
+    try {
+      const o = W[name];
+      if (typeof o !== "function") return false;
+      const f = mk(o);
+      f.__v101hear = (o.__v101hear || 0) + 1;
+      W[name] = f;
+      try { if (typeof globalThis[name] === "function" && globalThis[name] !== f) globalThis[name] = f; } catch (e) { /* 無視 */ }
+      return true;
+    } catch (e) { err("wrap:" + name, e); return false; }
+  }
+  V.wrap = wrap;
+
+  /* ════════════ No.610 ① 数字として読めるか（取り決め） ════════════ */
+  const UNKW = /不明|わから|分から|判ら|わかりません|分かりません|知らない|しらない|未確認|記載(?:が|は)?(?:な|無)|資料に(?:な|無)|未記載|載って(?:い)?(?:ない|ません)|不詳|未定|調査中|確認中|検討中|未測定|測って(?:い)?(?:ない|ません)|はかって(?:い)?(?:ない|ません)|あとで|後で|まだ(?:ない|無い|ありません|分から|わから)|unknown|not\s*(?:known|stated|available|sure|specified)|\bn\/?a\b|\btbd\b|\btbc\b|to be (?:confirmed|determined)/i;
+  function isUnk(v) {
+    if (v == null) return false;
+    if (Array.isArray(v)) { const a = v.filter((x) => x != null && String(x).trim()); return a.length > 0 && a.every(isUnk); }
+    const s = NF(v).trim();
+    if (!s) return false;
+    if (/\d/.test(s)) return false; // 数字が入っていれば値（一部が分からないだけ）
+    if (UNKW.test(s)) return true;
+    return /^[?？\-—ー－‐・.。…]+$/.test(s);
+  }
+  V.isUnk = isUnk;
+  W.v101isUnk = isUnk;
+  const KANJI = { "〇": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
+  function numVal(v) {
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    if (v == null) return null;
+    const s0 = NF(v).trim();
+    if (!s0 || isUnk(s0)) return null;
+    const s = s0.replace(/(\d),(?=\d{3}(?!\d))/g, "$1");
+    const m = s.match(/-?\d+(?:\.\d+)?/);
+    if (m) { const x = parseFloat(m[0]); return isFinite(x) ? x : null; }
+    const k = s.match(/^[〇一二三四五六七八九]$/);
+    return k ? KANJI[k[0]] : null;
+  }
+  // 数値として読めるか（「不明」「わからない」「資料に記載なし」は false）
+  W.v101num = function (v) { try { return numVal(v) != null; } catch (e) { err("num", e); return false; } };
+  W.v101numVal = function (v) { try { return numVal(v); } catch (e) { err("numVal", e); return null; } };
+
+  /* 寸法の文字（mm の「400×300×250」・「φ47×14」）→ cm */
+  function mmTriple(s) {
+    s = NF(s).replace(/[✕＊*xX]/g, "×").trim();
+    if (!s || isUnk(s)) return null;
+    const phi = /^[φΦ]/.test(s) || /直径/.test(s);
+    const ns = (s.match(/\d+(?:\.\d+)?/g) || []).map(parseFloat).filter((x) => isFinite(x));
+    if (!ns.length) return null;
+    const unit = /cm|センチ/i.test(s) ? 10 : /(?<![a-z])m(?![a-z])|メートル/i.test(s) && !/mm/i.test(s) ? 1000 : 1;
+    const cm = (x) => Math.round(((x * unit) / 10) * 100) / 100;
+    if (phi) return { l: cm(ns[0]), wd: cm(ns[0]), h: ns[1] != null ? cm(ns[1]) : null };
+    return { l: cm(ns[0]), wd: ns[1] != null ? cm(ns[1]) : null, h: ns[2] != null ? cm(ns[2]) : null };
+  }
+  function kgOf(s) {
+    s = NF(s).trim();
+    if (!s || isUnk(s)) return null;
+    const m = s.match(/(\d+(?:[.,]\d+)?)\s*(kg|キログラム|キロ|グラム|g)?(?![a-z])/i);
+    if (!m) return null;
+    const x = parseFloat(m[1].replace(/,(?=\d{3}\b)/, "").replace(",", "."));
+    if (!isFinite(x)) return null;
+    const u = String(m[2] || "").toLowerCase();
+    return Math.round((u === "g" || u === "グラム" ? x / 1000 : x) * 10000) / 10000;
+  }
+  function cntOf(s) { const m = NF(s).match(/(\d+)/); return m ? +m[1] : null; }
+  const V54COLS = /単品\s*W×D×H|単品重量|入数|外装\s*W×D×H|外装重量/;
+  function colIdx(cols, re) { return (Array.isArray(cols) ? cols : []).findIndex((c) => re.test(NF(c))); }
+  // 寸法・重量の表を読む（外装〔カートン〕と単品を分けて）
+  function readDims(t) {
+    const out = { unit: { l: null, wd: null, h: null, w: null }, carton: { l: null, wd: null, h: null, w: null }, perCtn: null };
+    try {
+      const rows = (Array.isArray(t && t.dimRows) ? t.dimRows : []).filter((r) => Array.isArray(r) && r.some((x) => x != null && String(x).trim()));
+      if (!rows.length) return out;
+      const cols = Array.isArray(t.dimCols) ? t.dimCols : [];
+      const put = (o, k, v) => { if (o[k] == null && v != null) o[k] = v; };
+      const putD = (o, tr) => { if (tr) { put(o, "l", tr.l); put(o, "wd", tr.wd); put(o, "h", tr.h); } };
+      if (cols.filter((c) => V54COLS.test(NF(c))).length >= 3) {
+        const iU = colIdx(cols, /単品\s*W×D×H/), iUw = colIdx(cols, /単品重量/), iC = colIdx(cols, /入数/), iO = colIdx(cols, /外装\s*W×D×H/), iOw = colIdx(cols, /外装重量/);
+        rows.forEach((r) => {
+          if (iU >= 0) putD(out.unit, mmTriple(r[iU]));
+          if (iUw >= 0) put(out.unit, "w", kgOf(r[iUw]));
+          if (iC >= 0) put(out, "perCtn", cntOf(r[iC]));
+          if (iO >= 0) putD(out.carton, mmTriple(r[iO]));
+          if (iOw >= 0) put(out.carton, "w", kgOf(r[iOw]));
+        });
+        return out;
+      }
+      // ほかの形の表：行の文字をつないで、単品／外装の言葉で分けて読む（土台の読み取りと同じ v54upldDims を使えれば使う）
+      const txt = rows.map((r) => r.filter((x) => x != null && String(x).trim()).join(" ")).join("／");
+      if (fn("v54upldDims")) {
+        const r = W.v54upldDims(txt, "");
+        if (r && Array.isArray(r.rows) && r.rows[0]) {
+          const x = r.rows[0];
+          putD(out.unit, x[1] ? mmTriple(x[1]) : null); put(out.unit, "w", x[2] ? kgOf(x[2]) : null);
+          put(out, "perCtn", x[3] ? cntOf(x[3]) : null);
+          putD(out.carton, x[4] ? mmTriple(x[4]) : null); put(out.carton, "w", x[5] ? kgOf(x[5]) : null);
+        }
+      }
+    } catch (e) { err("readDims", e); }
+    return out;
+  }
+  const DIM_NM = { l: ["縦", "length"], wd: ["横", "width"], h: ["高さ", "height"], w: ["重さ", "weight"] };
+  // 取り決め：{ w: kg|null, l, wd, h: cm|null（＝外装〔カートン〕の値。単品の値は入れない）, ok, missing, unit, carton, perCtn, unknown, later }
+  W.v101dims = function (t) {
+    try {
+      t = t || ten();
+      const r = readDims(t || {});
+      const C = r.carton, U = r.unit;
+      const missing = [];
+      ["l", "wd", "h"].forEach((k) => { if (C[k] == null) missing.push(M("外装の" + DIM_NM[k][0], "carton " + DIM_NM[k][1])); });
+      if (C.w == null) missing.push(M("外装の重さ", "carton weight"));
+      if (r.perCtn == null) missing.push(M("入数（1箱あたり）", "units per carton"));
+      const uOk = U.l != null && U.wd != null && U.h != null && U.w != null;
+      const cOk = C.l != null && C.wd != null && C.h != null && C.w != null;
+      const unk = !!(t && t.v101hunk && t.v101hunk.dimRows);
+      return { w: C.w, l: C.l, wd: C.wd, h: C.h, ok: cOk, missing, unit: Object.assign({ ok: uOk }, U), carton: Object.assign({ ok: cOk }, C), perCtn: r.perCtn,
+        any: [U.l, U.wd, U.h, U.w, C.l, C.wd, C.h, C.w, r.perCtn].some((x) => x != null), unknown: unk, later: !!(t && t.v101dimLater) };
+    } catch (e) { err("dims", e); return { w: null, l: null, wd: null, h: null, ok: false, missing: [], unit: {}, carton: {}, perCtn: null, any: false, unknown: false, later: false }; }
+  };
+
+  /* ════════════ No.610 ② 「不明」などは値として登録しない ════════════ */
+  const NUMK = ["dimRows", "moq", "lead", "ctn", "priceRows"]; // 数字の欄：値を「未確認」として控えて、欄は空にする
+  const TXTK = ["origin", "cert", "shelf", "sku", "coEn", "itemEn", "pol", "hs", "co", "item"]; // 文字の欄：値は消さないが、充足度に数えない
+  // 表の行：項目名（1列目）を除いて数字が1つも無い行は、寸法・価格の行にしない
+  function rowHasNum(r, cols) {
+    if (!Array.isArray(r)) return false;
+    const vals = r.map((x) => (x == null ? "" : String(x)));
+    const v54 = Array.isArray(cols) && cols.filter((c) => V54COLS.test(NF(c))).length >= 3;
+    const body = (v54 || vals.length > 1) ? vals.slice(1) : vals;
+    return body.some((x) => /\d/.test(NF(x)));
+  }
+  function unkStore(t) { if (!t.v101hunk || typeof t.v101hunk !== "object" || Array.isArray(t.v101hunk)) t.v101hunk = {}; return t.v101hunk; }
+  function noteUnk(t, k, v, by) {
+    try {
+      const S = unkStore(t);
+      const txt = Array.isArray(v) ? v.map((r) => (Array.isArray(r) ? r.filter((x) => x != null && String(x).trim()).join(" ") : String(r))).filter(Boolean).join("／") : String(v == null ? "" : v);
+      S[k] = { v: txt.slice(0, 120), by: by || "", at: Date.now() };
+      cnt("unk:" + k); lg({ k: "unk", f: k, v: txt.slice(0, 60), by });
+    } catch (e) { err("noteUnk", e); }
+  }
+  // 数字の欄の「不明」を外して控える。変えたら true
+  function clean(t, by) {
+    let ch = false;
+    if (!t || typeof t !== "object" || V.inShip) return false;
+    try {
+      ["dimRows", "priceRows"].forEach((k) => {
+        const rows = t[k];
+        if (!Array.isArray(rows) || !rows.length) return;
+        const cols = k === "dimRows" ? t.dimCols : t.priceCols;
+        const body = (r) => (Array.isArray(cols) && cols.length > 1 && r.length > 1 ? r.slice(1) : r);
+        // 寸法・重量：数字の無い行は寸法にしない。価格：「不明」などだけの行は価格にしない（「応相談」などは残す）
+        const keep = rows.filter((r) => !Array.isArray(r) || (k === "dimRows" ? rowHasNum(r, cols) : !(isUnk(body(r)) || isUnk(r))));
+        if (keep.length === rows.length) return;
+        const drop = rows.filter((r) => keep.indexOf(r) < 0);
+        noteUnk(t, k, drop, by);
+        t[k] = keep;
+        if (!keep.length && k === "dimRows") { delete t.dimNote; }
+        ch = true;
+      });
+      ["moq", "lead", "ctn"].forEach((k) => {
+        const v = t[k];
+        if (typeof v === "string" && v.trim() && isUnk(v)) { noteUnk(t, k, v, by); t[k] = ""; ch = true; }
+      });
+      if (t.v101hunk) {
+        // 値が入ったら「未確認」の控えを消す
+        Object.keys(t.v101hunk).forEach((k) => {
+          const v = t[k];
+          const has = Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim() && !isUnk(v));
+          if (has && NUMK.indexOf(k) >= 0) { delete t.v101hunk[k]; ch = true; }
+        });
+        if (t.dimRows && t.dimRows.length && t.v101dimLater) { delete t.v101dimLater; ch = true; }
+      }
+    } catch (e) { err("clean", e); }
+    return ch;
+  }
+  V.clean = clean;
+  const cleanAll = () => { try { (typeof TENS !== "undefined" && Array.isArray(TENS) ? TENS : []).forEach((x) => { if (x && userT(x)) clean(x, "sweep"); }); } catch (e) { err("cleanAll", e); } }; // eslint-disable-line no-undef
+
+  // 答え（ヒアリング・AI の聞き取り）：数字の欄に「不明」だけの答えは登録しない
+  wrap("applyAnswer", (o) => function (t, k, raw) {
+    try {
+      if (t && NUMK.indexOf(String(k)) >= 0 && isUnk(raw)) {
+        noteUnk(t, String(k), raw, "hear");
+        V.lastUnk = { k: String(k), at: Date.now() };
+        return false;
+      }
+    } catch (e) { err("aa-pre", e); }
+    const r = o.apply(this, arguments);
+    try { if (r && t && NUMK.indexOf(String(k)) >= 0) clean(t, "hear"); } catch (e) { err("aa-post", e); }
+    try { if (r && t && k === "strengths") strDedupe(t); } catch (e) { err("aa-str", e); }
+    try { if (r && t && k === "compRows") compFix(t); } catch (e) { err("aa-comp", e); }
+    return r;
+  });
+  // ヒアリングで数字の欄に「不明」などと答えたら（土台は後回しにして登録しない）、何と答えたかを「未確認」として控える（商品情報の画面に出す）
+  wrap("fillAnswer", (o) => function (v) {
+    try {
+      const F = fillO(), t = ten();
+      const k = F && F.cur && !F.cur.x ? String(F.cur.k || "") : "";
+      if (t && k && NUMK.indexOf(k) >= 0 && isUnk(v)) noteUnk(t, k, v, "hear");
+    } catch (e) { err("fa-unk", e); }
+    return o.apply(this, arguments);
+  });
+  // 「不明」で登録しなかったとき、「うまく読み取れませんでした」と言って同じ問いを繰り返さず、「未確認として控えた」と言って次へ
+  wrap("fillSay", (o) => function (who, html) {
+    try {
+      const u = V.lastUnk;
+      if (who === "ai" && u && Date.now() - u.at < 3000 && typeof html === "string" && /^うまく読み取れませんでした/.test(html)) {
+        V.lastUnk = null;
+        const F = fillO();
+        if (F && F.cur && F.cur.k === u.k && !F.cur.x && typeof W.skipCurrent === "function") {
+          const nm = String(F.cur.n || "").replace(/<[^>]+>/g, "");
+          cnt("unkSay");
+          W.skipCurrent(E(M(`承知しました。${nm}は「未確認」として控えました（「不明」は値として登録しません）。分かったら、商品情報の画面から数字で入れられます。`,
+            `Noted. ${nm} is kept as “not confirmed” (“unknown” is not registered as a value). When you know it, you can enter the figures on the product page.`,
+            `已记录。${nm}记为“未确认”（“不明”不作为数值登记）。知道后可在商品信息画面中填写数字。`,
+            `Anotado. ${nm} queda como «sin confirmar» («no sé» no se registra como valor). Cuando lo sepa, puede introducir las cifras en la ficha del producto.`)));
+          return;
+        }
+      }
+    } catch (e) { err("fs-unk", e); }
+    return o.apply(this, arguments);
+  });
+  // 表の編集（寸法・重量／価格表）：数字の無い行は登録しない
+  wrap("tblSave", (o) => function () {
+    let kind = "", t = null, pre = 0;
+    try {
+      kind = (typeof __TBL !== "undefined" && __TBL) ? __TBL.kind : ""; t = ten(); // eslint-disable-line no-undef
+      // 保存の中（saveTen）でも外すので、外す行の数は保存の前に数えておく（「保存しました」とだけ言わないため）
+      if (t && (kind === "dim" || kind === "price")) {
+        try { if (typeof tblSync === "function") tblSync(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+        const T = __TBL, cols = (T.cols || []).map((c) => String(c || "").trim()); // eslint-disable-line no-undef
+        const rows = (T.rows || []).map((r) => r.map((v) => String(v || "").trim())).filter((r) => r.some((v) => v));
+        pre = rows.filter((r) => (kind === "dim" ? !rowHasNum(r, cols) : (isUnk(r.slice(cols.length > 1 ? 1 : 0)) || isUnk(r)))).length;
+      }
+    } catch (e) { /* 無視 */ }
+    const r = o.apply(this, arguments);
+    try {
+      if (t && (kind === "dim" || kind === "price")) {
+        const k = kind === "dim" ? "dimRows" : "priceRows";
+        const before = (Array.isArray(t[k]) ? t[k].length : 0) + pre;
+        if (clean(t, "table") || pre > 0) {
+          save(); try { if (typeof syncTenant === "function") syncTenant(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+          try { if (typeof render === "function") render(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+          const after = Array.isArray(t[k]) ? t[k].length : 0;
+          toast(kind === "dim"
+            ? M(`寸法・重量は数字で入れてください。「不明」などの行（${before - after}行）は寸法として登録せず、「未確認」として控えました`, `Please enter dimensions/weight as figures. ${before - after} row(s) such as “unknown” were not registered and are kept as “not confirmed”.`, `请用数字填写尺寸・重量。“不明”等${before - after}行未登记为尺寸，已记为“未确认”。`, `Introduzca medidas y peso en cifras. ${before - after} fila(s) como «no sé» no se registraron y quedan «sin confirmar».`)
+            : M(`価格は数字で入れてください。「不明」などの行（${before - after}行）は価格として登録せず、「未確認」として控えました`, `Please enter prices as figures. ${before - after} row(s) such as “unknown” were not registered.`, `请用数字填写价格。“不明”等${before - after}行未登记。`, `Introduzca los precios en cifras. ${before - after} fila(s) como «no sé» no se registraron.`));
+          cnt("tblClean");
+        }
+      }
+    } catch (e) { err("tblSave", e); }
+    return r;
+  });
+  // 保存の前に掃除（ほかの経路〔資料の取り込み・AI の読み取り・商品情報の画面〕から入った「不明」も）
+  wrap("saveTen", (o) => function () { try { const t = ten(); if (t && userT(t)) clean(t, "save"); } catch (e) { err("saveClean", e); } return o.apply(this, arguments); });
+
+  // 充足度（STEP 01・商品情報・取り込みの %）：「不明」「わからない」だけの値は、どの欄でも「入っている」に数えない
+  wrap("v92prodFill", (o) => function (t) {
+    const tt = t === undefined ? ten() : t;
+    try { if (tt) clean(tt, "fill"); } catch (e) { /* 無視 */ }
+    const K = o.apply(this, arguments);
+    try {
+      if (K && tt && Array.isArray(K.okKeys)) {
+        const bad = K.okKeys.filter((k) => (TXTK.indexOf(k) >= 0 || NUMK.indexOf(k) >= 0) && isUnk(tt[k]));
+        if (bad.length) {
+          K.okKeys = K.okKeys.filter((k) => bad.indexOf(k) < 0);
+          K.missKeys = (K.missKeys || []).concat(bad);
+          K.c = K.okKeys.length;
+          K.pct = K.d ? Math.round((K.c / K.d) * 100) : 0;
+          try { const req = NEED.filter((x) => x.w >= 5).map((x) => x.k); K.a = Math.max(0, (K.a || 0) - bad.filter((k) => req.indexOf(k) >= 0).length); } catch (e) { /* そのまま */ } // eslint-disable-line no-undef
+          K.full = K.c === K.d; K.allDone = K.full && !((K.optMiss || []).length);
+          K.v101hunk = bad;
+          cnt("fillUnk");
+        }
+      }
+    } catch (e) { err("fill", e); }
+    return K;
+  });
+  // 任意の項目（④ 業種ごとの項目：内容量・材質・対象年齢・入数など）：「不明（資料に記載なし）」も「入っていない」に（土台は「不明」ちょうどだけ）
+  wrap("v68pPlace", (o) => function (v) { try { if (isUnk(v)) return true; } catch (e) { /* 下へ */ } return o.apply(this, arguments); });
+  // 土台の数え方（v97 の層が無いときの scoreOf）も同じに
+  wrap("scoreOf", (o) => function (t) {
+    try { if (t) clean(t, "score"); } catch (e) { /* 無視 */ }
+    const s = o.apply(this, arguments);
+    try {
+      if (s && t && Array.isArray(s.filled)) {
+        const bad = s.filled.filter((x) => x && (TXTK.indexOf(x.k) >= 0 || NUMK.indexOf(x.k) >= 0) && isUnk(t[x.k]));
+        if (bad.length) {
+          s.filled = s.filled.filter((x) => bad.indexOf(x) < 0);
+          s.missing = (s.missing || []).concat(bad);
+          try { if (!s.basis) s.pct = Math.round(s.filled.reduce((a, y) => a + (y.w || 0), 0) / WSUM * 100); else { const K = fn("v92prodFill") ? W.v92prodFill(t) : null; if (K && typeof K.pct === "number") s.pct = K.pct; } } catch (e) { /* そのまま */ } // eslint-disable-line no-undef
+        }
+      }
+    } catch (e) { err("score", e); }
+    return s;
+  });
+
+  /* ════════════ No.610 ③ 寸法の登録・「まだ分からない」 ════════════ */
+  // 入力欄の値から、ヒアリングの答えと同じ形の文を作って、土台の読み取り（applyAnswer → v54upldDims）で登録する
+  V.setDims = function (f) {
+    const t = ten();
+    if (!t) return { ok: false, msg: "no product" };
+    const bad = [];
+    const g = (k, nm) => { const v = String(f[k] == null ? "" : f[k]).trim(); if (!v) return ""; if (!W.v101num(v)) { bad.push(nm); return ""; } return String(numVal(v)); };
+    const ul = g("ul", M("単品の縦", "unit length")), uw = g("uw", M("単品の横", "unit width")), uh = g("uh", M("単品の高さ", "unit height")), ug = g("ug", M("単品の重さ", "unit weight"));
+    const cl = g("cl", M("外装の縦", "carton length")), cw = g("cw", M("外装の横", "carton width")), ch = g("ch", M("外装の高さ", "carton height")), cg = g("cg", M("外装の重さ", "carton weight")), cn = g("cn", M("入数", "units per carton"));
+    if (bad.length) return { ok: false, bad, msg: M(`「${bad.join("」「")}」は数字で入れてください（分からない欄は空のままで大丈夫です）。`, `Please enter ${bad.join(", ")} as figures (leave unknown boxes empty).`, `请用数字填写「${bad.join("」「")}」（不知道的栏可以留空）。`, `Introduzca ${bad.join(", ")} en cifras (deje vacías las que no sepa).`) };
+    const du = f.du === "cm" ? "cm" : "mm", cu = f.cu === "cm" ? "cm" : "mm";
+    const ugu = f.ugu === "kg" ? "kg" : "g", cgu = f.cgu === "g" ? "g" : "kg";
+    const unitW = (() => { const m = NF(t.moq || "").match(/\d[\d,]*\s*([^\d\s,（(]{1,4})/); const u = m ? m[1].replace(/以上|から|〜|～/g, "") : ""; return /^(個|本|袋|枚|箱|缶|瓶|セット|パック|台|組|着|足|点)$/.test(u) ? u : "個"; })();
+    const dimsTxt = (a, b, c, u) => [a, b, c].filter(Boolean).length >= 2 ? [a, b, c].filter(Boolean).join("×") + u : "";
+    const U = [dimsTxt(ul, uw, uh, du), ug ? ug + ugu : ""].filter(Boolean).join("・");
+    const C = [dimsTxt(cl, cw, ch, cu), cg ? cg + cgu : "", cn ? cn + unitW + "入" : ""].filter(Boolean).join("・");
+    const lone = [ul, uw, uh, cl, cw, ch].filter(Boolean).length && !(dimsTxt(ul, uw, uh, du) || dimsTxt(cl, cw, ch, cu));
+    if (!U && !C) return { ok: false, msg: lone ? M("寸法は、縦・横・高さのうち2つ以上を入れてください。", "Enter at least two of length, width and height.") : M("数字を1つ以上入れるか、「まだ分からない」を押してください。", "Enter at least one figure, or press “Not known yet”.", "请至少填写一个数字，或点击“还不知道”。", "Introduzca al menos una cifra o pulse «Aún no lo sé».") };
+    const txt = [U ? "単品 " + U : "", C ? "外装 " + C : ""].filter(Boolean).join("／");
+    let ok = false;
+    try { ok = !!W.applyAnswer(t, "dimRows", txt); } catch (e) { err("setDims", e); }
+    if (!ok) return { ok: false, msg: M("寸法・重量を読み取れませんでした。数字と単位を確かめてください。", "Could not read the dimensions/weight. Check the figures and units.") };
+    delete t.v101dimLater;
+    try { if (t.v101hunk) delete t.v101hunk.dimRows; } catch (e) { /* 無視 */ }
+    if (cn && !String(t.ctn || "").trim()) { /* 入数は寸法の表に入る（パレットの積み数の欄 ctn は別） */ }
+    save();
+    try { if (typeof syncTenant === "function") syncTenant(); } catch (e) { err("sync", e); } // eslint-disable-line no-undef
+    cnt("setDims"); lg({ k: "setDims", txt });
+    const d = W.v101dims(t);
+    return { ok: true, txt, dims: d, msg: d.ok ? M("寸法・重量を登録しました（梱包明細・運賃の見積に使います）。", "Dimensions/weight registered (used for the packing list and freight quotes).", "已登记尺寸・重量（用于装箱单和运费报价）。", "Medidas y peso registrados (para la lista de empaque y el flete).")
+      : M(`寸法・重量を登録しました。まだ足りないのは ${d.missing.join("・")} です（梱包明細・運賃の見積の前に入れてください）。`, `Registered. Still missing: ${d.missing.join(", ")} (needed before the packing list and freight quotes).`, `已登记。还缺：${d.missing.join("・")}（制作装箱单・运费报价前请填写）。`, `Registrado. Falta: ${d.missing.join(", ")} (antes de la lista de empaque y el flete).`) };
+  };
+  V.dimLater = function (on) {
+    const t = ten();
+    if (!t) return false;
+    if (on) t.v101dimLater = { at: Date.now() }; else delete t.v101dimLater;
+    save();
+    try { if (typeof syncTenant === "function") syncTenant(); } catch (e) { err("sync2", e); } // eslint-disable-line no-undef
+    cnt(on ? "later" : "laterOff");
+    return true;
+  };
+  // 寸法が要る書類（梱包明細・船積依頼書・運賃の見積・コンテナ計算）か
+  const NEEDS_DIM = { PL: 1, SI: 1, "S/I": 1, FREIGHT: 1 };
+  V.needsDim = (k) => !!NEEDS_DIM[String(k || "").toUpperCase()];
+  V.dimsOk = (t) => { try { return W.v101dims(t || ten()).ok; } catch (e) { return false; } };
+
+  // 足りない項目（v68 の案内）：「まだ分からない」を選んだら、寸法は足りない項目にしない（見積書・請求書は作れる）
+  wrap("v68trNeed", (o) => function (t) {
+    const m = o.apply(this, arguments);
+    try { const tt = t || (fn("v68trTen") ? W.v68trTen() : ten()); if (Array.isArray(m) && tt && tt.v101dimLater) return m.filter((k) => k !== "dim"); } catch (e) { err("need", e); }
+    return m;
+  });
+  // 出荷案件：寸法が「まだ分からない」なら、寸法「未確認」のまま作る（見積書・PI・請求書を先に作れるように）
+  wrap("buildShip", (o) => function (d, t) {
+    let S = o.apply(this, arguments);
+    try {
+      if (!S && t && userT(t) && t.v101dimLater && !(Array.isArray(t.dimRows) && t.dimRows.length) && Array.isArray(t.priceRows) && t.priceRows.length && Array.isArray(t.targets) && t.targets[0]) {
+        const keep = t.dimRows, keepC = t.dimCols;
+        t.dimRows = [["寸法・重量：未確認"]]; t.dimCols = ["寸法・重量"];
+        V.inShip = 1;
+        try { S = o.apply(this, arguments); } finally { t.dimRows = keep; t.dimCols = keepC; V.inShip = 0; }
+        if (S) {
+          S.v101noDim = 1;
+          S.cargo = "寸法・重量：未確認（梱包明細・S/I・運賃の見積の前に入れてください）";
+          if (typeof S.reason === "string") S.reason = S.reason.replace(/いま登録されている寸法（[^）]*）と\s*/, "寸法・重量は未確認のため運賃は試算していません。");
+          cnt("shipNoDim");
+        }
+      }
+    } catch (e) { err("ship", e); }
+    return S;
+  });
+  // 運賃の見積（物流会社への AI 見積の依頼）：外装の寸法・重さが無いと出せない。止めて、その場で入れる欄を出す
+  wrap("fwdRequest", (o) => async function () {
+    try {
+      const t = ten(), S = dd() && dd().ship;
+      if (t && userT(t) && !W.v101dims(t).ok && !(S && S.poNo)) {
+        cnt("fwdStop");
+        toast(M("運賃の見積を頼むには、外装（カートン）の寸法・重さ・入数が要ります。下の欄で入れてください", "To request freight quotes, the carton dimensions, weight and units per carton are needed. Please enter them below.", "请求运费报价需要外箱尺寸・重量・入数。请在下方填写。", "Para pedir cotizaciones de flete se necesitan las medidas, el peso y las unidades por caja. Introdúzcalas abajo."));
+        if (fn("v101hearDimDialog")) W.v101hearDimDialog("freight");
+        return;
+      }
+    } catch (e) { err("fwd", e); }
+    return o.apply(this, arguments);
+  });
+  // この出荷に要る書類（AI商社マンの判断）：梱包明細・S/I は、寸法が無ければ「要確認」
+  wrap("v85docStatus", (o) => function (k) {
+    const r = o.apply(this, arguments);
+    try {
+      const t = ten();
+      if (Array.isArray(r) && t && userT(t) && (k === "PL" || k === "SI") && r[0] !== "ok" && !W.v101dims(t).ok) {
+        cnt("docChk");
+        return [r[0] === "draft" ? "draft" : "none", M("要確認：外装の寸法・重さが未登録", "To confirm: carton size/weight not registered", "待确认：外箱尺寸・重量未登记", "Por confirmar: medidas/peso de la caja sin registrar")];
+      }
+    } catch (e) { err("docSt", e); }
+    return r;
+  });
+
+  /* ════════════ No.612 件数は並べた項目の数から ════════════ */
+  function needName(k) {
+    try { if (fn("v92prodNm")) { const n = W.v92prodNm(k, ten()); if (n) return String(n); } } catch (e) { /* 下へ */ }
+    try { const x = (NEED || []).find((y) => y && y.k === k); return x ? String(x.n) : ""; } catch (e) { return ""; } // eslint-disable-line no-undef
+  }
+  function fixLaterList(html) {
+    const m = html.match(/(「あとで」にした<b>)(\d+)(項目<\/b>（)([\s\S]*?)(）を、もう一度だけ伺います)/);
+    if (!m) return html;
+    const F = fillO();
+    const ord = (F && Array.isArray(F.v54hearOrd)) ? F.v54hearOrd : [];
+    const inner = m[4];
+    // 並べた順のまま、画面に出ている項目名だけを拾う（ほかの層が外した項目は数えない）
+    const names = [];
+    ord.forEach((k) => { const n = needName(k); if (n && inner.indexOf(n) >= 0 && names.indexOf(n) < 0) names.push(n); });
+    if (!names.length) return html;
+    const list = names.map((n) => "「" + n + "」").join("");
+    cnt("laterList");
+    return html.replace(m[0], m[1] + names.length + m[3] + list + m[5]);
+  }
+  V.fixLaterList = fixLaterList;
+  // 書類の画面の「足りないのは 価格表（輸出用の単価）・寸法・重量（外装の寸法・入数・重量） です」も、項目を「」で1つずつ（日本語のとき）
+  wrap("v68trNeedTxt", (o) => function () {
+    const nd = o.apply(this, arguments);
+    try {
+      if (nd && Array.isArray(nd.m) && nd.N && lang() === "ja") {
+        const have = ["price", "dim", "cty"].filter((k) => nd.m.indexOf(k) < 0).map((k) => "「" + nd.N[k] + "」");
+        nd.how = "足りないのは " + nd.m.map((k) => "「" + nd.N[k] + "」").join("") + " です" + (have.length ? "（" + have.join("") + "は登録済み）" : "");
+      }
+    } catch (e) { err("needTxt", e); }
+    return nd;
+  });
+  function xqCounts() {
+    const F = fillO(), t = ten();
+    const qs = (F && Array.isArray(F.xq)) ? F.xq : [];
+    const asked = qs.length;
+    const QA = (t && Array.isArray(t.extraQA)) ? t.extraQA : [];
+    const qset = qs.map((x) => String((x && x.q) || "").trim());
+    const ans = QA.filter((x) => x && !x.v100 && !x.v101 && qset.indexOf(String(x.q || "").trim()) >= 0).length;
+    return { asked, ans };
+  }
+  V.xqCounts = xqCounts;
+  // fillSay の後（ほかの層が文を直した後）に、ログの最後の文を直す
+  wrap("fillSay", (o) => function (who, html) {
+    const F0 = fillO(); const n0 = F0 && Array.isArray(F0.log) ? F0.log.length : -1;
+    const r = o.apply(this, arguments);
+    try {
+      const F = fillO();
+      if (who === "ai" && F && Array.isArray(F.log) && F.log.length > n0 && n0 >= 0) {
+        const it = F.log[F.log.length - 1];
+        if (it && typeof it.html === "string") {
+          let h = it.html;
+          if (/「あとで」にした<b>\d+項目<\/b>/.test(h)) h = fixLaterList(h);
+          const mm = h.match(/＋AI追加ヒアリング(\d+)件|＋追加の確認 (\d+)件/);
+          if (mm) {
+            const c = xqCounts();
+            if (c.asked > 0) {
+              const was = +(mm[1] || mm[2]);
+              const rep = mm[1] != null
+                ? "＋" + M("AI追加ヒアリング", "AI follow-up") + " " + c.asked + M("問", " questions") + (c.ans !== c.asked ? M(`（回答 ${c.ans}問・あとで ${c.asked - c.ans}問）`, ` (${c.ans} answered, ${c.asked - c.ans} later)`) : "")
+                : "＋" + M("追加の確認", "follow-up") + " " + c.asked + M("問", " questions") + (c.ans !== c.asked ? M(`（回答 ${c.ans}問）`, ` (${c.ans} answered)`) : "");
+              h = h.replace(mm[0], rep);
+              if (was !== c.asked || c.ans !== c.asked) cnt("xqCount");
+            }
+          }
+          // AI の気づきの内訳：最後の文と商品情報の「AIの気づき」で、並び（未解決→「不明」と回答→解決済み）をそろえる
+          h = h.replace(/解決済み (\d+)件・「不明」と回答 (\d+)件・未解決 (\d+)件/, (m0, a, b, c) => `未解決 ${c}件・「不明」と回答 ${b}件・解決済み ${a}件`);
+          if (h !== it.html) it.html = h;
+        }
+      }
+    } catch (e) { err("fs-count", e); }
+    return r;
+  });
+
+  /* ════════════ No.613 強み：まとめた強みを分け、重なりを登録しない ════════════ */
+  const STRK = (s) => NF(s).toLowerCase().replace(/[\s　、,，。．.・･:：;；!！?？「」『』【】\[\]()（）"'“”‘’\-‐－—～〜/／]/g, "").replace(/(です|でした|ます|である)$/g, "");
+  // 1つの強みの中の区切り（括弧の外の 、 ／ 。 改行）で分ける。数字の 1,000 は分けない
+  function splitStr(s) {
+    const x = String(s == null ? "" : s).replace(/\r/g, "");
+    const out = []; let cur = "", d = 0;
+    for (let i = 0; i < x.length; i++) {
+      const ch = x[i];
+      if ("（(［[【「『".includes(ch)) d++;
+      else if ("）)］]】」』".includes(ch)) d = Math.max(0, d - 1);
+      const isSep = ch === "\n" || (d === 0 && (ch === "、" || ch === "／" || ch === "。" || ch === "；" || ch === ";" || (ch === "," && !/\d/.test(x[i - 1] || "") ) || (ch === "，")));
+      if (isSep) { out.push(cur); cur = ""; continue; }
+      cur += ch;
+    }
+    out.push(cur);
+    const P = out.map((p) => p.replace(/^[\s・•\-*]+|[\s。．]+$/g, "").trim()).filter((p) => p.length > 1);
+    // 「〜を使い、〜で仕上げた」のような1つの文の途中の「、」では分けない（区切りの前が続きの形〔い・し・て・で…〕なら1つの強み）
+    // 続きの形：〜て・〜で・〜し・〜り・〜ず・〜つつ・〜ながら、「使い・用い・扱い」などの動詞の形（「少ない」「高い」などの形容詞・「だけ」「仕上げ」などは区切りとみなす）
+    const CONT = /(?:て|で|つつ|ながら|し|り|ず|(?:使|用|扱|伴|違|従|向|払|行|言|思|吸|洗|揃|補|生か|活か|含|選|重|込|組)[みいびりし])$/;
+    if (P.length >= 2 && /[、,，]/.test(x) && !/[\n／。;；]/.test(x) && P.slice(0, -1).some((p) => CONT.test(p) && !/[）)」』】]$/.test(p))) return [x.trim()];
+    return P;
+  }
+  V.splitStr = splitStr;
+  function strDedupe(t) {
+    if (!t || !Array.isArray(t.strengths) || !t.strengths.length) return false;
+    const before = JSON.stringify(t.strengths);
+    const items = [];
+    t.strengths.forEach((x) => {
+      const txt = String((Array.isArray(x) ? x[0] : x) || "").trim();
+      const src = Array.isArray(x) ? String(x[1] || "") : "";
+      if (!txt) return;
+      const parts = splitStr(txt);
+      // 「低振動（…）、長寿命、採用実績」のような1通のまとめ：3つ以下の短い区切りなら、分けて1つずつ数える
+      const P = (parts.length >= 2 && parts.length <= 8 && parts.every((p) => p.length <= 60)) ? parts : [txt];
+      P.forEach((p) => items.push({ p, src, k: STRK(p), orig: x }));
+    });
+    const keep = [];
+    items.forEach((it) => {
+      if (!it.k) return;
+      const same = keep.find((y) => y.k === it.k || (y.k.length >= 4 && it.k.indexOf(y.k) >= 0 && it.k.length - y.k.length <= 2) || (it.k.length >= 4 && y.k.indexOf(it.k) >= 0 && y.k.length - it.k.length <= 2));
+      if (same) { if (!same.src && it.src) same.src = it.src; return; }
+      keep.push(it);
+    });
+    const out = keep.map((y) => [y.p.slice(0, 160), y.src]);
+    if (JSON.stringify(out) === before) return false;
+    t.strengths = out;
+    cnt("strDedupe"); lg({ k: "str", n0: JSON.parse(before).length, n1: out.length });
+    return true;
+  }
+  V.strDedupe = strDedupe;
+
+  /* ════════════ No.614 材質表：規制の注記を表の行にしない ════════════ */
+  const REG_NOTE = /RoHS|REACH|PFAS|SVHC|CPSIA|EN\s*71|ASTM|食品衛生法|規制|適合|対応|非該当|該当|証明|認証|宣誓|試験/i;
+  const NOTE_TAIL = /記載(?:が|は)?(?:な|無)|資料に(?:な|無)|未記載|不明|未確認|要確認|わから|分から|確認中|調査中|対象外|なし$|無し$/;
+  const ING_LAB = /^(?:原材料名?|原料|材料名?|全成分|成分)$/;
+  function isRegNote(r) {
+    if (!Array.isArray(r)) return false;
+    const cells = r.map((x) => NF(x == null ? "" : x).trim());
+    const all = cells.filter(Boolean).join(" ");
+    if (!all || !REG_NOTE.test(all)) return false;
+    const lab = cells[0] || "";
+    const val = cells.slice(1).filter(Boolean).join(" ") || lab;
+    if (!NOTE_TAIL.test(val) || val.length > 60) return false;
+    // 「RoHS・REACH 対応は資料に記載なし」：規制の言葉で始まる値、または項目名が規制の言葉・原材料名・空のもの（部位の名前の行〔保持器：鋼板〕は残す）
+    return new RegExp("^(?:" + REG_NOTE.source + ")", "i").test(val) || REG_NOTE.test(lab) || ING_LAB.test(lab) || !lab || lab === val;
+  }
+  function compFix(t) {
+    if (!t || !Array.isArray(t.compRows) || !t.compRows.length) return false;
+    let ch = false;
+    const ck = String(t.catKey || (fn("catKeyOf") ? W.catKeyOf(t.cat) : "") || "");
+    const food = /food|cosme|liquor|pharma|supple|pet/.test(ck) || /食品|化粧|酒|医薬|サプリ|ペット/.test(String(t.cat || ""));
+    const keep = [], notes = [];
+    // 材質の後ろに続けて書かれた注記（「鋼板シールド（ZZ）　RoHS・REACH 対応は資料に記載なし」）は、材質と注記に分ける
+    const REG_HARD = /RoHS|REACH|PFAS|SVHC|CPSIA|EN\s*71|ASTM|食品衛生法/i;
+    const rows0 = t.compRows.map((r) => {
+      if (!Array.isArray(r)) return r;
+      let mod = false;
+      const a = r.map((x, j) => {
+        if (j === 0 || x == null) return x;
+        const s = NF(x);
+        const i = s.search(REG_HARD);
+        if (i <= 0) return x;
+        const note = s.slice(i).trim(), pre = s.slice(0, i).replace(/[\s　、,，／/・;；]+$/, "").trim();
+        if (pre && NOTE_TAIL.test(note) && note.length <= 60) { notes.push(note); mod = true; return pre; }
+        return x;
+      });
+      if (mod) ch = true;
+      return mod ? a : r;
+    });
+    rows0.forEach((r) => {
+      if (isRegNote(r)) {
+        const c = Array.isArray(r) ? r.map((x) => NF(x == null ? "" : x).trim()).filter(Boolean) : [];
+        const lab0 = c[0] || "";
+        const note = (c.length > 1 && (ING_LAB.test(lab0) || !REG_NOTE.test(lab0))) ? c.slice(1).join(" ") : c.join(" ");
+        notes.push(note);
+        ch = true;
+        return;
+      }
+      keep.push(r);
+    });
+    // 工業部品・日用品などの材質表で、部位の欄に「原材料名」と出ている行は、項目名を「材質」に
+    if (!food) {
+      keep.forEach((r, i) => {
+        if (Array.isArray(r) && ING_LAB.test(NF(r[0] || "").trim()) && r.slice(1).some((x) => String(x || "").trim())) { const a = r.slice(); a[0] = "材質"; keep[i] = a; ch = true; }
+      });
+    }
+    if (!ch) return false;
+    t.compRows = keep;
+    if (notes.length) {
+      const old = Array.isArray(t.v101regNote) ? t.v101regNote : [];
+      t.v101regNote = old.concat(notes.filter((n) => old.indexOf(n) < 0)).slice(0, 6);
+    }
+    cnt("compFix"); lg({ k: "comp", notes });
+    return true;
+  }
+  V.compFix = compFix;
+  V.isRegNote = isRegNote;
+  // 資料の取り込み（AI の読み取り）で入った表も、保存の前に直す
+  wrap("saveTen", (o) => function () { try { const t = ten(); if (t && userT(t)) { strDedupe(t); compFix(t); } } catch (e) { err("saveFix", e); } return o.apply(this, arguments); });
+  // 画面・資料に渡す D（tenantToD）でも同じに（保存の前に描かれる画面のため）
+  wrap("tenantToD", (o) => function (t) {
+    try { if (t && userT(t)) { clean(t, "ttd"); strDedupe(t); compFix(t); } } catch (e) { err("ttd-pre", e); }
+    const d = o.apply(this, arguments);
+    try {
+      if (d && t && userT(t)) {
+        if (Array.isArray(t.strengths)) d.strengths = t.strengths;
+        if (Array.isArray(d.compRows) && d.compRows.some(isRegNote)) d.compRows = d.compRows.filter((r) => !isRegNote(r));
+        if (Array.isArray(t.v101regNote) && t.v101regNote.length) d.v101regNote = t.v101regNote.slice();
+      }
+    } catch (e) { err("ttd", e); }
+    return d;
+  });
+
+  /* ════════════ No.518 否定の答えのあとに、それを前提にした問いを出さない ════════════ */
+  // 否定の話題：本人の答え（ヒアリング・追加ヒアリング・登録の欄）から
+  const NEGS = [
+    { k: "md", say: /医療機器\s*(?:では|でも|じゃ)\s*(?:な[いくかし]|ありません)|医療機器\s*でな[いく]|非医療機器|医療機器以外|医療機器(?:に|には)?\s*(?:該当|当た|分類され)(?:しない|しません|らない|りません|ない|れない)|not\s+(?:a\s+)?medical\s+device/i,
+      q: /クラス\s*(?:分類|[IⅠⅡⅢ1-4]|\(|（)|class\s*(?:[I1-4]|\(|ification)|ISO\s*13485|医療機器(?:の|として)?(?:届出|認証|承認|登録|製造販売|区分|クラス)|一般医療機器|管理医療機器|510\s*\(?k|CE\s*マーク.{0,6}医療|MDR|薬機法.{0,8}(?:届出|承認|認証)|医療用.{0,6}(?:規格|クラス)|JIS\s*T\s*9001/i },
+    { k: "food", say: /食品(?:に|と)?(?:は)?(?:直接)?(?:触れ|接触し|ふれ)(?:ない|ません|る部材(?:は)?(?:なし|ない|ありません))|食品(?:に|と)?(?:は)?接触(?:なし|無し)|食品接触(?:なし|無し)|非食品接触|no food contact/i,
+      q: /食品(?:に|と)?(?:直接)?(?:触れる|接触する)|食品接触|溶出試験|食品衛生法.{0,10}(?:試験|規格|適合)|food[- ]contact/i },
+    { k: "batt", say: /電池(?:は)?(?:なし|無し|を?使(?:用し|っ)?て(?:い)?(?:ない|ません)|は?入って(?:い)?(?:ない|ません)|不使用|含ま(?:ない|ず|れ(?:てい)?ない))|バッテリー(?:は)?(?:なし|無し|不使用)|no batter/i,
+      q: /電池|バッテリー|リチウム|UN\s*38\.3|battery|lithium/i },
+    { k: "steril", say: /滅菌\s*[：:は]?\s*(?:なし|無し|して(?:い)?(?:ない|ません)|不要)|非滅菌|未滅菌|non[- ]?sterile/i,
+      q: /滅菌(?:の)?(?:方法|条件|有効期限|バリデーション|証明|試験)|EOG|ガンマ線|sterilization (?:method|validation)/i },
+    { k: "pres", say: /防腐剤(?:は)?(?:含ま(?:ない|ず)|不使用|なし|無し|無添加|フリー|使(?:用し|っ)?て(?:い)?(?:ない|ません))|パラベンフリー|preservative[- ]free|no preservatives?/i,
+      q: /防腐剤(?:の)?(?:種類|名前|配合|量|濃度)|どの防腐剤|パラベン(?:の)?(?:種類|量)|preservative (?:type|system|level)/i },
+    { k: "warr", say: /保証\s*[：:は]?\s*(?:なし|無し|ありません|しない|対象外)|保証なし|no warranty/i,
+      q: /保証(?:の)?(?:期間|年数|範囲|条件)|何年(?:の)?保証|warranty (?:period|term)/i },
+    { k: "allg", say: /アレルゲン\s*[：:は]?\s*(?:なし|無し|ありません|含ま(?:ない|ず))|アレルギー物質(?:は)?(?:なし|無し|含まない)|allergen[- ]free|no allergens?/i,
+      q: /アレルゲン(?:の)?(?:表示|種類|一覧|名前)|どのアレルゲン|allergen (?:label|list|declaration)/i },
+  ];
+  V.NEGS = NEGS;
+  function negSaid(t) {
+    const out = {};
+    try {
+      if (!t) return out;
+      // 医療機器：21.98 の 1か所の判定（V98REG.md）を正とする
+      try { if (typeof V98REG !== "undefined" && V98REG && typeof V98REG.md === "function") { const md = V98REG.md(t); if (md && md.v === "no" && md.why !== "pharma" && !/医薬品/.test(String(t.cat || ""))) out.md = "V98REG"; } } catch (e) { /* 下へ */ } // eslint-disable-line no-undef
+      if (t.v98md && t.v98md.v === "no") out.md = out.md || "hear";
+      const txts = [];
+      ["compRows", "dimRows"].forEach((k) => { (Array.isArray(t[k]) ? t[k] : []).forEach((r) => { if (Array.isArray(r)) txts.push(r.join(" ")); }); });
+      ["shelf", "cert", "store", "catRaw"].forEach((k) => { if (typeof t[k] === "string") txts.push(t[k]); });
+      (Array.isArray(t.extraQA) ? t.extraQA : []).forEach((x) => { if (x && x.a) txts.push(String(x.a)); });
+      try { const A = t.v68attrs || {}; Object.keys(A).forEach((k) => { if (typeof A[k] === "string") txts.push(A[k]); }); } catch (e) { /* 無視 */ }
+      try { const F = fillO(); (F && Array.isArray(F.log) ? F.log : []).forEach((x) => { if (x && x.who === "u") txts.push(String(x.html || "").replace(/<[^>]+>/g, "")); }); } catch (e) { /* 無視 */ }
+      const all = NF(txts.join("\n"));
+      NEGS.forEach((n) => { if (!out[n.k] && n.say.test(all)) out[n.k] = "said"; });
+      if (out.md === "said" && t.v98md && t.v98md.v === "yes") delete out.md;
+    } catch (e) { err("negSaid", e); }
+    return out;
+  }
+  V.negSaid = negSaid;
+  // 問いが否定した事柄を前提にしているか（問い自体が否定を確かめる形〔「〜は入っていますか」〕も、答えがもう出ているので出さない）
+  function premiseOf(q, said) {
+    const s = NF(q);
+    for (const n of NEGS) {
+      if (!said[n.k]) continue;
+      if (n.q.test(s)) return n.k;
+    }
+    return "";
+  }
+  V.premiseOf = premiseOf;
+  const NEG_NM = { md: ["医療機器ではない", "not a medical device"], food: ["食品に触れない", "no food contact"], batt: ["電池なし", "no battery"], steril: ["滅菌なし", "non-sterile"], pres: ["防腐剤なし", "no preservatives"], warr: ["保証なし", "no warranty"], allg: ["アレルゲンなし", "no allergens"] };
+  // AI の追加ヒアリングの問い・気づき
+  wrap("llmGapAnalyze", (o) => async function () {
+    const res = await o.apply(this, arguments);
+    try {
+      const t = ten();
+      const said = negSaid(t);
+      if (res && Object.keys(said).length) {
+        const drop = [];
+        res.questions = (res.questions || []).filter((x) => { const k = premiseOf(x && x.q, said); if (k) drop.push({ q: String(x.q).slice(0, 80), k }); return !k; });
+        res.insights = (res.insights || []).filter((x) => { const k = premiseOf(x, said); if (k) drop.push({ q: String(x).slice(0, 80), k, note: 1 }); return !k; });
+        if (drop.length) { cnt("gapDrop", drop.length); lg({ k: "gapDrop", drop }); if (t) t.v101gapDrop = drop.slice(0, 8); }
+      }
+    } catch (e) { err("gap", e); }
+    return res;
+  });
+  // 追加ヒアリングの途中で否定の答えが出たら、残りの問いからも外す
+  wrap("llmExtraNext", (o) => function () {
+    try {
+      const F = fillO(), t = ten();
+      if (F && Array.isArray(F.xq) && F.xq.length && t) {
+        const said = negSaid(t);
+        if (Object.keys(said).length) {
+          const i0 = F.xi || 0;
+          const drop = [];
+          const rest = F.xq.slice(i0).filter((x) => { const k = premiseOf(x && x.q, said); if (k) drop.push(k); return !k; });
+          if (drop.length) {
+            cnt("xqDrop", drop.length);
+            F.xq = F.xq.slice(0, i0).concat(rest);
+            const why = [...new Set(drop)].map((k) => "「" + M(NEG_NM[k][0], NEG_NM[k][1]) + "」").join("");
+            try { W.fillSay("ai", E(M(`前の答え${why}と合わない問い（${drop.length}問）は、聞かずに外しました。`, `${drop.length} question(s) that conflict with your earlier answer ${why} were removed.`, `与之前的回答${why}不符的问题（${drop.length}个）已略过。`, `Se quitaron ${drop.length} pregunta(s) que no encajan con su respuesta anterior ${why}.`))); } catch (e) { /* 無視 */ }
+          }
+        }
+      }
+    } catch (e) { err("xnext", e); }
+    return o.apply(this, arguments);
+  });
+  // 任意項目（④ 業種ごとの項目）：医療機器ではない商品から「医療機器のクラス分類」「届出・認証・登録の番号」を外す（ほかの層の判定に頼らず、答えからも）
+  wrap("v68pGroups", (o) => function (t) {
+    const g = o.apply(this, arguments);
+    try {
+      if (Array.isArray(g) && t && g.indexOf("v92med") >= 0) {
+        const said = negSaid(t);
+        if (said.md && typeof V68P_G !== "undefined" && V68P_G) { // eslint-disable-line no-undef
+          if (!V68P_G.v100hyg && V68P_G.v92med) V68P_G.v100hyg = { ja: "衛生用品の項目", f: V68P_G.v92med.f.filter((f) => f && f.k !== "mdClass" && f.k !== "mdReg").map((f) => Object.assign({}, f, { g: "v100hyg" })) }; // eslint-disable-line no-undef
+          const i = g.indexOf("v92med"); g.splice(i, 1, "v100hyg"); cnt("hyg");
+        }
+      }
+    } catch (e) { err("groups", e); }
+    return g;
+  });
+  // ヒアリングの問いの文（医療・衛生用品）：医療機器かどうかが決まる前は、医療機器を前提にしない言い方に。
+  // 「医療機器ではない」と答えたあとは、クラス分類・ISO 13485・届出の番号を聞かない
+  const MD_Q = /クラス分類|ISO\s*13485|医療機器の認証|届出番号|一般医療機器/;
+  wrap("v68hearNeed", (o) => function (nx, p) {
+    const r = o.apply(this, arguments);
+    try {
+      const x = r || nx;
+      const k = String((x && x.k) || "");
+      if (!x || !/^(compRows|cert|shelf|strengths)$/.test(k) || !(MD_Q.test(String(x.q || "") + String(x.ex || "")) || (k === "shelf" && /滅菌/.test(String(x.q || "") + String(x.ex || ""))))) return r;
+      const t = p || ten();
+      const said = negSaid(t);
+      const no = !!said.md;
+      const y = Object.assign({}, x);
+      if (k === "compRows") {
+        y.q = no ? M("構成品と材質、滅菌の有無を教えてください。<b>医療機器ではないと伺っているので、医療機器のクラス分類は要りません。</b>", "Please tell us the components, materials and whether it is sterilized. <b>As it is not a medical device, no device class is needed.</b>")
+          : M("構成品と材質、滅菌の有無を教えてください。<b>医療機器にあたるかどうか</b>（あたる場合はクラス分類も）をお書きください。相手国での登録・届出の要否は、ここで決まります。", "Please tell us the components, materials, whether it is sterilized, and <b>whether it is a medical device</b> (and its class if so).");
+        y.ex = no ? M("例：本体：ポリプロピレン不織布／耳ひも：ポリウレタン／滅菌：なし", "e.g. Body: PP non-woven / Ear loops: polyurethane / Sterilized: no")
+          : M("例：本体：ポリプロピレン不織布／耳ひも：ポリウレタン／滅菌：なし／医療機器ではない（医療機器なら：一般医療機器 クラスI）", "e.g. Body: PP non-woven / Sterilized: no / Not a medical device (if it is: class I)");
+      } else if (k === "cert") {
+        y.ex = no ? M("例：ISO 9001／試験機関の試験成績書（性能の表示の根拠）", "e.g. ISO 9001 / test reports from a testing body") : M("例：ISO 9001／試験機関の試験成績書／医療機器にあたる場合は届出・認証の番号", "e.g. ISO 9001 / test reports / notification number if it is a medical device");
+      } else if (k === "shelf") {
+        if (!(no || said.steril)) return r;
+        y.n = M("使用期限・保証期間", "Expiry / warranty");
+        y.q = M("使用期限（衛生用品）または保証期間を教えてください。無ければ「なし」で大丈夫です。", "Please tell us the expiry (hygiene products) or warranty. “None” is fine.");
+        y.ex = M("例：製造から3年／保証なし", "e.g. 3 years from manufacture / no warranty");
+      } else if (k === "strengths") {
+        // 強みの例：医療機器かどうかが決まる前・医療機器ではないときは、ISO 13485・滅菌済み を例にしない
+        y.ex = M("例：試験機関で確かめた性能（数字）／日本の工場で一貫生産／個包装", "e.g. performance verified by a testing body (figures) / made in our own factory in Japan / individually wrapped");
+      }
+      cnt("mdQ");
+      return y;
+    } catch (e) { err("hearNeed", e); return r; }
+  });
+  // 追加ヒアリングの途中で否定の問いを外したときは、外したことを言う（「あと3問」と言って2問で終わらないように）
+  V.NEG_NM = NEG_NM;
+
+  /* ════════════ その他（out の担当の申し送り）：味噌などの醸造食品が「酒類」になる ════════════
+     A 有機味噌を📎の資料（区分の行なし・「木桶で天然醸造」「みそ醸造株式会社」）でヒアリングすると、資料の読み取り（土台の detectCat）が
+     「醸造」を数えて酒類（catKey liquor）にし、区分は埋まったとみなされて聞かれない → 営業資料の札「Alcoholic beverages」・酒類の輸入免許。
+     直し：①detectCat：味噌・醤油・酢・甘酒・酒粕・料理酒・みりん（調味料）・麹など醸造食品の言葉があり、酒そのものの言葉（日本酒・清酒・焼酎・ワイン・本みりん・アルコール分…）が無ければ食品
+           ②本人が区分を答えたら（ヒアリング・選び直し）それを正とし、資料の読み取り・AI の推定（mergeTen）で上書きしない
+           ③資料の読み取りで酒類になっても、品名が醸造食品で酒の言葉が無ければ食品に（今までに登録した商品も、本人が答えていなければ同じ） */
+  const FERM = /味噌|みそ|ミソ|醤油|しょうゆ|しょう油|酢|ビネガー|甘酒|あまざけ|酒粕|酒かす|料理酒|みりん|味醂|麹|こうじ|糀|漬物|漬け|納豆|発酵調味料|調味料|たれ|タレ|ソース|ドレッシング|miso|soy\s*sauce|vinegar|amazake|sake\s*lees|mirin|koji/i;
+  const HARDLIQ = /日本酒|清酒|純米酒|純米吟醸|純米大吟醸|吟醸酒|大吟醸|焼酎|泡盛|ウイスキー|ウィスキー|ワイン|ビール|発泡酒|リキュール|梅酒|ブランデー|ウォッカ|本みりん|本味醂|アルコール分|アルコール度数|度数\s*\d|酒税|whisk(?:e)?y|\bwine\b|\bbeer\b|liquor|spirits|shochu|\bsake\b(?!\s*lees)/i;
+  const fermFood = (s) => { const x = NF(s); return FERM.test(x) && !HARDLIQ.test(x); };
+  V.fermFood = fermFood;
+  wrap("detectCat", (o) => function (all) {
+    const r = o.apply(this, arguments);
+    try { if (r === "liquor" && fermFood(all)) { cnt("catFerm"); return "food"; } } catch (e) { err("detectCat", e); }
+    return r;
+  });
+  wrap("applyAnswer", (o) => function (t, k) {
+    const r = o.apply(this, arguments);
+    try { if (r && t && k === "cat" && String(t.cat || "").trim()) t.v101catBy = { by: "hear", cat: String(t.cat), key: String(t.catKey || ""), at: Date.now() }; } catch (e) { err("catBy", e); }
+    return r;
+  });
+  wrap("mergeTen", (o) => function (t, x) {
+    const by = t && t.v101catBy && t.v101catBy.cat ? t.v101catBy : null;
+    const c0 = t ? { cat: t.cat, catKey: t.catKey, catRaw: t.catRaw } : null;
+    const r = o.apply(this, arguments);
+    try {
+      if (t && c0) {
+        if (by && (t.cat !== c0.cat || t.catKey !== c0.catKey)) {
+          // 本人の答えを正とする（資料・AI の推定で上書きしない）
+          t.cat = c0.cat; t.catKey = c0.catKey; if (c0.catRaw === undefined) delete t.catRaw; else t.catRaw = c0.catRaw;
+          cnt("catKeep");
+        } else if (!by && t.catKey === "liquor" && c0.catKey !== "liquor" && fermFood(String(t.item || "") + " " + String(t.itemEn || "")) && !HARDLIQ.test(String(t.catRaw || ""))) {
+          t.cat = "食品"; t.catKey = "food"; delete t.catRaw;
+          t.v101catFix = { from: "酒類", why: "品名が醸造食品（味噌・醤油など）で、酒の言葉が無い", at: Date.now() };
+          cnt("catFix");
+        }
+      }
+    } catch (e) { err("mergeCat", e); }
+    return r;
+  });
+  // 今までに登録した商品：本人が区分を答えていない（資料の読み取りで決まった）酒類で、品名が醸造食品なら食品に
+  function catSweep(t) {
+    try {
+      if (!t || !userT(t) || t.catKey !== "liquor" || (t.v101catBy && t.v101catBy.cat) || t.v101catFixed) return false;
+      if (!fermFood(String(t.item || "") + " " + String(t.itemEn || ""))) return false;
+      if (/酒/.test(String(t.catRaw || "")) && HARDLIQ.test(String(t.catRaw || ""))) return false;
+      t.cat = "食品"; t.catKey = "food"; delete t.catRaw; t.v101catFixed = 1;
+      t.v101catFix = { from: "酒類", why: "品名が醸造食品（味噌・醤油など）で、酒の言葉が無い", at: Date.now() };
+      cnt("catSweep");
+      return true;
+    } catch (e) { err("catSweep", e); return false; }
+  }
+  V.catSweep = catSweep;
+  wrap("tenantToD", (o) => function (t) { try { catSweep(t); } catch (e) { /* 無視 */ } return o.apply(this, arguments); });
+
+  // 起動時と画面の描き直しの前に、今までに登録した商品も掃除する（保存はしない。次の保存で残る）
+  wrap("render", (o) => function () { try { const t = ten(); if (t && userT(t)) { clean(t, "render"); strDedupe(t); compFix(t); } } catch (e) { err("render", e); } return o.apply(this, arguments); });
+  try { cleanAll(); } catch (e) { err("boot", e); }
+  V.ready = 1;
+})();

@@ -1,0 +1,26 @@
+/* 22.01 hear：寸法・重量を入れる欄（No.610）・未確認の項目・材質表の注記（No.614） */
+.v101dim{margin:10px 0 4px;padding:11px 12px;border:1px solid var(--bl,#0064bf);border-radius:var(--r2,8px);background:var(--surface,#fff);font-size:12px;line-height:1.6;max-width:100%;box-sizing:border-box}
+.v101dim-h{margin:0 0 6px}
+.v101dim-h small{display:block;color:var(--ink-2,#44546a);font-size:11.5px;margin-top:2px}
+.v101dim-was{margin:0 0 6px;padding:5px 8px;border-radius:6px;background:var(--warn-soft,#fff6e5);color:var(--ink,#1b2a3a);font-size:11.5px}
+.v101dim-g{border:1px solid var(--line,#d5dbe3);border-radius:6px;margin:0 0 8px;padding:6px 9px 8px;min-width:0}
+.v101dim-g legend{font-weight:700;font-size:11.5px;padding:0 4px;color:var(--ink,#1b2a3a)}
+.v101dim-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px 6px;margin-top:3px}
+.v101dim-row i{font-style:normal;color:var(--ink-3,#7a8797);padding-bottom:6px}
+.v101dim-f{display:inline-flex;flex-direction:column;font-size:10.5px;color:var(--ink-2,#44546a)}
+.v101dim-f input{font:inherit;font-size:13px;padding:5px 6px;border:1px solid var(--line,#c9d1db);border-radius:6px;background:var(--surface,#fff);color:var(--ink,#1b2a3a);box-sizing:border-box;min-height:32px}
+.v101dim-row select{font:inherit;font-size:12px;padding:5px 4px;border:1px solid var(--line,#c9d1db);border-radius:6px;background:var(--surface,#fff);color:var(--ink,#1b2a3a);min-height:32px}
+.v101dim-msg{margin:4px 0;min-height:1em;font-size:12px;color:var(--good,#1a7f4b)}
+.v101dim-msg.bad{color:var(--crit,#c0392b);font-weight:700}
+.v101dim-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.v101dim-btns .btn{font-size:12px;padding:6px 12px;white-space:normal;text-align:left}
+.v101dim-note{margin:7px 0 0;font-size:11px;color:var(--ink-2,#44546a)}
+.v101dimst,.v101hunk,.v101regnote{margin:8px 0;padding:8px 11px;border:1px solid var(--warn,#e0a100);border-radius:var(--r2,8px);background:var(--warn-soft,#fff6e5);font-size:12px;line-height:1.7;color:var(--ink,#1b2a3a);overflow-wrap:anywhere}
+.v101dimst .btn,.v101hunk .btn{font-size:11px;padding:3px 10px;margin:5px 6px 0 0}
+.v101regnote{border-color:var(--line,#d5dbe3);background:var(--surface-2,#f6f8fa)}
+.v101regnote small{color:var(--ink-2,#44546a)}
+@media (max-width:600px){
+  .v101dim{padding:9px 9px}
+  .v101dim-f input{width:58px !important}
+  .v101dim-btns .btn{flex:1 1 100%}
+}
