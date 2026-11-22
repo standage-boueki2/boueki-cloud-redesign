@@ -1,0 +1,21 @@
+/* 刷新版：デモ用アカウントの上の帯（#v57demobar）を最小化する（rd_v101dmin.js と対・2026-11-22 大森さん「デモをするときに邪魔」） */
+/* ひらいているとき：右上に「最小化」。ボタンの分だけ右をあける */
+#v57demobar.k-dmok{padding-right:116px}
+#v57demobar .k-dminbtn{position:absolute;top:7px;right:10px;z-index:1;display:inline-flex;align-items:center;gap:4px;margin:0;font:inherit;font-size:12px;font-weight:700;line-height:1.3;padding:4px 10px;border:1px solid var(--line,#d6e0ec);border-radius:999px;background:var(--card,#fff);color:var(--v33-bl-t,var(--bl-deep,#1d4ed8));cursor:pointer;white-space:nowrap;box-shadow:none}
+#v57demobar .k-dminbtn:hover{background:var(--bl-soft,#eaf3fe);border-color:var(--v33-bl-t,var(--bl-deep,#1d4ed8))}
+#v57demobar .k-dminbtn:focus-visible{outline:2px solid var(--v33-bl-t,var(--bl-deep,#1d4ed8));outline-offset:2px}
+#v57demobar .k-dminbtn svg{width:11px;height:11px;flex:0 0 auto}
+#v57demobar .k-dminlab{display:none}
+/* たたんだとき：1行の細い帯（デモ用アカウント＋保存されないこと＋「ひらく」）。上に張りつかず、ページと一緒に流れる */
+#v57demobar.k-dmin{position:relative;top:auto;flex-wrap:nowrap;align-items:center;gap:8px;padding:3px 10px 3px 14px;font-size:12.5px;line-height:1.5;min-height:0}
+#v57demobar.k-dmin > :not(.k-dminlab):not(.k-dminbtn){display:none!important}
+#v57demobar.k-dmin .k-dminlab{display:block;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+#v57demobar.k-dmin .k-dminlab b{color:var(--v33-bl-t,var(--bl-deep));font-weight:700}
+#v57demobar.k-dmin .k-dminbtn{position:static;flex:0 0 auto;padding:1px 10px;font-size:11.5px}
+@media (max-width:560px){
+  #v57demobar.k-dmok{padding-right:100px}
+  #v57demobar .k-dminbtn{top:5px;right:8px;padding:4px 9px;font-size:11.5px;min-height:28px}
+  #v57demobar.k-dmin{padding:2px 8px 2px 12px;font-size:12px}
+  #v57demobar.k-dmin .k-dminbtn{min-height:26px;padding:1px 9px}
+}
+@media print{#v57demobar .k-dminbtn{display:none}}
