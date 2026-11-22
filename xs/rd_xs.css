@@ -71,3 +71,8 @@
   .k-xsstep>summary{padding:10px 12px}
   .k-xsl2{padding:0 8px 10px}
 }
+/* 22.01.2 の検証：目標と道筋のカードと並ぶときの短い形・用語の印を付けない所は普通の文字のまま */
+.k-xs.k-xs--c{padding:10px 14px 10px 14px}
+.k-xs.k-xs--c .k-xsone{display:none}
+.k-xs.k-xs--c .k-xst{font-size:16px;margin:6px 0 2px}
+.k-xs.k-xs--c .k-xswhy{font-size:13.5px;font-weight:600}

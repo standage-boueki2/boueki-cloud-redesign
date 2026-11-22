@@ -63,7 +63,7 @@
     { id: "dg_yaichi", team: "デジタルチーム", grp: "販路", nm: "YAICHI", one: "現在は運用を止めています", st: [5], on: "stop", plans: ["（運用停止中）"] },
     { id: "dg_coupang", team: "デジタルチーム", grp: "販路", nm: "Coupang（韓国）", one: "現在は運用を止めています", st: [5], on: "stop", plans: ["（運用停止中）"] },
     // 物流チーム・STANDAGE の機能
-    { id: "lg_coo", team: "物流チーム", grp: "物流・決済", nm: "原産地の登録と原産地証明書（EPA）", one: "EPA を使うと相手の国の関税が下がることがあります。原産地の登録と証明書の申請を代行します", st: [6, 7], plans: ["原産地登録サポート（1SKU・1協定）", "特定原産地証明書の発給の申請代行（1申請）"], self: ["ops:doc", "書類をつくる"] },
+    { id: "lg_coo", team: "物流チーム", grp: "物流・決済", nm: "原産地の登録と原産地証明書（EPA）", one: "原産地の登録（1品目・1協定ごと）と、特定原産地証明書の申請を代行します", st: [6, 7], plans: ["原産地登録サポート（1SKU・1協定）", "特定原産地証明書の発給の申請代行（1申請）"], self: ["ops:doc", "書類をつくる"] },
     { id: "fn_trade", team: "STANDAGE（商社）", grp: "物流・決済", nm: "STANDAGE が商社として間に入る", one: "初めての取引・代金の回収が心配な相手は、STANDAGE が輸出者になり、書類・通関・代金の回収を引き受けます", st: [6], fn: 1, plans: ["間接貿易（STANDAGE が輸出者）", "手数料込みのオファーを AI が計算", "商社デスクで担当とやりとり"], self: ["case", "商流を決める（案件の画面）"] },
     { id: "fn_logi", team: "STANDAGE（物流）", grp: "物流・決済", nm: "物流の見積・出荷の手配", one: "見積に入れる送料を物流会社に一度に頼み、仮押さえ・出荷の手配まで進めます", st: [6, 7], fn: 1, plans: ["物流会社への見積の依頼（相見積）", "仮押さえ・出荷の手配"], self: ["ops:ship", "出荷を進める"] },
     { id: "fn_pay", team: "STANDAGE（決済）", grp: "物流・決済", nm: "ブロックチェーン決済", one: "代金と船荷証券をデジタルの金庫で同時に交換し、「送ったのに払われない」を防ぐ仕組みです（準備中）", st: [6], fn: 1, on: "soon", plans: ["代金と船荷証券の同時交換（デジタル金庫）"] },
@@ -168,7 +168,23 @@
     dg_amazon: (c) => (c.step >= 5 && has(c.allCc, ["US", "GB", "DE", "FR", "IT", "ES", "JP", "CA", "AU", "SG", "AE"]) && consumer(c) && c.ch.indexOf("ec") >= 0 ? { w: 40, why: "販路に EC を選んでいます。Amazon は掲載と運営を代行できます" } : null),
     dg_yaichi: () => null,
     dg_coupang: () => null,
-    lg_coo: (c) => { if (c.step < 6 && c.best < 3) return null; let L = []; try { const f = G("v85docEpaOf"); L = c.allCc.filter((x) => x !== "US" && f && f(x) && (f(x).ag || []).length); } catch (e) { L = []; } return L.length ? { w: 58, why: `${L.slice(0, 3).map((x) => { try { return G("v85docCName") ? window.v85docCName(x) : x; } catch (e) { return x; } }).join("・")}は日本と EPA があります。原産地を証明すると、相手の関税が下がることがあります（価格で選ばれやすくなります）` } : null; },
+    // 22.01.2 の検証 x1-1：関税が 0% の国（シンガポール・香港など）に「関税が下がる」と言わない。EPA があり、アプリの関税率（v56priceDuty＝市場のページ・価格の画面と同じ数）が 0% より大きい国だけ。分からない国は出さない
+    lg_coo: (c) => {
+      if (c.step < 6 && c.best < 3) return null;
+      const ep = G("v85docEpaOf"), cn = G("v85docCName"), du = G("v56priceDuty");
+      if (!ep || !du) return null;
+      const L = [];
+      c.allCc.forEach((x) => {
+        if (x === "US") return;
+        let e = null; try { e = ep(x); } catch (er) { e = null; }
+        if (!e || !(e.ag || []).length) return;
+        const name = (cn && cn(x)) || x;
+        let d = null; try { d = du(name); } catch (er) { d = null; }
+        const n = d && d.n != null && isFinite(+d.n) ? +d.n : null;
+        if (n != null && n > 0) L.push({ name, n, ref: d.src !== "item" });
+      });
+      return L.length ? { w: 58, why: `${L.slice(0, 3).map((y) => `${y.name}（${y.ref ? "関税の目安" : "いまの関税"} ${Math.round(y.n * 10) / 10}%）`).join("・")}は日本と EPA があります。原産地を証明できれば、この関税が下がることがあります` } : null;
+    },
     fn_trade: (c) => (c.best >= 2 && !c.route ? { w: 90, why: `${c.best >= 4 ? "契約・取引" : "サンプル・見積"}の段階の相手がいるのに、商流（直接／STANDAGE が間に入る）がまだ決まっていません。初めての相手・代金の回収が心配な相手は、STANDAGE に任せると安全です` } : null),
     fn_logi: (c) => (c.best >= 3 ? { w: c.best >= 5 ? 75 : 60, why: c.best >= 5 ? "取引が始まりました。出荷の手配（物流会社の見積・仮押さえ）をここから進められます" : "見積を出す段階です。送料を物流会社にまとめて見積もってもらうと、CIF・DDP の価格を正しく出せます" } : null),
     fn_pay: (c) => (c.best >= 3 && c.best <= 5 ? { w: 30, why: "支払条件を決める段階です。前払い・L/C の代わりに、代金と船荷証券を同時に交換する決済を STANDAGE が準備しています" } : null),
@@ -179,17 +195,29 @@
     const c = XS.ctx(jny);
     const R = XS.rec();
     const out = [];
+    // 22.01.2 の検証 x1-1：いまの段階より前に「抜け」（100% でない段階）があれば、その段階のサービスを先に（貿易ジャーニーの「抜けを埋める」と同じ考え）
+    const gaps = (c.jny && Array.isArray(c.jny.gaps)) ? c.jny.gaps.map((s) => s && s.no).filter(Boolean) : [];
     M.forEach((m) => {
       if (m.on === "stop") return;
       let r = null; try { r = W[m.id] ? W[m.id](c) : null; } catch (e) { r = null; }
       if (!r) return;
-      let w = r.w;
-      if (m.st.indexOf(c.step) >= 0) w += 20; else if (Math.min.apply(null, m.st) > c.step) w -= 25;
+      let w = r.w, at = c.step, gap = 0;
+      const g = m.st.find((s) => gaps.indexOf(s) >= 0);
+      if (g) { w += 28; at = g; gap = 1; }
+      else if (m.st.indexOf(c.step) >= 0) w += 20;
+      else if (Math.min.apply(null, m.st) > c.step) { w -= 25; at = m.st[0]; }
+      else at = m.st[m.st.length - 1];
       const a = R.asks.find((x) => x && x.m === m.id);
-      out.push({ m, why: S(r.why, 220), w, asked: !!a, ask: a || null });
+      out.push({ m, why: S(r.why, 220), w, at, gap, asked: !!a, ask: a || null });
     });
     out.sort((a, b) => b.w - a.w);
     return { c, list: out };
+  };
+  /* 出してよいもの（相談済み・今は要らない・同じチームを控えている を除く）。カードと「いまのおすすめ」は同じ並び */
+  XS.avail = function (list, R, t) {
+    R = R || XS.rec(); t = t || now();
+    const grpNo = {}; Object.keys(R.no).forEach((id) => { const x = R.no[id]; if (x && x.until > t) { const m = M.find((y) => y.id === id); if (m && x.grp) grpNo[m.team] = Math.max(grpNo[m.team] || 0, x.grp); } });
+    return list.filter((x) => !x.asked && !(R.no[x.m.id] && R.no[x.m.id].until > t) && !((grpNo[x.m.team] || 0) > t));
   };
 
   /* ───── 記録（会社ごと・この端末の保存＋同期のキー） ───── */
@@ -233,20 +261,28 @@
     opt = opt || {};
     try { if (typeof PID === "undefined" || !PID) return null; } catch (e) { return null; } // eslint-disable-line no-undef
     const R = XS.rec(); const t = now();
-    const open = R.props.find((p) => p && (p.st === "new" || p.st === "seen" || (p.st === "later" && (p.until || 0) <= t)));
     const { c, list } = XS.rank(jny);
+    const av = XS.avail(list, R, t);
+    let open = R.props.find((p) => p && (p.st === "new" || p.st === "seen" || (p.st === "later" && (p.until || 0) <= t)));
+    let swap = false;
     if (open) {
-      const still = list.find((x) => x.m.id === open.m);
-      if (still || open.st !== "later") { if (open.st === "later") { open.st = "new"; XS.save(); } return open; }
+      // 22.01.2 の検証 x1-1：見せている提案が、ほかの商品のもの・いまのおすすめ（上位3つ）から外れたものなら、古い提案として下げて選び直す（頻度の間は待たない）
+      const top3 = av.slice(0, 3).map((x) => x.m.id);
+      const stale = (open.pk != null && open.pk !== c.item) || top3.indexOf(open.m) < 0;
+      if (!stale) {
+        const x = av.find((y) => y.m.id === open.m); if (x) { open.why = x.why; open.step = x.at; }
+        if (open.st === "later") open.st = "new";
+        XS.save(); return open;
+      }
+      open.st = "stale"; open.stAt = t; swap = true; open = null;
     }
     const fd = freqDays();
-    if (!fd) return null;
+    if (!fd) { if (swap) XS.save(); return null; }
     const stepUp = c.step > (R.pr.lastStep || 0);
-    if (!stepUp && t - (R.pr.lastAt || 0) < fd * DAY && !opt.force) return null;
-    const grpNo = {}; Object.keys(R.no).forEach((id) => { const x = R.no[id]; if (x && x.until > t) { const m = M.find((y) => y.id === id); if (m && x.grp) grpNo[m.team] = Math.max(grpNo[m.team] || 0, x.grp); } });
-    const pick = list.find((x) => !x.asked && !(R.no[x.m.id] && R.no[x.m.id].until > t) && !((grpNo[x.m.team] || 0) > t) && !R.props.some((p) => p && p.m === x.m.id && p.at > t - 30 * DAY));
-    if (!pick) { if (stepUp) { R.pr.lastStep = c.step; XS.save(); } return null; }
-    const p = { id: "x" + t.toString(36) + Math.random().toString(36).slice(2, 5), m: pick.m.id, at: t, step: c.step, why: pick.why, st: "new" };
+    if (!swap && !stepUp && t - (R.pr.lastAt || 0) < fd * DAY && !opt.force) return null;
+    const pick = av.find((x) => !R.props.some((p) => p && p.m === x.m.id && p.st !== "stale" && p.at > t - 30 * DAY));
+    if (!pick) { if (stepUp) R.pr.lastStep = c.step; XS.save(); return null; }
+    const p = { id: "x" + t.toString(36) + Math.random().toString(36).slice(2, 5), m: pick.m.id, at: t, step: pick.at || c.step, gap: pick.gap || 0, pk: c.item, why: pick.why, st: "new" };
     R.props.push(p); R.pr.lastAt = t; R.pr.lastStep = c.step; XS.save();
     try { if (typeof notifBadge === "function") notifBadge(); } catch (e) { /* 無い */ } // eslint-disable-line no-undef
     return p;

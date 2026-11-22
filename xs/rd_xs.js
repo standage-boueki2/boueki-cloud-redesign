@@ -26,7 +26,7 @@
     } catch (e) { /* 無い版 */ }
     return undefined;
   };
-  const jny = () => { try { return RD._jny || (RD.jnyNow ? RD.jnyNow() : null); } catch (e) { return null; } };
+  const jny = () => { try { return RD.jnyNow ? RD.jnyNow() : (RD._jny || null); } catch (e) { return RD._jny || null; } }; // 商品を切り替えた直後でも古い控え（RD._jny）を使わない
   const shipper = () => { try { const S = G("SES"); return !RD.locked() && !RD.isFwd() && !(S && S.t === "admin") && !!G("PID"); } catch (e) { return false; } };
   const TAG = { "改訂中": ["改訂中のメニュー", "gy"] };
   const stTag = (m) => (m.on === "stop" ? '<span class="rd-tag gy">運用停止中</span>' : m.on === "soon" ? '<span class="rd-tag bl">準備中</span>' : "") + (m.src && TAG[m.src] ? `<span class="rd-tag ${TAG[m.src][1]}" title="クロスセルメニュー表の改訂中のシートにある項目です">${TAG[m.src][0]}</span>` : "");
@@ -78,10 +78,13 @@
     if (pid) b.push(`<button type="button" class="k-xslink" data-xs="later" data-xp="${esc(pid)}">あとで</button><button type="button" class="k-xslink" data-xs="no" data-xp="${esc(pid)}">今は要らない</button>`);
     return `<div class="k-xsbtns">${b.join("")}</div>`;
   }
-  function cardHtml(p) {
+  // 22.01.2 の検証 x1-2：用語の印（点線の言葉）を付けない＝読み上げで「EPA」「関税」などが抜けて文が壊れない（data-noterm＝今のアプリの印・k-termhint＝刷新版の印）
+  const NOTERM = 'data-noterm=""';
+  function cardHtml(p, compact) {
     const m = X.item(p.m); if (!m) return "";
-    return `<section class="rd-x k-xs" data-xsc="${esc(p.id)}" aria-label="STANDAGE のサービスの提案">
-      <div class="k-xsh"><span class="k-xsbadge">${I("bulb", 16)}AI商社マンからの提案</span><span class="k-xsmeta">STANDAGE のサービス・STEP ${String(p.step).padStart(2, "0")} ${esc(X.step[p.step] || "")}・${md(p.at)}</span></div>
+    // 22.01.2 の検証 x1-1：目標と道筋の「AI商社マンからの提案」と見分けがつくように、名前を「STANDAGE のサービスの提案」に。段階はそのサービスが合う段階（前の段階の抜けなら「抜け」）
+    return `<section class="rd-x k-xs k-termhint${compact ? " k-xs--c" : ""}" ${NOTERM} data-xsc="${esc(p.id)}" aria-label="STANDAGE のサービスの提案">
+      <div class="k-xsh"><span class="k-xsbadge">${I("bulb", 16)}STANDAGE のサービスの提案</span><span class="k-xsmeta">STEP ${String(p.step).padStart(2, "0")} ${esc(X.step[p.step] || "")}${p.gap ? "（抜け）" : ""}・AI商社マンが選びました・${md(p.at)}</span></div>
       <h3 class="k-xst">${esc(m.nm)}</h3>
       <p class="k-xswhy">${esc(p.why)}</p>
       <p class="k-xsone">${esc(m.one)}<span class="k-xsteam">（${esc(m.team)}）</span></p>
@@ -96,7 +99,8 @@
     $$(".k-xs[data-xsc]", w).forEach((x) => x.remove());
     let p = null; try { p = X.now(jny()); } catch (e) { console.error("[xs] now", e); p = null; }
     if (!p) return;
-    const html = cardHtml(p); if (!html) return;
+    // 目標と道筋の提案カードが同じ画面にあるときは、短い形（中身の説明の行を省く）で1枚に見えすぎないように
+    const html = cardHtml(p, !!$(".k-rm88 .v88prop", w)); if (!html) return;
     const after = $(".k-rm88", w) || $("[data-rdhero]", w);
     if (after) after.insertAdjacentHTML("afterend", html); else w.insertAdjacentHTML("afterbegin", html);
     if (p.st === "new") { p.st = "seen"; X.save(); }
@@ -121,7 +125,7 @@
     let L = []; try { L = X.rank(jny()).list; } catch (e) { L = []; }
     const x = L.filter((y) => ids.indexOf(y.m.id) >= 0 && !y.asked && !(R.no[y.m.id] && R.no[y.m.id].until > t)).sort((a, b) => ids.indexOf(a.m.id) - ids.indexOf(b.m.id) || b.w - a.w)[0];
     if (!x) return;
-    const html = `<div class="rd-x k-xsl" data-xsl="${esc(k)}"><span class="k-xsli">${I("bulb", 18)}</span><span class="k-xslt"><b>STANDAGE に頼めます：${esc(x.m.nm)}</b><span>${esc(x.why)}</span></span>
+    const html = `<div class="rd-x k-xsl k-termhint" ${NOTERM} data-xsl="${esc(k)}"><span class="k-xsli">${I("bulb", 18)}</span><span class="k-xslt"><b>STANDAGE に頼めます：${esc(x.m.nm)}</b><span>${esc(x.why)}</span></span>
       <span class="k-xslb"><button type="button" class="rd-btn ghost k-xsb2" data-xs="ask" data-xm="${esc(x.m.id)}">相談する</button><button type="button" class="k-xslink" data-xs="more" data-xm="${esc(x.m.id)}">ほかのサービス</button><button type="button" class="k-xsx" data-xs="ctxno" data-xk="${esc(k)}" aria-label="この画面では14日出さない" title="この画面では14日出さない">${I("x", 16) || "×"}</button></span>
       <div class="k-xsform" data-xsf="${esc(x.m.id)}" hidden></div></div>`;
     const hero = $("[data-rdhero]", w);
@@ -134,8 +138,9 @@
     let rk = { c: { step: 1 }, list: [] }; try { rk = X.rank(J); } catch (e) { console.error("[xs] rank", e); }
     const c = rk.c, step = c.step || 1;
     const R = X.rec(); const t = Date.now();
-    const top = rk.list.filter((x) => !(R.no[x.m.id] && R.no[x.m.id].until > t)).slice(0, 3);
-    const recIds = rk.list.filter((x) => !(R.no[x.m.id] && R.no[x.m.id].until > t)).slice(0, 6).map((x) => x.m.id);
+    const av = X.avail(rk.list, R, t); // ホームのカードと同じ並び（相談済み・今は要らないを除く）
+    const top = av.slice(0, 3);
+    const recIds = av.slice(0, 6).map((x) => x.m.id);
     const whyOf = (id) => { const x = rk.list.find((y) => y.m.id === id); return x ? x.why : ""; };
     const askOf = (id) => R.asks.find((a) => a && a.m === id) || null;
     const row = (m, rec, quiet) => {
@@ -158,7 +163,7 @@
     }).join("");
     const asks = X.asks();
     const stNm = { sent: "STANDAGE に届けました", trial: "体験用のアカウントのため届けていません（記録だけ）", unsent: "まだ届いていません", draft: "下書き" };
-    return `<section class="rd-x k-xspage">
+    return `<section class="rd-x k-xspage k-termhint" ${NOTERM}>
       <div class="rd-card k-xstop"><div class="k-xsh"><span class="k-xsbadge">${I("bulb", 16)}いまのおすすめ</span><span class="k-xsmeta">STEP ${String(step).padStart(2, "0")} ${esc(X.step[step] || "")}・${esc(c.item || "商品が未登録")}${c.ctyNm && c.ctyNm.length ? "・" + esc(c.ctyNm.join("・")) : ""}</span></div>
         ${top.length ? `<ul class="k-xsl2">${top.map((x) => row(x.m, true)).join("")}</ul>` : '<p class="k-xsone">いまの段階でおすすめできるサービスはありません。下の一覧から、いつでも相談できます。</p>'}
         <p class="rd-note">おすすめは、貿易ジャーニーの現在地・商材・販売先国・商談の進み・目標（目的・販路）から AI商社マンが選んでいます。理由はお客様のデータだけから書いています。</p></div>
