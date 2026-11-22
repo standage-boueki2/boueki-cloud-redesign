@@ -656,7 +656,10 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
           if (ts.length < 6 || tl.length <= ts.length || drop.has(long) || trimmed.some((x) => x.e === long)) return;
           const raw = NF(elTx(long)).replace(/\s+/g, " ").trim(), rs = NF(elTx(short)).replace(/\s+/g, " ").trim();
           const re1 = new RegExp("^" + esc(rs) + "\\s*" + SEPS + "\\s*(.+)$", "i"), re2 = new RegExp("^(.+?)\\s*" + SEPS + "\\s*" + esc(rs) + "$", "i");
-          const m = raw.match(re1) || raw.match(re2);
+          /* 22.01.3（x1-4）：「Household goods by 社名」「区分 from 社名」「社名's 区分」のように、社名が別の文の中に入る形も（社名と、つなぎの言葉だけを外す） */
+          const CONJ = "(?:by|from|of|made by|produced by|manufactured by|supplied by|brought to you by|par|de|von|por|由)";
+          const re3 = new RegExp("^(.+?)\\s+" + CONJ + "\\s+" + esc(rs) + "\\.?$", "i"), re4 = new RegExp("^" + esc(rs) + "\\s*['’]s\\s+(.+)$", "i");
+          const m = raw.match(re1) || raw.match(re2) || raw.match(re3) || raw.match(re4);
           if (!m || !m[1] || m[1].trim().length < 2) return;
           try {
             const p0 = long.ps[0] || {}; const r0 = Object.assign({}, ((p0.r || [])[0]) || {}); delete r0.r;
@@ -695,6 +698,8 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
           if (typeof V.priceDec === "function") V.priceDec(M);
           if (typeof V.packUnitSpec === "function") V.packUnitSpec(M, lang0); // 22.01.2（w1-11）
           if (typeof V.polishModel === "function") V.polishModel(M, lang0); // 22.01.2（w2-15）
+          if (typeof V.heroDedupe === "function") V.heroDedupe(M, lang0); // 22.01.3（x1-4）
+          if (typeof V.factLabelDup === "function") V.factLabelDup(M, lang0); // 22.01.3（x2-14）
           const d = dedupe(M, tt, lang0);
           V.lastDup = { at: Date.now(), uid: V.pkey(tt), lang: lang0, list: d };
           /* 22.01.2：営業資料の画面の「表紙（見本）」が、資料の表紙と同じバッジを出せるように、ほかの層（fact）の直しの後の表紙のバッジを
@@ -1356,6 +1361,172 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
         en: (m) => "Unit dimensions on the packaging page now point to the dimensions in the specifications table: " + m[1], zh: (m) => "包装・物流页的单品尺寸已与规格表一致：" + m[1], es: (m) => "Las dimensiones de la unidad en la página de embalaje remiten a la tabla de especificaciones: " + m[1] });
     }
   } catch (e) { err("i18n1012", e); }
+})();
+
+/* ═══ 22.01.3 out（22.01.2 の公開後の検証 x1・x2 の指摘） ═══
+   x1-4（中）B の表紙：社名が「Household goods by 社名」の形で2回（coverDup に「by／from／’s」の形を足した）・
+         同じ表紙で見出し「99.9% sanitizing rate in third-party testing」とバッジ「99.9% germ removal rate」が同じ事実を2回（heroDedupe）
+   x2-3（中）E：作った後の表紙の見本が2つ（3-layer structure／Individually packaged）、資料の表紙は3つ（PFE, BFE, VFE 99% filtration が先頭）。
+         原因：見本が読む控え（deck3.v101cover）は資料を組む前のバッジ（「PFE・BFE・VFE 99% filtration」）で、見本の側の「日本語を除く」決まりが
+         「・」（全角の中黒）を日本語と数えて落としていた。資料の表紙では後の校正で「・」が「, 」になる。
+         直し：資料ができた後（最終チェックのとき）に、表紙のスライドの文字で控えを置き換える（同じ数・同じ順・同じ言葉）。見本は「・」で落とさない。
+   x2-14（低）E の梱包のページ「Shelf life: Expiration date: 3 years from manufacture」（同じ事実の見出しが2つ）（factLabelDup）
+   x1-9（低）支払の書き方のばらつき（見積 T/T 100% in advance・D の資料 prepayment・A・C advance payment）→ 資料の中は「T/T 100% in advance」に（payWord） */
+(function () {
+  "use strict";
+  const W = window, V = W.V101OUT;
+  if (!V || V._v1013) return;
+  V._v1013 = 1;
+  const err = V.errf, NF = V.NF;
+  const cnt = (k, d) => { try { const x = d == null ? 1 : +d; if (x) V.n[k] = (V.n[k] || 0) + x; } catch (e) { /* 数えるだけ */ } };
+  const plain = (s) => NF(String(s == null ? "" : s)).replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
+  const key = (s) => plain(s).toLowerCase().replace(/[^a-z0-9%À-ɏ一-鿿]+/g, "");
+
+  /* 見出し（headline）とバッジが同じ事実（同じ数字と単位）を言うとき、バッジを外す（見出しの方が詳しいので残す） */
+  const NUMU = /(\d+(?:\.\d+)?)\s*(%|％|mm\/s|layers?|-layer|-ply|ply|層)/gi; // 数と単位が同じ「売りの数字」だけ（期間・重さは別の事実のことがあるので見ない）
+  const facts = (s) => { const out = new Set(); String(s || "").replace(NUMU, (m0, n, u) => { out.add(n + "|" + u.toLowerCase().replace(/^-/, "").replace(/s$/, "").replace("％", "%")); return m0; }); return out; };
+  V.heroDedupe = function (M0) {
+    try {
+      const H = M0 && M0.hero; if (!H || !Array.isArray(H.badges) || !H.badges.length) return 0;
+      const hf = facts(plain(H.headline) + " " + plain(H.brand));
+      if (!hf.size) return 0;
+      const keep = [], gone = [];
+      H.badges.forEach((b) => { const bf = facts(plain(b && b.t)); const same = [...bf].some((x) => hf.has(x)); if (same && plain(b && b.t).split(" ").length <= 8) gone.push(plain(b.t)); else keep.push(b); });
+      if (!gone.length) return 0;
+      M0.hero = Object.assign({}, H, { badges: keep });
+      V.lastHeroDup = { at: Date.now(), gone, head: plain(H.headline).slice(0, 80) };
+      cnt("heroDup", gone.length);
+      return gone.length;
+    } catch (e) { err("heroDup", e); return 0; }
+  };
+
+  /* 値の頭に、項目名と同じ事実の見出しがもう1つ付く（「Shelf life: Expiration date: 3 years…」）ときは、値の頭の見出しを外す */
+  const HEADV = /^\s*([A-Za-zÀ-ɏ][A-Za-zÀ-ɏ .\-/()]{2,32}?)\s*[:：]\s*(.+)$/;
+  V.factLabelDup = function (M0, lang) {
+    let n = 0;
+    try {
+      if (!M0 || typeof V.factOf !== "function") return 0;
+      const fix = (lab, val) => {
+        const m = NF(val).match(HEADV); if (!m) return null;
+        const k1 = V.factOf(lab), k2 = V.factOf(m[1]);
+        if (!k1 || k1 !== k2) return null;
+        return m[2].trim();
+      };
+      (M0.packs || []).forEach((pk) => {
+        (pk && Array.isArray(pk.facts) ? pk.facts : []).forEach((f) => { if (f && typeof f.v === "string") { const nv = fix(f.k, f.v); if (nv) { f.v = nv; n++; } } });
+        (pk && Array.isArray(pk.rows) && Array.isArray(pk.cols) && pk.cols.length <= 2 ? pk.rows : []).forEach((r) => { if (Array.isArray(r) && typeof r[1] === "string") { const nv = fix(r[0], r[1]); if (nv) { r[1] = nv; n++; } } });
+      });
+      [].concat(M0.specsList || [], M0.specsP1 ? [M0.specsP1] : []).forEach((sp) => (sp && sp.rows || []).forEach((r) => { if (Array.isArray(r) && typeof r[1] === "string") { const nv = fix(r[0], r[1]); if (nv) { r[1] = nv; n++; } } }));
+      const P = M0.pricing || {};
+      [].concat(P.terms || [], ...(P.groups || []).map((g) => g.terms || [])).forEach((t) => { if (t && typeof t.v === "string") { const nv = fix(t.k, t.v); if (nv) { t.v = nv; n++; } } });
+      if (M0.glance && Array.isArray(M0.glance.items)) M0.glance.items.forEach((x) => { if (x && typeof x.v === "string") { const nv = fix(x.k || x.l, x.v); if (nv) { x.v = nv; n++; } } });
+      if (n) { V.lastLabelDup = { at: Date.now(), n }; cnt("labelDup", n); }
+    } catch (e) { err("labelDup", e); }
+    return n;
+  };
+
+  /* 要約のページ（At a Glance）も同じ：「Shelf life｜Expiration date: 3 years…」（v85dkGlanceList はスライドを組むときに値を作る） */
+  if (typeof W.v85dkGlanceList === "function" && !W.v85dkGlanceList.v101out) {
+    const __gl1013 = W.v85dkGlanceList;
+    const f = function () {
+      const items = __gl1013.apply(this, arguments);
+      try {
+        (Array.isArray(items) ? items : []).forEach((it) => {
+          if (!it || typeof it.v !== "string" || typeof V.factOf !== "function") return;
+          const m = NF(it.v).match(HEADV); if (!m) return;
+          const k1 = V.factOf(it.k), k2 = V.factOf(m[1]);
+          if (k1 && k1 === k2) { it.v = m[2].trim(); V.lastLabelDup = { at: Date.now(), n: ((V.lastLabelDup && V.lastLabelDup.n) || 0) + 1 }; cnt("labelDupGl"); }
+        });
+      } catch (e) { err("glance", e); }
+      return items;
+    };
+    f.v101out = 1;
+    W.v85dkGlanceList = f;
+  }
+
+  /* 支払の書き方を、資料の中で1つ（見積の文面と同じ「T/T 100% in advance」）にそろえる。英語の資料だけ・意味は変えない */
+  const payWord = (s) => String(s)
+    .replace(/\b(\d{1,3})\s*%\s*T\/T\s*(?:in advance|advance payment|prepayment|pre-payment|advance)\b/gi, "T/T $1% in advance")
+    .replace(/\bT\/T\s*,?\s*(\d{1,3})\s*%\s*(?:advance payment|prepayment|pre-payment|payment in advance|advance|in advance)\b/gi, "T/T $1% in advance")
+    .replace(/\b(\d{1,3})\s*%\s*(?:advance payment|prepayment|pre-payment|payment in advance)\b(?:\s*(?:by|via)\s*T\/T)?/gi, (m0, p) => (/T\/T/i.test(m0) ? "T/T " : "") + p + "% in advance");
+  V.payWord = payWord;
+  V.payModel = function (M0, lang) {
+    let n = 0;
+    try {
+      if (!M0 || !/^en/.test(String(lang || ""))) return 0;
+      const seen = new WeakSet();
+      const walk = (o, d) => {
+        if (!o || typeof o !== "object" || seen.has(o) || d > 8) return;
+        seen.add(o);
+        Object.keys(o).forEach((k) => { if (/^(ic|src|ref|url|web|mail|photos|media)$/.test(k)) return; const v = o[k]; if (typeof v === "string") { if (/advance|prepay|T\/T/i.test(v)) { const nv = payWord(v); if (nv !== v) { o[k] = nv; n++; } } } else walk(v, d + 1); });
+      };
+      ["pricing", "glance", "packs", "products", "quality", "v85", "specsList", "hero", "contact"].forEach((k) => walk(M0[k], 0));
+      if (n) cnt("payWord", n);
+    } catch (e) { err("payWord", e); }
+    return n;
+  };
+  if (typeof W.dk3Model === "function" && !W.dk3Model.v101out1013) {
+    const __dm1013 = W.dk3Model;
+    const f = function (lang0) { const M0 = __dm1013.apply(this, arguments); try { if (M0 && lang0 && !/^ja/.test(String(lang0))) V.payModel(M0, lang0); } catch (e) { err("payM", e); } return M0; };
+    f.v101out1013 = 1;
+    W.dk3Model = f;
+  }
+
+  /* x2-3：資料ができた後の表紙の文字で、見本の控え（deck3.v101cover）を置き換える（同じ数・同じ順・同じ言葉） */
+  function syncCover(deck) {
+    try {
+      if (!deck || !Array.isArray(deck.slides) || !deck.lang || /^ja/.test(deck.lang)) return;
+      const g = V.G(); const T = (g && g.ten) || V.ten(); if (!T || !T.deck3 || !T.deck3.v101cover) return;
+      const rec = T.deck3.v101cover[deck.lang]; if (!rec || !Array.isArray(rec.b)) return;
+      const cv = deck.slides.find((s) => s && s.kind === "cover"); if (!cv) return;
+      const tx = (cv.els || []).filter((e) => e && e.k === "text" && Array.isArray(e.ps)).map((e) => plain(e.ps.map((p) => (p.r || []).map((r) => (r && r.r ? r.r.map((x) => x.t || "").join("") : String((r && r.t) || ""))).join("")).join(" ")));
+      const nb = [], used = new Set();
+      const words = (s) => new Set(plain(s).toLowerCase().split(/[^a-z0-9%.]+/).filter((w) => w.length >= 3));
+      const nums = (s) => (plain(s).match(/\d+(?:\.\d+)?/g) || []).join(",");
+      rec.b.forEach((b) => {
+        const k = key(b);
+        let hit = tx.find((t) => !used.has(t) && key(t) === k);
+        if (!hit) { // ほかの層が表紙で言い方を少し変えた（「Bactericidal rate」→「Germ removal rate」・「・」→「, 」）：数字が同じで、言葉の半分以上が同じもの
+          const wb = words(b);
+          hit = tx.find((t) => { if (used.has(t) || nums(t) !== nums(b)) return false; const wt = words(t); let same = 0; wb.forEach((w) => { if (wt.has(w)) same++; }); return wb.size && same / wb.size >= 0.5 && wt.size <= wb.size + 3; });
+        }
+        if (hit) { used.add(hit); nb.push(hit); }
+      });
+      // 表紙に無いバッジ（重なりで外した・枠に入らない）は見本にも出さない。順は控え（＝表紙の並び）のまま
+      if (nb.join("\n") !== rec.b.join("\n")) { const c2 = Object.assign({}, T.deck3.v101cover); c2[deck.lang] = Object.assign({}, rec, { b: nb, synced: Date.now() }); T.deck3.v101cover = c2; cnt("coverSync"); }
+    } catch (e) { err("coverSync", e); }
+  }
+  V.syncCover = syncCover;
+  if (typeof W.dk3Check === "function" && !W.dk3Check.v101out1013) {
+    const __ck1013 = W.dk3Check;
+    const f = function (deck) {
+      const r = __ck1013.apply(this, arguments);
+      try { syncCover(deck); } catch (e) { err("ck1013", e); }
+      try {
+        const fresh = (x) => x && Date.now() - x.at < 15 * 60000;
+        if (r && Array.isArray(r.ok) && fresh(V.lastHeroDup) && !r.ok.some((x) => /^表紙で見出しと同じ事実のバッジを/.test(String(x)))) r.ok.push("表紙で見出しと同じ事実のバッジを外しました（同じことを2回言わない）：「" + V.lastHeroDup.gone.join("」「") + "」（見出し「" + V.lastHeroDup.head + "」）");
+        if (r && Array.isArray(r.ok) && fresh(V.lastLabelDup) && !r.ok.some((x) => /^値の頭の見出しの重なりを/.test(String(x)))) r.ok.push("値の頭の見出しの重なりを外しました（「Shelf life: Expiration date: …」→「Shelf life: …」など " + V.lastLabelDup.n + "か所）");
+      } catch (e) { err("ck1013b", e); }
+      return r;
+    };
+    f.v101out1013 = 1;
+    W.dk3Check = f;
+  }
+  // 次の資料の分だけを書く（dk3Model の始めに消す）
+  if (typeof W.dk3Model === "function" && !W.dk3Model.v101out1013r) {
+    const __dm1013r = W.dk3Model;
+    const f = function () { V.lastHeroDup = null; V.lastLabelDup = null; return __dm1013r.apply(this, arguments); };
+    f.v101out1013r = 1;
+    W.dk3Model = f;
+  }
+  try {
+    if (typeof I18N !== "undefined" && I18N && Array.isArray(I18N.pat)) { // eslint-disable-line no-undef
+      I18N.pat.unshift({ re: /^表紙で見出しと同じ事実のバッジを外しました（同じことを2回言わない）：([\s\S]+)$/, // eslint-disable-line no-undef
+        en: (m) => "Removed a cover badge that repeated the headline’s fact: " + m[1], zh: (m) => "已删除与封面标题重复同一事实的徽章：" + m[1], es: (m) => "Se quitó una insignia de portada que repetía el dato del titular: " + m[1] });
+      I18N.pat.unshift({ re: /^値の頭の見出しの重なりを外しました（([\s\S]+)）$/, // eslint-disable-line no-undef
+        en: (m) => "Removed duplicated labels at the start of values (" + m[1] + ")", zh: (m) => "已删除值开头重复的标签（" + m[1] + "）", es: (m) => "Se quitaron etiquetas repetidas al inicio de los valores (" + m[1] + ")" });
+    }
+  } catch (e) { err("i18n1013", e); }
 })();
 
 /* ═══ v22.01 out：最終チェックの ✓ の文（英・中・西） ═══ */

@@ -504,6 +504,7 @@
       Object.keys(o6).forEach((k) => { if (!(k in s6) && !/^v99|^v100/.test(k)) delete o6[k]; });
       Object.assign(o6, s6);
       if (again) recompute(R);
+      skipLater(R);
       R.v101deal = 1;
     } catch (e) { err("fixR", e); }
     return R;
@@ -559,11 +560,13 @@
       const ms = (sc && Array.isArray(sc.missing) ? sc.missing : []).filter((x) => x && x.k);
       if (!ms.length) return null;
       const skip = skipOf(t);
-      const passed = (k) => skip.indexOf(k) >= 0 || !!(t.v92r9bDash && t.v92r9bDash[k]); // 任意の項目を飛ばした・「—」と答えた
+      /* 22.01.3（x2-12・x1-9）：入数（ctn）は「飛ばした項目」の控え（この PC の保存）で数え方を変えない。前は、同じ回は飛ばした扱いで
+         「寸法・重量を入れる」、入り直すと控えが消えて「寸法・重量・入数を入れる」に変わった。入数がまだなら、いつも寸法と一緒に出す */
+      const passed = (k) => k !== "ctn" && (skip.indexOf(k) >= 0 || !!(t.v92r9bDash && t.v92r9bDash[k])); // 任意の項目を飛ばした・「—」と答えた
       const req = ms.filter((x) => (+x.w || 0) >= 5);
       const opt = ms.filter((x) => (+x.w || 0) < 5 && !passed(x.k));
       let B = req.length ? req.slice() : opt.slice();
-      if (B.some((x) => x.k === "dimRows")) { const c = opt.find((x) => x.k === "ctn"); if (c && B.indexOf(c) < 0) B.push(c); }
+      if (B.some((x) => x.k === "dimRows")) { const c = ms.find((x) => x.k === "ctn"); if (c && B.indexOf(c) < 0) B.push(c); }
       if (!B.length) B = ms.slice();
       const deferred = { dimRows: !!t.v101dimLater, ctn: !!(t.v101ctnLater || t.v101dimLater) };
       const logiAll = B.filter((x) => LOGI.indexOf(x.k) >= 0).map((x) => x.k);
@@ -681,11 +684,38 @@
   function fix1(s1, t) {
     try {
       if (!s1 || !Array.isArray(s1.it) || !t || !t.item) return s1;
+      /* 22.01.3（x1-9・x2-12）：現在地バーの「次の一手」「抜けを埋める」も見出しの「次は」と同じ言葉に（前は「寸法・重量」だけ）。
+         「まだ分からない」にした寸法・入数は印 v101later を付け、バーの次の一手に選ばない（skipLater） */
+      const G = dimsGap(t);
+      const isLogi = (x) => x && !x.ok && /^(寸法・重量|パレット・コンテナ入数)/.test(String(x.t || ""));
+      if (G) {
+        const L = s1.it.filter(isLogi);
+        L.forEach((x) => { if (G.later) x.v101later = 1; else delete x.v101later; });
+        const first = G.later ? null : L[0];
+        if (first && !first.v101lab) { first.v101t0 = first.t; first.t = DIMS.t(G); first.v101lab = 1; }
+      }
       s1.it.forEach((x) => { if (x && !x.ok && /^(寸法・重量|パレット・コンテナ入数)/.test(String(x.t || "")) && !(x.go && x.go.v101)) x.go = { k: "ops:doc", find: ["寸法・重量を入れる", "書類を自動でつくる"], act: "v101dealDims", v101: 1 }; }); // 22.01.2：入数も同じ欄の近くへ
     } catch (e) { err("fix1", e); }
     return s1;
   }
   V.fix1 = fix1;
+  // 「まだ分からない」にした寸法・入数（v101later）を、バーの「次の一手」「抜けを埋める」に選ばない（ほかの抜けがあればそちら・無ければ先の手順）
+  function skipLater(R) {
+    try {
+      if (!R || !Array.isArray(R.S)) return R;
+      const later = (x) => !!(x && x.v101later);
+      const live = (s) => s.it.some((x) => !x.ok && !later(x));
+      if (!R.nextItem || !later(R.nextItem)) return R;
+      R.gaps = (R.gaps || []).filter((s) => live(s));
+      const S = R.S, now = R.now || 0;
+      const step = R.gaps[0] || (S[now] && S[now].pct < 100 && live(S[now]) ? S[now] : S.slice(now + 1).find((s) => s.pct < 100 && live(s))) || null;
+      R.nextStep = step;
+      R.nextItem = step ? step.it.find((x) => !x.ok && !later(x)) : null;
+      R.v101skip = 1;
+    } catch (e) { err("skipLater", e); }
+    return R;
+  }
+  V.skipLater = skipLater;
 
   /* ══════ No.615 書類をつくる（と出荷）の規制の欄：関税率・STEP03 の確かめ・販売前の手続きを分けて出す ══════ */
   const E = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);

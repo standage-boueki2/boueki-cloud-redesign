@@ -55,8 +55,11 @@
     var L = [];
     try {
       if (!T) return L;
-      (Array.isArray(T.v101unk) ? T.v101unk : []).forEach(function (u) { if (u && (u.q || u.k)) L.push({ src: "hear", k: String(u.k || ""), q: NF(u.q || u.n || u.k || ""), a: NF(u.a || "") }); });
-      (Array.isArray(T.extraQA) ? T.extraQA : []).forEach(function (x, i) { if (x && x.q && isUnk(x.a)) L.push({ src: "extra", k: "extraQA." + i, q: NF(x.q), a: NF(x.a) }); });
+      /* 22.01.3（hear の申し送り）：問いの「事柄」の印（TEN.extraQA[i].v101tp・window.v101qaTopics(問い)）も持たせる。
+         問いの文の判定と並べて使い、どちらかで当たれば「不明」の事柄とする（topicsOf） */
+      var qtp = function (q) { try { return (typeof window !== "undefined" && typeof window.v101qaTopics === "function") ? (window.v101qaTopics(q) || []) : []; } catch (e) { return []; } };
+      (Array.isArray(T.v101unk) ? T.v101unk : []).forEach(function (u) { if (u && (u.q || u.k)) { var q0 = NF(u.q || u.n || u.k || ""); L.push({ src: "hear", k: String(u.k || ""), q: q0, a: NF(u.a || ""), tps: Array.isArray(u.v101tp) ? u.v101tp : qtp(q0) }); } });
+      (Array.isArray(T.extraQA) ? T.extraQA : []).forEach(function (x, i) { if (x && x.q && isUnk(x.a)) L.push({ src: "extra", k: "extraQA." + i, q: NF(x.q), a: NF(x.a), tps: Array.isArray(x.v101tp) ? x.v101tp : qtp(x.q) }); });
       var A = T.v68attrs;
       if (A && typeof A === "object" && !Array.isArray(A)) Object.keys(A).forEach(function (k) { var v = A[k]; if (!/^_/.test(k) && typeof v === "string" && isUnk(v)) { var lab = k; try { if (typeof v68dAttrLab === "function") lab = v68dAttrLab(k) || k; } catch (e) { /* 無視 */ } L.push({ src: "attr", k: "v68attrs." + k, q: NF(lab), a: NF(v) }); } });
       ["origin", "cert", "shelf", "store", "moq", "lead", "ctn"].forEach(function (k) { if (typeof T[k] === "string" && isUnk(T[k])) L.push({ src: "field", k: k, q: ({ origin: "原産地・製造国", cert: "認証・規格", shelf: "期限・保証", store: "保存方法", moq: "最小ロット", lead: "リードタイム", ctn: "入数" })[k], a: NF(T[k]) }); });
@@ -71,7 +74,7 @@
     try {
       var T = ten || curT();
       if (!T) return r;
-      var U = unkList(T), saidUnk = U.some(function (u) { return u.k === "origin" || (u.src !== "field" && ORIG_Q.test(u.q)); });
+      var U = unkList(T), saidUnk = U.some(function (u) { return u.k === "origin" || (u.src !== "field" && (ORIG_Q.test(u.q) || (Array.isArray(u.tps) && u.tps.indexOf("origin") >= 0))); });
       var hit = function (val, src) { var v = NF(val).trim(); if (!v || isUnk(v)) return false; var c = countryOf(v); r.known = true; r.country = c || v.replace(/[（(].*$/, "").trim().slice(0, 40); r.src = src; r.raw = v.slice(0, 60); return true; };
       /* ① 登録の項目（原産地） */
       if (typeof T.origin === "string" && hit(T.origin, "入力")) return r;
@@ -161,9 +164,9 @@
   V.stripOrigin = stripOrigin;
   var TOPICS = [
     /* 22.01.1：「成分適合性」「基準適合」など車種・機種の適合でない「適合」は話題にしない（B の容器の耐性試験の問いで適合の話題になっていた） */
-    { k: "fit", lab: "適合（車種・機種・品番）", ja: /適合(?:車種|車|表|品番|機種|型式|一覧|リスト|する(?:車|機種|型式))|車種|対応車|対応機種|互換|フィッティング|fitment|application (?:list|chart)/i,
+    { k: "fit", lab: "適合（車種・機種・品番）", ja: /適合(?!性|宣言|証明|基準|規格|検査|試験)|車種|対応車|対応機種|対応メーカー|互換|純正品番|純正番号|純正部品番号|OE(?:M)?番号|品番対応|フィッティング|fitment|compatib|application (?:list|chart)|cross[- ]?reference/i,
       en: /application (?:chart|list|guide|table|catalog(?:ue)?|data)|\bfitments?\b|\bcompatib(?:le|ility)\b|\bfits?\s+(?:most|all|major|leading|many|popular)\b|\b(?:major|leading|all|most|popular|many)[\s-]+(?:japanese[\s-]+)?(?:passenger[- ]car[\s-]+|car[\s-]+|vehicle[\s-]+|auto(?:motive)?[\s-]+|automobile[\s-]+)?(?:makers?|brands?|manufacturers?|models?|OEMs?)\b|\bOEM[- ](?:equivalent|replacement|compatible)\b|\bdirect[- ]fit\b|\bcovers? (?:most|major|all) (?:models|vehicles|cars)\b|主要メーカー|適合表|車種対応|适配|适用车型|compatible con|aplicaci[oó]n/i,
-      ja2: /主要メーカー|適合|対応車種|全車種|多車種|互換/ },
+      ja2: /主要メーカー|適合|対応車種|全車種|多車種|互換/, zh: /主要(?:汽車|汽车)?(?:品牌|製造商|制造商|車廠|车厂|車款|车款)|對應.{0,8}(?:車款|車型|品牌|製造商)|对应.{0,8}(?:车款|车型|品牌|制造商)|適用(?:車款|車型)|适用(?:车款|车型)|適配|适配|相容車型|兼容车型/ },
     { k: "asbestos", lab: "アスベスト不使用", ja: /アスベスト|石綿|asbestos/i, en: /non-?asbestos|asbestos[- ]free(?! certificate)|free (?:of|from) asbestos|without asbestos|no asbestos|无石棉|sin amianto|sin asbesto/i, ja2: /アスベスト|石綿|NAO/i,
       /* 「NAO 材」は登録した材質の名前なので消さない。「non-asbestos」「asbestos-free」の言い切りだけを外し、NAO には「アスベスト不使用の証明は要確認」を付ける */
       strip: function (s) { return String(s).replace(/\s*\(\s*non-?asbestos[^)]*\)/gi, "").replace(/\bnon-?asbestos(?:\s+organic)?\s*/gi, "").replace(/\s*[,;]?\s*\basbestos[- ]free\b\s*/gi, " ").replace(/\b(?:free (?:of|from)|without|no) asbestos\b\s*/gi, "").replace(/\s{2,}/g, " ").replace(/\s+([,.;:)])/g, "$1").trim(); },
@@ -191,18 +194,44 @@
       var mD = q.match(DOC_W);
       if (mD && mD.index < mT.index && /について|の(?:内容|詳細|項目)|[、・,]/.test(q.slice(mD.index, mT.index))) return false;
       if (tp.k === "shelflife" && u.src !== "field" && T && typeof T.shelf === "string" && T.shelf.trim() && !isUnk(T.shelf) && /\d/.test(T.shelf)) return false;
-      if (!tp.qual && tp.ja2 && u.src !== "field" && DETAIL_Q.test(q.replace(tp.ja, ""))) {
-        var reg = regText(T);
-        if (tp.ja2.test(reg) || tp.ja.test(reg)) return false;
+      if (/^(?:organic|halal)$/.test(tp.k) && u.src !== "field" && DETAIL_Q.test(q.replace(tp.ja, ""))) {
+        var regC = prodsOf(T).map(function (t) { return NF((t && t.cert) || ""); }).join(" ");
+        if (tp.ja2 && tp.ja2.test(regC)) return false;
       }
     } catch (e) { err("tpa", e); }
     return true;
   }
   V.topicApplies = topicApplies;
+  /* 印だけで当たったとき（問いの文では当たらないとき）の除外：資料の項目として聞いている問い・登録の期限・登録の認証の細目 */
+  function tagSkip(tp, u, T, q) {
+    try {
+      var mD = q.match(DOC_W);
+      if (mD && /について|の(?:内容|詳細|項目)/.test(q.slice(mD.index))) return true;
+      if (tp.k === "shelflife" && T && typeof T.shelf === "string" && T.shelf.trim() && !isUnk(T.shelf) && /\d/.test(T.shelf)) return true;
+      /* 印の言葉のうち、ほかの意味にも取れるもの：「型式」だけ（機械の型式）・「capacity」だけ（ボトルの容量）は、印だけでは当てない */
+      if (tp.k === "fit" && !/車|年式|互換|純正|適合|対応|フィッティング|fitment|compatib|application|cross/i.test(q)) return true;
+      if (tp.k === "capacity" && !/生産|供給|月産|年産|production|supply|monthly|annual|output/i.test(q)) return true;
+      if (/^(?:organic|halal)$/.test(tp.k) && DETAIL_Q.test(q)) {
+        var regC = prodsOf(T).map(function (t) { return NF((t && t.cert) || ""); }).join(" ");
+        if (tp.ja2 && tp.ja2.test(regC)) return true;
+      }
+    } catch (e) { err("tagSkip", e); }
+    return false;
+  }
   function topicsOf(u, T) {
     var q = NF(u.q), out = [];
     TOPICS.forEach(function (tp) { if (tp.ja.test(q) && topicApplies(tp, u, T)) out.push(tp); });
-    if (ORIG_Q.test(q)) out.push({ k: "origin", lab: "原産国・製造国", en: ORIGIN_EN, origin: 1 });
+    /* 22.01.3（hear の申し送り）：問いの事柄の印（v101tp）で当たったものも足す。
+       問いの文で当たったのに上の判定で外したもの（資料の項目・登録の期限・有機の細目）は、印があっても足さない（文での判定が正） */
+    var tags = Array.isArray(u.tps) ? u.tps : [];
+    tags.forEach(function (k) {
+      if (k === "origin") return;
+      var tp = TOPICS.filter(function (x) { return x.k === k; })[0];
+      if (!tp || out.indexOf(tp) >= 0 || tp.ja.test(q)) return;
+      if (tagSkip(tp, u, T, q)) return;
+      out.push(tp); V.n.qaTag = (V.n.qaTag || 0) + 1;
+    });
+    if (ORIG_Q.test(q) || tags.indexOf("origin") >= 0) out.push({ k: "origin", lab: "原産国・製造国", en: ORIGIN_EN, origin: 1 });
     /* 問いに出てくる認証・試験・規格の名前（ISO 13485・CE・FDA・BFE…）：「ありますか」の形の問いで、登録に無いものだけ */
     if (/認証|証明|証書|登録|届出|承認|試験|テスト|検査|成績書|規格|適合宣言|certif|test|report/i.test(q) && ASK_HAVE.test(q)) {
       var reg = regText(T), toks = [];
@@ -231,7 +260,7 @@
     var L = [];
     try {
       var U = unkList(T);
-      U.forEach(function (u) { topicsOf(u, T).forEach(function (tp) { if (tp.origin) return; if (!L.some(function (x) { return x.k === tp.k; })) L.push({ k: tp.k, lab: tp.lab, en: tp.en, ja2: tp.ja2, tableOnly: tp.tableOnly, strip: tp.strip, qual: tp.qual, qtxt: tp.qtxt, q: u.q, a: u.a, src: u.src }); }); });
+      U.forEach(function (u) { topicsOf(u, T).forEach(function (tp) { if (tp.origin) return; if (!L.some(function (x) { return x.k === tp.k; })) L.push({ k: tp.k, lab: tp.lab, en: tp.en, zh: tp.zh, ja2: tp.ja2, tableOnly: tp.tableOnly, strip: tp.strip, qual: tp.qual, qtxt: tp.qtxt, q: u.q, a: u.a, src: u.src }); }); });
       var O = v101origin(T);
       if (!O.known) L.push({ k: "origin", lab: "原産国・製造国", en: ORIGIN_EN, ja2: /日本製|国産|国内生産|国内製造|Made in Japan/i, q: "原産地・製造国", a: (U.filter(function (u) { return u.k === "origin" || ORIG_Q.test(u.q); })[0] || {}).a || "未登録", origin: 1 });
     } catch (e) { err("topics", e); }
@@ -247,7 +276,8 @@
   V.whyUnk = whyUnk;
   var NOT_ASSERT = /\b(?:is|are)\s+not\s+(?:yet\s+)?(?:registered|specified|confirmed|available|provided|stated|listed|known|verified)\b|\b(?:not|un)\s*(?:yet\s+)?(?:confirmed|registered|specified|verified)\b|\bunknown\b|未確認|未登録|要確認/i;
   V.NOT_ASSERT = NOT_ASSERT;
-  function hitTopic(s, L) { s = String(s || ""); if (TBC_RE.test(s) || NOT_ASSERT.test(s)) { if (!L.some(function (tp) { return tp.origin; }) || !originHits(s.replace(NOT_ASSERT, " ").replace(TBC_RE, " "))) return null; } for (var i = 0; i < L.length; i++) { var tp = L[i]; if (tp.tableOnly) continue; if (tp.origin ? originHits(s) : (tp.en && tp.en.test(s))) return tp; } return null; }
+  function hitTopic1(s, L) { if (TBC_RE.test(s) || NOT_ASSERT.test(s)) { if (!L.some(function (tp) { return tp.origin; }) || !originHits(s.replace(NOT_ASSERT, " ").replace(TBC_RE, " "))) return null; } for (var i = 0; i < L.length; i++) { var tp = L[i]; if (tp.tableOnly) continue; if (tp.origin ? originHits(s) : ((tp.en && tp.en.test(s)) || (tp.zh && tp.zh.test(s)))) return tp; } return null; }
+  function hitTopic(s, L) { s = String(s || ""); var parts = s.split(/[;；]|(?<=[.!?。])\s+/).filter(function (z) { return z.trim(); }); if (parts.length < 2) return hitTopic1(s, L); for (var i = 0; i < parts.length; i++) { var h = hitTopic1(parts[i], L); if (h) return h; } return null; }
   V.hitTopic = hitTopic;
   var TBC = { en: "to be confirmed", es: "por confirmar", zh: "待确认", fr: "à confirmer", de: "zu bestätigen", it: "da confermare", pt: "a confirmar", ko: "확인 필요", ja: "要確認" };
   var TBC_RE = /to be confirmed|por confirmar|待确认|待確認|à confirmer|zu bestätigen|da confermare|a confirmar|확인 필요|要確認|未確認/i;
@@ -434,18 +464,39 @@
     return null;
   }
   V.evFor = evFor;
+  /* 引用の片（原文と少し違う）に近い根拠の行：片の2字ずつの組の8割以上を含み、片の数字を全部含む、表でない行 */
+  function bigr(q) { var a = []; for (var i = 0; i + 1 < q.length; i++) a.push(q.slice(i, i + 2)); return a; }
+  function nearLine(blocks, ids, z) {
+    var q = SQ0(z); if (q.length < 4) return null;
+    var bq = bigr(q), digs = NF(z).match(/\d+(?:\.\d+)?/g) || [], best = null, bs = 0;
+    ids.forEach(function (id) {
+      String(blocks[id] || "").split("\n").forEach(function (ln) {
+        ln = ln.trim(); if (!ln || /[|｜]/.test(ln)) return;
+        var lq = SQ0(ln); if (lq.length < 4) return;
+        if (!digs.every(function (d) { return lq.indexOf(d) >= 0; })) return;
+        var bl = {}; bigr(lq).forEach(function (g) { bl[g] = 1; });
+        var h = bq.filter(function (g) { return bl[g]; }).length / bq.length;
+        if (h > bs || (h === bs && best && ln.length < best.ln.length)) { bs = h; best = { id: id, ln: ln.length > 120 ? ln.slice(0, 120) : ln }; }
+      });
+    });
+    return bs >= 0.8 ? best : null;
+  }
+  V.nearLine = nearLine;
   var FREE_RE = /\b(?:fragrance|colou?r(?:ant|ing)?s?|preservatives?|alcohol|ethanol|parabens?|additives?|gluten|grains?|asbestos|latex|sulfates?|silicones?)[- ]free\b/i;
   var FREE_RE_G = new RegExp(FREE_RE.source, "gi");
   var CTA_RE = /^(?:Please\s+)?(?:Contact|Discuss|Request|Ask|Reach out|Get in touch|Let's|Let us|Send|Email|Talk|Explore|Start|Book|Schedule|Inquire|Enquire|Partner)\b/i;
-  var CTA_WORDS = /\b(?:contact|discuss|request|ask|reach|out|get|touch|let's|let|send|email|talk|explore|start|book|schedule|inquire|enquire|partner|partnership|opportunit(?:y|ies)|distribution|importing|import|samples?|quotes?|quotations?|pricing|prices?|list|details?|information|terms|your|market|markets|needs|requirements|today|together|now|more|learn|next|steps?|options?|collaboration|plans?|volumes?|channels?)\b/gi;
+  var CTA_WORDS = /\b(?:contact|discuss|request|ask|reach|out|get|touch|let's|let|send|email|talk|explore|start|book|schedule|inquire|enquire|partner|partnership|opportunit(?:y|ies)|distribution|importing|import|samples?|quotes?|quotations?|pricing|prices?|list|details?|information|terms|your|market|markets|needs|requirements|today|together|now|more|learn|next|steps?|options?|collaboration|plans?|volumes?|channels?|documentation|documents?|commercial|catalog(?:ue)?s?|specifications?|specs?|sheets?|data|inquiries|enquiries|questions?|availability|available|supply|supplies|orders?|ordering)\b/gi;
   /* 用途・買い手の言葉 → 根拠（日本語）の言葉。用途の言葉が全部根拠にあるときだけ残す */
   var USE_DICT = [[/^motors?$/, /モーター|電動機/], [/^pumps?$/, /ポンプ/], [/^(?:conveyors?|conveying|conveyance)$/, /搬送|コンベア/], [/^fans?$/, /ファン|送風/], [/^compressors?$/, /コンプレッサー|圧縮機/], [/^(?:gearbox(?:es)?|gears?|reducers?)$/, /ギア|歯車|減速機/],
     [/^(?:rotating|rotary|rotation)$/, /回転/], [/^(?:industrial|industry)$/, /産業|工業/], [/^(?:automotive|cars?|vehicles?|automobiles?)$/, /自動車|乗用車|車/], [/^bicycles?$/, /自転車/], [/^appliances?$/, /家電/], [/^kitchens?$/, /キッチン|台所|厨房/],
     [/^restaurants?$/, /飲食店|レストラン/], [/^hotels?$/, /ホテル/], [/^(?:hospitals?|clinics?)$/, /病院|クリニック|医療機関/], [/^(?:schools?|kindergartens?|nurser(?:y|ies))$/, /学校|幼稚園|保育/], [/^(?:pets?|dogs?|cats?)$/, /ペット|犬|猫/],
     [/^salons?$/, /サロン/], [/^(?:retail|retailers?|stores?|shops?)$/, /小売|店舗|販売店|ショップ/], [/^supermarkets?$/, /スーパー/], [/^(?:pharmac(?:y|ies)|drugstores?)$/, /薬局|ドラッグストア/], [/^(?:machinery|machines?)$/, /機械|機器/], [/^equipment$/, /機器|装置|設備/]];
   var BUYER_W = /^(?:buyers?|customers?|users?|makers?|manufacturers?|oems?|components?|parts?|applications?|uses?|sourcing|procurement|teams?|distributors?|importers?|wholesalers?|brands?|companies|operators?|owners?|segments?|need|needs|for|and|or|the|a|an|of|in|to|with|who|that|requiring|seeking|looking)$/i;
-  function useEv(txt, blocks, ids) {
-    var words = (NF(txt).toLowerCase().match(/[a-z][a-z'-]*/g) || []).filter(function (w) { return !BUYER_W.test(w) && !FUNC_W.test(w); });
+  var PART_W = /^(?:sections?|areas?|parts?|portions?|units?|points?|positions?|rotating|moving|use|used|for|in|on)$/i;
+  function useEv(txt, blocks, ids, T) {
+    var allowU = {};
+    try { prodsOf(T).concat([T]).forEach(function (t) { if (!t) return; [t.itemEn, t.coEn].forEach(function (n) { (NF(n || "").toLowerCase().match(/[a-z]{2,}/g) || []).forEach(function (w) { allowU[w] = 1; allowU[w.replace(/s$/, "")] = 1; }); }); }); } catch (e) { /* 無視 */ }
+    var words = (NF(txt).toLowerCase().match(/[a-z][a-z'-]*/g) || []).filter(function (w) { return !BUYER_W.test(w) && !FUNC_W.test(w) && !allowU[w] && !allowU[w.replace(/s$/, "")] && !(PART_W.test(w) && !USE_DICT.some(function (e) { return e[0].test(w); })); });
     if (!words.length) return null;
     var srcTxt = ids.map(function (id) { return String(blocks[id] || ""); }).join("\n");
     var jas = [];
@@ -454,19 +505,14 @@
       if (!d || !d[1].test(srcTxt)) return null;
       jas.push(d[1]);
     }
-    var first = jas[0];
-    for (var k = 0; k < ids.length; k++) {
-      var lines = String(blocks[ids[k]] || "").split("\n");
-      for (var j = 0; j < lines.length; j++) {
-        var ln = lines[j].trim();
-        if (!ln || /[|｜]/.test(ln) || !first.test(ln)) continue;
-        var all = jas.every(function (re) { return re.test(ln); });
-        if (!all) continue;
-        var m = ln.match(first), cand = ln.length > 80 ? ln.slice(Math.max(0, m.index - 20), Math.max(0, m.index - 20) + 70) : ln;
-        if (SQ0(cand).length >= 6) return { id: ids[k], ln: cand };
-      }
-    }
-    return null;
+    /* 用途の言葉ごとに、その言葉を含む表でない根拠の行（1行で全部を含む行があればそれ・無ければ行を「｜」でつなぐ） */
+    var pick = function (res) { for (var k = 0; k < ids.length; k++) { var lines = String(blocks[ids[k]] || "").split("\n"); for (var j = 0; j < lines.length; j++) { var ln = lines[j].trim(); if (!ln || /[|｜]/.test(ln) || !res.every(function (re) { return re.test(ln); })) continue; var m = ln.match(res[0]), cand = ln.length > 80 ? ln.slice(Math.max(0, m.index - 20), Math.max(0, m.index - 20) + 70) : ln; if (SQ0(cand).length >= 3) return { id: ids[k], ln: cand }; } } return null; };
+    var one = pick(jas);
+    if (one && SQ0(one.ln).length >= 6) return one;
+    var outL = [], outI = [];
+    for (var q = 0; q < jas.length; q++) { var e1 = pick([jas[q]]); if (!e1) return null; if (outL.indexOf(e1.ln) < 0) outL.push(e1.ln); if (outI.indexOf(e1.id) < 0) outI.push(e1.id); }
+    if (!outL.length || outL.map(SQ0).join("").length < 6) return null;
+    return { id: outI.join(","), ln: outL.join("｜") };
   }
   V.useEv = useEv;
   function lineWith(blocks, ids, test) {
@@ -568,6 +614,26 @@
             if (ol) { x.blk = ol.id; x.ev = ol.ln; ch++; cnt("originEv"); }
           }
         }
+        /* ②⁰ 22.01.3（x1-5）：照合の AI の引用が根拠の原文と少し違う（言い換え・全角と半角・語順）→ 土台が「根拠の引用が根拠の原文に見つからない」で外す。
+              引用の片が原文に無いときは、その片の文字の8割以上を含む根拠の行（表でない行・片の数字を全部含む）に置き換える */
+        if (x.ok === true && x.ev && String(x.blk || "").trim() && String(x.blk).trim() !== "-") {
+          var bsq = {}; Object.keys(F.blocks).forEach(function (id) { bsq[id] = SQ0(F.blocks[id]); });
+          var ids0 = String(x.blk).split(/[,\s、]+/).filter(Boolean);
+          var parts0 = String(x.ev).split(/[｜|]/).map(function (z) { return z.trim(); }).filter(function (z) { return SQ0(z); });
+          var inIds = function (q) { return ids0.filter(function (id) { return bsq[id] && bsq[id].indexOf(q) >= 0; })[0] || Object.keys(bsq).filter(function (id) { return bsq[id].indexOf(q) >= 0; })[0]; };
+          if (parts0.some(function (z) { return !inIds(SQ0(z)); })) {
+            var fixed0 = [], fb = [], okF = true;
+            parts0.forEach(function (z) {
+              var hid = inIds(SQ0(z));
+              if (hid) { fixed0.push(z); if (fb.indexOf(hid) < 0) fb.push(hid); return; }
+              var best = nearLine(F.blocks, ids, z);
+              if (!best) { okF = false; return; }
+              if (fixed0.indexOf(best.ln) < 0) fixed0.push(best.ln);
+              if (fb.indexOf(best.id) < 0) fb.push(best.id);
+            });
+            if (okF && fixed0.length) { x.ev = fixed0.join("｜"); x.blk = fb.join(","); ch++; cnt("nearEv"); lg({ k: "nearEv", txt: txt.slice(0, 50), ev: x.ev.slice(0, 80) }); }
+          }
+        }
         /* ②''' 22.01.1・22.01.2（v2-7・w1-5・w2-7）：引用が短い（「紙」「ブナ材」）・表の行の「|」で切れて短くなる（土台は「｜」と「|」の両方で切る）
            → 同じ値を含む、表でない根拠の行（📎の仕様書「容器：PET／トリガー：PP／ラベル：紙」など）を引用に。短ければ隣の行も含める */
         if (x.ok === true && x.ev && String(x.blk || "").trim() && String(x.blk).trim() !== "-") {
@@ -578,7 +644,22 @@
           if (shortQ) {
             var vals = evs.map(function (z) { return z.replace(/^#\d+\s*/, "").trim(); }).filter(function (z) { return SQ(z).length >= 1 && !/^[—\-–]$/.test(z); });
             var outE = [], outB = [], okE = vals.length > 0;
-            vals.forEach(function (v) { if (!okE) return; var e1 = evFor(F.blocks, ids, v, SQ); if (!e1) { okE = false; return; } if (outE.indexOf(e1.ln) < 0) outE.push(e1.ln); if (outB.indexOf(e1.id) < 0) outB.push(e1.id); });
+            /* 22.01.3（x1-5 B）：3字以上で原文にそのままある片（表の「食品接触なし」）はそのまま残す。短い片（「紙」）だけを表でない行に置き換える */
+            var bsq3 = {}; Object.keys(F.blocks).forEach(function (id) { bsq3[id] = SQ(F.blocks[id]); });
+            vals.forEach(function (v) {
+              if (!okE) return;
+              var sv = SQ(v), vid = sv.length >= 3 ? Object.keys(bsq3).filter(function (id) { return bsq3[id].indexOf(sv) >= 0; })[0] : null;
+              if (vid) { if (outE.indexOf(v) < 0) outE.push(v); if (outB.indexOf(vid) < 0) outB.push(vid); return; }
+              var e1 = evFor(F.blocks, ids, v, SQ);
+              if (!e1) { okE = false; return; }
+              if (outE.indexOf(e1.ln) < 0) outE.push(e1.ln); if (outB.indexOf(e1.id) < 0) outB.push(e1.id);
+            });
+            /* 残した片を合わせても短いとき（「ラベル：紙」だけ）は、短い片を表でない行全体に置き換える */
+            if (okE && outE.length && outE.map(SQ).join("").length < needN) {
+              var outE2 = [], outB2 = [];
+              outE.forEach(function (v) { var e2 = SQ(v).length < 6 ? evFor(F.blocks, ids, v, SQ) : null; var lnv = e2 ? e2.ln : v; if (outE2.indexOf(lnv) < 0) outE2.push(lnv); var idv = e2 ? e2.id : Object.keys(bsq3).filter(function (id) { return bsq3[id].indexOf(SQ(v)) >= 0; })[0]; if (idv && outB2.indexOf(idv) < 0) outB2.push(idv); });
+              outE = outE2; outB = outB2;
+            }
             if (okE && outE.length && outE.map(SQ).join("").length >= needN) { x.ev = outE.join("｜"); x.blk = outB.join(","); ch++; cnt("shortEv"); lg({ k: "shortEv", txt: txt.slice(0, 50), ev: x.ev.slice(0, 80) }); }
           }
         }
@@ -595,18 +676,18 @@
         }
         /* ⑥ 22.01.2（w1-5）：事実を言わない呼びかけ（「Contact us to discuss export terms for your market.」）を土台が「事実を含むのに根拠の引用が無い」で外す
               → 会社名の行を引用に（呼びかけの言葉・つなぎの言葉だけのときだけ） */
-        if (x.ok === true && (!String(x.blk || "").trim() || String(x.blk).trim() === "-") && CTA_RE.test(txt) && !/\d/.test(txt.replace(/\b[A-Z]{1,6}[-‐]?[A-Z0-9-]*\d[A-Z0-9-]*\b/g, " ")) && !SUP_RE.test(txt) && !hitTopic(txt, UT)) {
+        if (((x.ok === true && (!String(x.blk || "").trim() || String(x.blk).trim() === "-")) || (x.ok === false && !x.v101 && /記載|根拠|明記/.test(String(x.why || "")))) && CTA_RE.test(txt) && !/\d/.test(txt.replace(/\b[A-Z]{1,6}[-‐]?[A-Z0-9-]*\d[A-Z0-9-]*\b/g, " ")) && !SUP_RE.test(txt) && !hitTopic(txt, UT)) {
           var rc = residualWords(txt.replace(CTA_WORDS, " "), T, MT);
           if (rc && !rc.left.length) {
             var cc1 = lineWith(F.blocks, ["C1"], function (z) { return /^(?:英文社名|会社名)[:：]/.test(z) && SQ0(z).length >= 6; }) || lineWith(F.blocks, allIds.filter(function (id) { return /^P\d+$/.test(id); }), function (z) { return /^販売する会社[:：]/.test(z); });
-            if (cc1) { x.blk = cc1.id; x.ev = cc1.ln; ch++; cnt("ctaEv"); lg({ k: "ctaEv", txt: txt.slice(0, 60) }); }
+            if (cc1) { if (x.ok === false) { x.whyAI = x.why; x.okAI = false; x.ok = true; x.why = ""; } x.blk = cc1.id; x.ev = cc1.ln; ch++; cnt("ctaEv"); lg({ k: "ctaEv", txt: txt.slice(0, 60) }); }
           }
         }
         /* ⑦ 22.01.2（w1-5 C）：買い手・用途の項目（「Motor / Pump / Conveyor Component Buyers」）を「購入者の記載なし」で外す
               → 買い手の言葉を除いた用途の言葉が、全部📎の商品の説明・登録に（カタカナ・漢字の用途の言葉として）あるときだけ、その行を引用にして残す */
         if (x.ok === false && !x.v101 && /購入者|買い手|顧客|バイヤー|対象|用途|使い道|使用先|buyer|customer|application/i.test(String(x.why || ""))) {
           try {
-            var ul = useEv(txt, F.blocks, allIds);
+            var ul = useEv(txt, F.blocks, allIds, T);
             if (ul && x.ok === false && !SUP_RE.test(txt) && !hitTopic(txt, UT)) { x.whyAI = x.why; x.okAI = false; x.ok = true; x.blk = ul.id; x.ev = ul.ln; x.why = ""; ch++; cnt("useRescue"); lg({ k: "useRescue", txt: txt.slice(0, 60), ev: ul.ln.slice(0, 60), whyAI: String(x.whyAI || "").slice(0, 30) }); }
           } catch (e) { err("use", e); }
         }
@@ -661,14 +742,17 @@
     var o = String(s == null ? "" : s);
     if (SOFT_FREE.test(o)) { SOFT_FREE.lastIndex = 0; o = softFree(o); }
     SOFT_FREE.lastIndex = 0;
-    if (!/registered|registration|stated|specified|classified|categori[sz]ed|designated|documented|identified|own\s|listed/i.test(o)) return o;
+    if (!/registered|registration|stated|specified|classified|categori[sz]ed|designated|documented|identified|identifies|described|indicated|own\s|listed|production area|specification (?:identifies|lists|states|shows|specifies)/i.test(o)) return o;
     o = o.replace(REG_RE1, "$1 ").replace(REG_RE2, function (m0, a, c) { return a + c.toUpperCase(); }).replace(REG_RE3, "");
     o = o.replace(/\s+(?:is|are)\s+(?:registered|listed)\s+for\s+(?:the|this)\s+product(?=\s*(?:[.!?]|$))/g, "");
     o = o.replace(/\b([Cc])ompany-registered\s+/g, "").replace(/\b(its|their|our|Its|Their|Our)\s+registered\s+(?=(?:[a-z-]+\s+){0,2}(?:products?|items?|goods)\b)/g, "$1 ");
     o = o.replace(/(^|[.!?]\s+|[—:–]\s*)Registered\s+(?:as|under)\s+(?=(?:a|an|the|product|item|model|part|HS)\b)([a-zA-Z])/g, function (m0, a, c) { return a + c.toUpperCase(); });
     o = o.replace(/\b(?:as registered|per (?:the )?registration)\b\s*/gi, "");
     /* 22.01.2（w1-7・w2-6）：登録を読み上げる言い方 */
-    o = o.replace(/\b(is|are)\s+(?:explicitly\s+|clearly\s+|officially\s+)?(?:specified|stated|listed|documented|registered|identified|described|indicated)\s+as\s+(?!having\b|being\b)/gi, "$1 ");
+    o = o.replace(/\b(is|are)\s+(?:explicitly\s+|clearly\s+|officially\s+|expressly\s+|specifically\s+)?(?:specified|stated|listed|documented|registered|identified|described|indicated)\s+as\s+(?!having\b|being\b)/gi, "$1 ");
+    /* 22.01.3（x1-7・x2-4）：さらに新しい言い方 */
+    o = o.replace(/,?\s*with\s+([A-Z][\w ,.-]{1,50}?)\s+(?:identified|listed|specified|stated|indicated)\s+as\s+the\s+(?:production\s+area|origin|place\s+of\s+production|production\s+region|source)\b/g, " from $1");
+    o = o.replace(/(^|[.!?]\s+)The\s+(?:product\s+)?(?:specification|spec\s+sheet|specification\s+sheet|data\s+sheet|product\s+information)\s+(?:identifies|lists|states|specifies|shows|indicates|names)\s+([^.!?]+)([.!?]|$)/g, function (m0, a, b, c) { return a + CAP(b.trim()) + c; });
     o = o.replace(/(^|[.!?]\s+)(?:The|This)\s+product\s+is\s+(?:classified|categori[sz]ed)\s+(?:as|under)\s+([^.!?]+)([.!?]|$)/g, function (m0, a, b, c) { return a + "Category: " + CAP(b.trim()) + c; });
     o = o.replace(/\b(the\s+|The\s+)?(?:product\s+)?registration\s+and\s+(?:the\s+)?specification\s+(?:document|sheet|data)s?\s+(?:identify|identifies|show|shows|list|lists|state|states|indicate|indicates)\b/g, function (m0, a) { return (a && /^T/.test(a) ? "The" : (a ? "the" : "The")) + " specification sheet lists"; });
     o = o.replace(/(^|[.!?]\s+)(?:The\s+)?(?:product\s+)?registration\s+(?:data|record|information|details)\s+(?:shows?|states?|lists?|indicates?)\s+(?:that\s+)?([a-z])/gi, function (m0, a, c) { return a + c.toUpperCase(); });
@@ -694,6 +778,20 @@
     if (!j || typeof j !== "object") return r;
     var nReg = { c: 0 };
     try { deRegObj(j, nReg); } catch (e) { err("dereg", e); }
+    /* 22.01.3（x1-5 C）：用途・買い手の項目の「〜 supports the application.」（根拠の無い因果）は照合の前に外す
+       （項目の名前と「for rotating motor sections」のような用途の文は残す＝照合で用途の根拠が読める） */
+    try {
+      var INFER = /\b(?:supports?|enables?|suits?|helps?|serves?)\s+(?:the\s+|this\s+|these\s+|such\s+|its\s+|their\s+)?(?:[\w-]+\s+){0,3}(?:applications?|uses?|use cases?|sections?|operations?|requirements?|needs)\b/i;
+      var nInf = 0;
+      ["targets", "usage", "problem"].forEach(function (key) {
+        var sec = j[key]; if (!sec || typeof sec !== "object") return;
+        (Array.isArray(sec.items) ? sec.items : Array.isArray(sec.steps) ? sec.steps : Array.isArray(sec.points) ? sec.points : []).forEach(function (it) {
+          if (!it || typeof it !== "object") return;
+          ["need", "benefit", "d"].forEach(function (f) { if (typeof it[f] !== "string" || !INFER.test(it[f])) return; var ps = sentsOf(it[f]), keep = ps.filter(function (x) { return !INFER.test(x); }); if (keep.length !== ps.length) { it[f] = keep.join(" ").trim(); nInf++; } });
+        });
+      });
+      if (nInf) { nReg.c += nInf; cnt("inferDrop", nInf); }
+    } catch (e) { err("infer", e); }
     /* 22.01.2（w2-1 の資料側）：登録の「ささみ」を書き手が chicken breast（胸肉）と訳すと、照合が「鶏むね肉の記載なし」で外す → 照合の前に登録の言葉にそろえる */
     try { var tf = termFixer(T); if (tf) { var nT = { c: 0 }; (function walk(o) { if (!o || typeof o !== "object") return; Object.keys(o).forEach(function (k) { if (SKIPK.test(k)) return; var v = o[k]; if (typeof v === "string") { var y = tf(v); if (y !== v) { o[k] = y; nT.c++; } } else walk(v); }); })(j); if (nT.c) { nReg.c += nT.c; cnt("termFix", nT.c); } } } catch (e) { err("termw", e); }
     if (nReg.c) { cnt("deReg", nReg.c); lg({ k: "deReg", n: nReg.c }); }
@@ -1086,6 +1184,29 @@
      ・会社情報の事業内容が未登録で、📎の資料に「会社の紹介：…」があれば、それを事業内容に（v1 N7）
      ・「該非判定書」は日本から出すときの輸出側の書類。国ごとの「輸入の書類」に並べない（ページの小見出しで輸出側として分けて書く・v2-10） */
   var XC_RE = /該非判定|該非|輸出令別表/;
+  /* 書類の判断の表で、buyer が足した「確かめること」（lv: check）の行のうち、この国・この商品に当たるもの */
+  function checkRows(c) {
+    var out = [];
+    try {
+      var W = window, d = (typeof D !== "undefined" && D) ? D : null, t = (typeof TEN !== "undefined" && TEN) ? TEN : {};
+      if (!d || typeof V85DOC_D === "undefined" || !V85DOC_D || !Array.isArray(V85DOC_D.rules) || !fn("v85docRuleHit") || !fn("v85docCC")) return out;
+      var cc = W.v85docCC(c); if (!cc) return out;
+      var hsRaw = d.hs || t.hs || "", hs0 = fn("v85docHsDigits") ? W.v85docHsDigits(hsRaw) : String(hsRaw).replace(/\D/g, "").slice(0, 10);
+      if (!hs0) return out;
+      var fa = {}; try { fa = fn("v85docFlagsAuto") ? (W.v85docFlagsAuto(d, hs0) || {}) : {}; } catch (e) { fa = {}; }
+      var flags = {}; Object.keys(fa).forEach(function (k) { flags[k] = true; });
+      var F = { hs: hs0, hsProv: null, item: d.item || "", itemEn: d.itemEn || "", dest: cc, mode: "sea", inc: "", lc: false, pref: "", flags: flags, epa: false };
+      V85DOC_D.rules.forEach(function (R) {
+        if (!R || R.lv !== "check" || !/^v101/.test(String(R.id || ""))) return;
+        var h = null; try { h = W.v85docRuleHit(R, F); } catch (e) { h = null; }
+        if (!h) return;
+        var pend = h.pend || []; if (pend.indexOf("hs") >= 0 || pend.indexOf("dest") >= 0) return;
+        (R.k || []).forEach(function (k) { var di = (V85DOC_D.docs || {})[k] || [k, ""]; if (!out.some(function (x) { return x.k === k; }) && di[0]) out.push({ k: k, ja: String(di[0]), en: String(di[1] || "") }); });
+      });
+    } catch (e) { err("checkRows", e); }
+    return out;
+  }
+  V.checkRows = checkRows;
   if (fn("dk3DataSrc")) {
     var oDSf = window.dk3DataSrc;
     window.dk3DataSrc = function (T) {
@@ -1119,6 +1240,20 @@
               m.v101cond = rows.map(function (x) { return x.k; });
             });
           }
+          /* 22.01.3（x2-10）：規制の画面の「確かめること」の行（buyer の H のベトナムのペットフードの手続きなど・sepReq には出ない）も「（要確認）」で */
+          (Array.isArray(d.markets) ? d.markets : []).forEach(function (m) {
+            if (!m || !m.c) return;
+            var rows2 = checkRows(m.c); if (!rows2.length) return;
+            var docs2 = Array.isArray(m.docs) ? m.docs.slice() : [];
+            rows2.forEach(function (x) {
+              var ja2 = String(x.ja).replace(/（[^（）]*）$/, "").trim() + "（要確認）";
+              if (docs2.some(function (y) { return String(y).indexOf(String(x.ja).slice(0, 8)) >= 0; })) return;
+              docs2.push(ja2);
+              try { if (VF && typeof VF.addTerm === "function" && x.en) VF.addTerm(ja2, String(x.en).replace(/\s*\([^()]*\)\s*$/, "").trim() + " (to be confirmed)"); } catch (e) { /* 訳は土台の訳に任せる */ }
+            });
+            m.docs = docs2.slice(0, 8);
+            m.v101check = rows2.map(function (x) { return x.k; });
+          });
         } catch (e) { err("cond", e); }
       } catch (e) { err("ds", e); }
       return d;
@@ -1139,7 +1274,7 @@
   /* 訳されていない（日本語のまま）か：かながある・原文と同じ・中国語以外で漢字がある */
   function untr(ja, en, lang) { if (typeof en !== "string" || !en.trim()) return true; if (ja && NF(en).trim() === NF(ja).trim()) return true; if (/[ぁ-ゖァ-ヺ]/.test(en)) return true; return !/^zh/.test(String(lang || "")) && JP_CH.test(en); }
   var STOP_EN = /^(?:with|from|that|this|than|have|has|for|and|the|are|its|our|your|into|only|using|uses|used|make|each|more|less|very|also|their|which|while|other|such|will|can|product|products|item)$/;
-  function cwords(s) { return (NF(s).toLowerCase().match(/[a-z][a-z-]{2,}/g) || []).filter(function (w) { return !STOP_EN.test(w); }).map(function (w) { return w.slice(0, 5); }); }
+  function cwords(s) { return (NF(s).toLowerCase().match(/[a-z]{3,}/g) || []).filter(function (w) { return !STOP_EN.test(w); }).map(function (w) { return w.slice(0, 5); }); }
   function covers(it, en) {
     var A = cwords(en).filter(function (v, i, a) { return a.indexOf(v) === i; }); if (!A.length) return false;
     var B = cwords(String(it.t || "") + " " + String(it.d || ""));
@@ -1170,8 +1305,12 @@
         var B = cwords(tx), h = A.filter(function (w) { return B.indexOf(w) >= 0; }).length;
         var extra = B.filter(function (w, i, a) { return a.indexOf(w) === i && A.indexOf(w) < 0; }).length;
         if (extra < 2) return; /* 見出しの言い直しだけの文は使わない */
-        if (h > bs && h >= Math.min(2, A.length) && h / A.length >= 0.5) { bs = h; best = tx; }
+        /* 22.01.3（x2-9）：2語までの短い強み（Low Dust）は、いちばん長い語（dust）があればよい */
+        var keyW = A.slice().sort(function (a, b) { return b.length - a.length; })[0];
+        var okH = A.length <= 2 ? (keyW && B.indexOf(keyW) >= 0) : (h >= Math.min(2, A.length) && h / A.length >= 0.5);
+        if (okH && h > bs) { bs = h; best = tx; }
       });
+      if (best) usedSup[best] = 1;
       return best;
     } catch (e) { return null; }
   }
@@ -1184,6 +1323,19 @@
     return (s.match(/[(（]/g) || []).length === (s.match(/[)）]/g) || []).length;
   }
   V.cleanTr = cleanTr; V.goodTr = goodTr;
+  var IMPER = /^(?:Offer|Provide|Present|Highlight|Add|Build(?:\s+on)?|Leverage|Use|Show|Give|Deliver|Bring|Support|Enable|Address|Serve|Meet|Capture|Expand|Broaden|Strengthen|Differentiate|Promote|Stock|Sell|Market|Position|Target|Win|Attract|Reduce|Increase|Improve|Boost|Secure|Ensure|Make|Create|Develop|Tap|Source|Buy|Choose|Select|Order|Purchase|Get|Rely|Count|Trust|Gain|Benefit|Achieve|Stand|Grow|Answer|Respond|Earn|Keep|Lead|Pursue)\b/i;
+  /* 照合を通った書き手の文の「見出し（.t）と説明（.d）」の組で、見出しが同じ強みを言うものの説明 */
+  function pairSupport(plan, en, usedSup) {
+    try {
+      var leaves = fn("dk3Leaves") ? dk3Leaves(plan) : [], byP = {};
+      leaves.forEach(function (c) { if (!c || !c.txt || /^why\./.test(String(c.path || ""))) return; var m = String(c.path || "").match(/^(.*)\.(t|d)$/); if (!m) return; (byP[m[1]] = byP[m[1]] || {})[m[2]] = String(c.txt); });
+      var best = null;
+      Object.keys(byP).some(function (k) { var o = byP[k]; if (!o.t || !o.d || o.d.length < 12 || o.d.length > 140 || (usedSup && usedSup[o.d])) return false; if (covers({ t: o.t }, en) || covers({ t: en }, o.t)) { best = o.d; return true; } return false; });
+      if (best && usedSup) usedSup[best] = 1;
+      return best;
+    } catch (e) { return null; }
+  }
+  V.pairSupport = pairSupport;
   function rebuildWhy(M, lang, plan, data, src, T) {
     if (!M || !M.v85) return null;
     var d0 = (data && data.prods && data.prods[0]) || {}, s0 = (src && src.prods && src.prods[0]) || {};
@@ -1208,10 +1360,14 @@
       var item = null;
       if (k >= 0) {
         used[k] = 1; item = ai[k]; info.kept++;
+        /* 22.01.3（x1-6）：書き手の見出しが書き手への指示のような言い方（「Offer a long-life design」「Support Repeat Purchases」）なら、登録の強みの訳の見出しに */
+        var keyEn = cwords(en || "").sort(function (a, b) { return b.length - a.length; })[0];
+        if (en && (IMPER.test(String(item.t || "")) || (keyEn && cwords(item.t || "").indexOf(keyEn) < 0 && /\b(?:buyers?|customers?|evidence|positioning|proposition|option|choice|assortment|offering|differentiation|value)\b/i.test(String(item.t || ""))))) { var spI = splitTD(en); if (spI.t && goodTr(spI.t)) { item.tAI = item.t; item.t = spI.t; info.retitle = (info.retitle || 0) + 1; } }
         if (nums.length && en && !nums.every(function (n) { return hasNum(String(item.t || "") + " " + String(item.d || ""), n); })) { var sp0 = splitTD(en); item.d = sp0.d ? sp0.t + ": " + sp0.d : en; item.v101num = 1; }
       } else if (en) {
         var sp = splitTD(en);
-        var sup = sp.d ? "" : (supportOf(plan, en, usedSup) || "");
+        /* 22.01.3（x2-9）：説明の文が無いときは、照合を通った書き手の文のうち、同じ強みを見出しにした項目の説明（商品の特長「Low dust / Keeps wheels cleaner.」など）を使う */
+        var sup = sp.d ? "" : (supportOf(plan, en, usedSup) || pairSupport(plan, en, usedSup) || "");
         if (sup) usedSup[sup] = 1;
         item = { ic: icOf(ja), t: sp.t, d: sp.d || sup, src: "P1", v101: 1 };
         info.fromStr++;
@@ -1221,7 +1377,10 @@
     });
     if (!out.length) return Object.assign(info, { done: 0 });
     /* 22.01.2（w2-6）：残りの AI の理由は、入れた強みと同じこと（F「Address Dust Concerns」＝Low Dust の繰り返し）なら入れない */
+    /* 22.01.3（x2-1）：残りの AI の理由も、「不明」の事柄・未登録の原産地を言い切るものは入れない */
+    var unkOf = function (it) { var tx = String(it.t || "") + " " + String(it.d || ""); return !!hitTopic(tx, LN) || (!O.known && originHits(tx)); };
     var dupOf = function (it) { var tx = String(it.t || "") + " " + String(it.d || ""); return out.some(function (o) { var ot = String(o.t || "") + " " + String(o.d || ""); return covers(it, ot) || covers(o, tx); }) || strEn.some(function (e) { return covers(it, e); }); };
+    ai.forEach(function (it, j) { if (!used[j] && unkOf(it)) { used[j] = 1; info.unk = (info.unk || 0) + 1; } });
     ai.forEach(function (it, j) { if (out.length >= 3 || used[j]) return; if (LOGI.test(String(it.t || "") + " " + String(it.d || ""))) return; if (dupOf(it)) { used[j] = 1; info.dup = (info.dup || 0) + 1; return; } used[j] = 1; out.push(it); });
     ai.forEach(function (it, j) { if (out.length >= 2 || used[j]) return; if (dupOf(it)) return; used[j] = 1; out.push(it); });
     if (out.length < 2) return Object.assign(info, { done: 0 });
@@ -1251,7 +1410,8 @@
   var BADGE_BAD = /\bHS\b|HS code|shelf[- ]life|best before|lead time|\bMOQ\b|minimum order|\bport\b|\bFOB\b|\bCIF\b|T\/T|payment|replacement part|incoterms?/i;
   function fixBadges(M, wi, T) {
     try {
-      if (!M || !M.hero || !wi || !Array.isArray(wi.badges) || !wi.badges.length) return 0;
+      if (!M || !M.hero) return 0;
+      wi = (wi && Array.isArray(wi.badges)) ? wi : { badges: [] };
       var MH = [];
       try { var V100 = window.V100FACT; if (V100 && typeof V100.headMatchers === "function" && typeof V100.factsOf === "function") { var F0 = V100.factsOf(T); MH = V100.headMatchers(F0.unres, F0) || []; } } catch (e) { MH = []; }
       var res = [];
@@ -1260,11 +1420,13 @@
         if (res.length >= 3) return;
         var t = String((a && a.t) || "").trim();
         if (!t || BADGE_BAD.test(t)) return;
+        /* 22.01.3（x2-1）：AI のバッジも「不明」の事柄・未登録の原産地を言い切るものは使わない（要確認の形でも表紙には出さない） */
+        try { var Lb = unkTopics(T); if (hitTopic(t, Lb.filter(function (x) { return !x.origin; })) || (!v101origin(T).known && originHits(t))) { cnt("badgeUnk"); return; } } catch (e) { /* 無視 */ }
         if (res.some(function (r) { return r.t.toLowerCase() === t.toLowerCase() || covers({ t: r.t }, t) || covers({ t: t }, r.t); })) return;
         res.push(a);
       });
-      if (!res.length) return 0;
       var before = (M.hero.badges || []).map(function (a) { return a && a.t; }).join("|");
+      if (!res.length && !before) return 0;
       M.hero.badges = res;
       if (before !== res.map(function (a) { return a.t; }).join("|")) { cnt("badges"); V.lastBadges = { at: Date.now(), from: before, to: res.map(function (a) { return a.t; }) }; }
       return res.length;
@@ -1285,6 +1447,69 @@
     } catch (e) { err("mk", e); return 0; }
   }
   V.fixMarkets = fixMarkets;
+  /* ── ⑤' 22.01.3（x1-7・x2-4）：品質のページ（Trust & Evidence）と商品のページが、登録の値の言い直し（品番・HS・使用期間・原産国）や同じことの繰り返しにならないように ──
+        ・品質のページ：品番・HS コード・使用期間・期限・原産国・「登録した〜」だけの項目は外す（それらは要約・仕様・梱包の表に出ている）
+        ・商品のページ：説明が「Product code for the …」だけの特長は外す。特長と同じことを言う札（chips）は外す。同じことを言う特長は1つに */
+  var RESTATE_T = /^(?:product\s+(?:model|code|number|identification)|model(?:\s+number)?|part\s+number|item\s+code|hs\s+code|(?:trade|customs|product)\s+classification|classification|defined[\w\s-]*|use\s+period|shelf\s+life|expiry|(?:manufacturing\s+|product\s+)?origin|country\s+of\s+origin|registered[\w\s-]*|documented[\w\s-]*|specified[\w\s-]*|stated[\w\s-]*|identification|traceable\s+identification|product\s+identification|(?:specification|data|record|product\s+data)\s+consistency|consistent\s+(?:records|specifications?|data))$/i;
+  var RESTATE_D = /^(?:the\s+(?:product\s+)?(?:model|model\s+number|hs\s+code|use\s+period|shelf\s+life|origin|country\s+of\s+origin|part\s+number|item\s+code|product\s+code)\b|(?:product\s+)?(?:model|code|hs\s+code|item\s+code|part\s+number)\s*:)/i;
+  function trimRestate(M) {
+    var n = 0;
+    try {
+      if (M.quality && Array.isArray(M.quality.items)) {
+        var q0 = M.quality.items.length;
+        M.quality.items = M.quality.items.filter(function (it) { var t = NF((it && it.t) || "").trim(), d = NF((it && it.d) || "").trim(); var bad = RESTATE_T.test(t) || (RESTATE_D.test(d) && d.length < 90); if (bad) n++; return !bad; });
+        if (M.quality.items.length === 1 && q0 >= 2) { var p0 = (M.products || [])[0]; if (p0 && Array.isArray(p0.feats) && p0.feats.length < 6 && !p0.feats.some(function (f) { return covers(f, NF(M.quality.items[0].t || "") + " " + NF(M.quality.items[0].d || "")); })) p0.feats.push(M.quality.items[0]); M.quality.items = []; }
+        if (!M.quality.items.length && q0) M.quality = null;
+      }
+      (M.products || []).forEach(function (p) {
+        if (!p) return;
+        /* 説明の中の「Product code: KC-500. HS code: 3808.94.」（表にある値の読み上げ）は外す */
+        if (typeof p.desc === "string" && /(?:product\s+code|item\s+code|model|part\s+number|hs\s+code)\s*:/i.test(p.desc)) {
+          var ps0 = sentsOf(p.desc), ps1 = ps0.filter(function (x) { return !/^(?:product\s+code|item\s+code|model|part\s+number|hs\s+code)\s*:\s*[\w.\-]+\.?$/i.test(String(x).trim()); });
+          if (ps1.length && ps1.length !== ps0.length) { p.desc = ps1.join(" "); n += ps0.length - ps1.length; }
+        }
+        if (Array.isArray(p.feats)) {
+          var keep = [];
+          p.feats.forEach(function (f) {
+            if (!f) return;
+            var t = NF(f.t || ""), d = NF(f.d || "");
+            if (/^product\s+code\s+for\b/i.test(d) || (/^product\s+code$/i.test(t.trim()) && !/\d/.test(d))) { n++; return; }
+            /* 22.01.3：品番・識別・「仕様が〜を定める」だけの特長（「Part number FP-201 / Product identification is based on part number FP-201.」「Defined product specification / The specification covers …」） */
+            if (/^(?:part\s+number|item\s+code|model(?:\s+number)?|product\s+(?:identification|model|number|code))\b/i.test(t.trim()) || /\buse\s+period$/i.test(t.trim()) || /^(?:the\s+)?use\s+period\s+is\b/i.test(d.trim()) || /^(?:product\s+identification\s+is\s+based\s+on|the\s+specification\s+covers|identification\s+is\s+based\s+on)\b/i.test(d.trim()) || /^(?:defined|documented|registered|specified)\s+(?:product\s+)?(?:specification|spec|identification)s?$/i.test(t.trim())
+              || /^(?:hs\s+code|unit\s+weight)\b/i.test(t.trim()) || /\b(?:is|are)\s+documented\s+(?:in|on)\b|^classified\s+under\s+hs\b/i.test(d.trim())) { n++; return; }
+            if (keep.some(function (k) { return covers(k, t + " " + d) && covers(f, NF(k.t || "") + " " + NF(k.d || "")); })) { n++; return; }
+            keep.push(f);
+          });
+          p.feats = keep;
+        }
+        if (Array.isArray(p.chips)) {
+          var ft = (p.feats || []).map(function (f) { return NF((f && f.t) || "") + " " + NF((f && f.d) || ""); });
+          var c0 = p.chips.length;
+          p.chips = p.chips.filter(function (c, i, a) { var s = NF(c || ""); if (!s.trim() || a.indexOf(c) !== i) return false; return !ft.some(function (x) { return covers({ t: x }, s) || covers({ t: s }, x); }); });
+          n += c0 - p.chips.length;
+        }
+      });
+    } catch (e) { err("restate", e); }
+    if (n) cnt("restate", n);
+    return n;
+  }
+  V.trimRestate = trimRestate;
+  /* ── 22.01.3（x1-5 C）：用途・買い手のページ（targets）が、照合を通った項目が2つ以上あるのに、型の並び（工業部品などは並びに targets が無い）で出ない
+        → 項目が2つ以上あるときだけ、商品のページの後に入れる（型の並びはそのまま・ほかのページは動かさない） ── */
+  if (fn("dk3Order")) {
+    var oOR = window.dk3Order;
+    window.dk3Order = function (M) {
+      var out = oOR.apply(this, arguments);
+      try {
+        if (Array.isArray(out) && M && M.targets && Array.isArray(M.targets.items) && M.targets.items.filter(Boolean).length >= 2 && out.indexOf("targets") < 0 && !/^ja/.test(String((M && M.lang) || ""))) {
+          var last = -1; out.forEach(function (k, i) { if (/^product(?::|$)/.test(String(k))) last = i; });
+          var at = last >= 0 ? last + 1 : Math.max(0, out.indexOf("specs"));
+          out.splice(at, 0, "targets"); cnt("targetsPage");
+        }
+      } catch (e) { err("order", e); }
+      return out;
+    };
+  }
   V.lastWhy = null;
   if (fn("dk3Model")) {
     var oMDf = window.dk3Model;
@@ -1297,6 +1522,7 @@
           V.lastWhy = wi ? Object.assign({ at: Date.now(), lang: lang, uid: String((TT && TT.uid) || "") }, wi) : null;
           if (deck && M.v85) deck.v85 = M.v85;
           fixBadges(M, wi, TT);
+          trimRestate(M);
           fixAbout(M, lang, data);
           fixMarkets(M, lang, data, src);
         }
@@ -1309,6 +1535,8 @@
      ・登録の原材料が「ささみ」なら「chicken breast（胸肉）」と書かない（H：表は Chicken tenderloin、文章は chicken breast で混在・v2-10）
      ・「The registered … is」の登録の読み上げ調を普通の言い方に（照合の前に直しきれなかった所の安全網） */
   var TERMS = [{ w: 1, ja: /ささみ|笹身/, not: /胸肉|むね肉/, re: /\b([Cc]hicken)\s+([Bb]reast)(?:\s+[Tt]enderloin)?(s?)\b(?!\s+[Tt]enderloin|\s+fillet)/g, to: function (m0, a, b, s) { return a + " " + (b.charAt(0) === "B" ? "Tenderloin" : "tenderloin") + s; } },
+    /* 22.01.3（x1-9）：登録の「高周波焼入れ」は資料の中で「induction hardening」にそろえる（本文 high-frequency hardening と表紙 induction hardening が混在） */
+    { ja: /高周波焼(?:き)?入れ/, not: /^$/, re: /\b([Hh])igh[- ][Ff]requency\s+(?:[Ii]nduction\s+)?([Hh]arden(?:ing|ed))\b/g, to: function (m0, h, w) { var tc = /[- ]F/.test(m0); return (h === "H" ? "Induction " : "induction ") + (tc ? w.charAt(0).toUpperCase() + w.slice(1) : w.charAt(0).toLowerCase() + w.slice(1)); } },
     /* 訳に残った「・」（英語の語と語の間）は「, 」に（H「Low fat・high protein」・E「PFE・BFE」） */
     { ja: /./, not: /^$/, re: /([A-Za-z0-9%)])\s*・\s*(?=[A-Za-z0-9(])/g, to: function (m0, a) { return a + ", "; } }];
   /* 登録の言葉にそろえる直し（書き手の答え・組み上がった資料の両方で使う）。当てはまるものが無ければ null */
@@ -1402,7 +1630,7 @@
           var W = V.lastWhy, hasWhy = (deck.slides || []).some(function (s) { return s && s.kind === "why"; });
           r.ok = Array.isArray(r.ok) ? r.ok : [];
           if (W && W.done && hasWhy && W.lang === deck.lang && Date.now() - W.at < 15 * 60000) {
-            var okT = "「売れる理由」のページに、登録した商品の強みを入れました（強み " + (W.kept + W.fromStr) + "件のうち、登録の強みの訳から作った項目 " + W.fromStr + "件）";
+            var okT = "「売れる理由」のページに、登録した商品の強みを " + (W.kept + W.fromStr) + "件入れました（書き手の文をそのまま使ったもの " + W.kept + "件・登録の強みの訳から作ったもの " + W.fromStr + "件）";
             if (r.ok.indexOf(okT) < 0) r.ok.push(okT);
             r.warn = r.warn.filter(function (w) { return !(w && (w.k === "v101why" || w.k === "v85why")); });
           }
@@ -1413,10 +1641,10 @@
   }
   try {
     if (typeof I18N !== "undefined" && Array.isArray(I18N.pat)) {
-      I18N.pat.unshift({ re: /^「売れる理由」のページに、登録した商品の強みを入れました（強み (\d+)件のうち、登録の強みの訳から作った項目 (\d+)件）$/,
-        en: (m) => "Added your registered product strengths to the “Reasons to stock” page (" + m[1] + " strengths; " + m[2] + " item(s) built from the translation of the registered strengths)",
-        zh: (m) => "已把登记的商品优势放入“畅销理由”页面（优势 " + m[1] + " 条，其中按登记优势的译文生成 " + m[2] + " 条）",
-        es: (m) => "Se añadieron los puntos fuertes registrados a la página «Razones para comprar» (" + m[1] + " puntos; " + m[2] + " creados a partir de la traducción de lo registrado)" });
+      I18N.pat.unshift({ re: /^「売れる理由」のページに、登録した商品の強みを (\d+)件入れました（書き手の文をそのまま使ったもの (\d+)件・登録の強みの訳から作ったもの (\d+)件）$/,
+        en: (m) => "Added " + m[1] + " of your registered product strengths to the “Reasons to stock” page (" + m[2] + " using the writer’s text as is; " + m[3] + " built from the translation of the registered strengths)",
+        zh: (m) => "已把 " + m[1] + " 条登记的商品优势放入“畅销理由”页面（直接使用撰稿文字 " + m[2] + " 条，按登记优势的译文生成 " + m[3] + " 条）",
+        es: (m) => "Se añadieron " + m[1] + " puntos fuertes registrados a la página «Razones para comprar» (" + m[2] + " con el texto del redactor tal cual; " + m[3] + " a partir de la traducción de lo registrado)" });
     }
   } catch (e) { err("i18n2", e); }
   WHY_TR.unshift([/^未解決の気づき「([\s\S]*?)」の数値（([\s\S]*?)）は、答えが出るまで資料に載せていません（追加ヒアリングで答えると載せられます）$/, { en: "the figure in the open AI note “$1” ($2) is not shown in the deck until it is answered (answer it in the follow-up questions)", zh: "未解决的提示“$1”中的数字（$2）在得到回答前不放入资料（在追加询问中回答即可）", es: "la cifra de la nota pendiente «$1» ($2) no se muestra hasta responderla (responda en las preguntas de seguimiento)" }]);

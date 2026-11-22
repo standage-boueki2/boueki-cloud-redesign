@@ -35,12 +35,14 @@
           if (!O.known && /^Made in Japan$/i.test(t)) { s.textContent = "Origin: to be confirmed"; s.setAttribute("data-v101org", t); v.n.rdFoot = (v.n.rdFoot || 0) + 1; }
           else if (O.known && s.getAttribute("data-v101org") && /^Origin: to be confirmed$/.test(t)) { s.textContent = s.getAttribute("data-v101org"); s.removeAttribute("data-v101org"); }
         });
+        /* 22.01.3（x2-1）：「不明」と答えた事柄・未登録の原産地に当たる強みは、「（要確認）」を付けても表紙には出さない（外す）。
+           作った後の見本（資料の表紙のバッジ・英語）も同じ見分けで外す */
         c.querySelectorAll(".k-cvb li").forEach((li) => {
           const t = (li.textContent || "").trim();
-          if (/要確認|to be confirmed|待确认|por confirmar/.test(t)) return;
-          const hitO = !O.known && /日本製|国産|国内(?:で)?(?:生産|製造)|made in japan/i.test(t);
-          const hit = hitO || L.some((x) => x.ja2.test(t));
-          if (hit) { li.textContent = t + (TBC_JA[l] || TBC_JA.ja); li.setAttribute("data-v101tbc", "1"); v.n.rdStr = (v.n.rdStr || 0) + 1; }
+          const t0 = t.replace(/（要確認）|\s*\((?:to be confirmed|por confirmar)\)|（待确认）/g, "").trim();
+          const hitO = !O.known && (/日本製|国産|国内(?:で)?(?:生産|製造)|made in japan/i.test(t0) || (typeof v.originHits === "function" && v.originHits(t0)));
+          const hit = hitO || L.some((x) => x.ja2.test(t0)) || (typeof v.hitTopic === "function" && !!v.hitTopic(t0, (v.unkTopics(T) || []).filter((x) => !x.origin)));
+          if (hit) { li.remove(); v.n.rdStr = (v.n.rdStr || 0) + 1; }
         });
       });
     } catch (e) { warn("cover", e); }

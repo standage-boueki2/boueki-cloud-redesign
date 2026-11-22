@@ -96,3 +96,8 @@ p.v101fwaystale{margin:6px 0 0;font-size:11px;line-height:1.55;color:#9a4a00}
   .v101flegx{background:#2b2111 !important;color:#f6e7cf !important}
   p.v101fwaystale{color:#f3c58a}
 }
+/* 22.01.3（x3 の直し） */
+.v101fchkmore{margin:6px 0 0;font-size:12px;line-height:1.6;color:var(--rd-ink-2,#374151)}
+.v101fanspol{margin:6px 0;padding:6px 9px;border-radius:8px;background:#fff8ee;border:1px solid #f3c58a;font-size:11.5px;line-height:1.6;color:#3b2a12}
+.v101fexpv{display:block;width:100%;font-size:11px;color:#9a4a00;font-weight:600}
+@media (prefers-color-scheme: dark){ .v101fanspol{background:#2b2111;border-color:#7a5a24;color:#f6e7cf} }

@@ -62,6 +62,50 @@ function v101fLegStale(r, l) {
   return o;
 }
 window.v101fLegStale = v101fLegStale;
+/* 22.01.3（x3 X1・X2）：貴社の見積（その国の貴社の見積の写し）について
+   valid＝貴社の見積に入っているレートの写しの期限（他社の期限と混ぜない）・exp＝それが切れている・pol＝依頼と違う仕出港のレートで組んだ。
+   now＝貴社のレート表の、いまの有効なレート（依頼の仕出港発・同じ仕向け〔同じ国・港〕・同じ形態＝同じ区間が更新済み）。
+   ※FOB の依頼は本船渡しまでの費用なので、アプリは仕向け先の違う同じ港発のレートでも組めるが、ここでは同じ区間のレートがあるときだけ「組み直し待ち」と数える
+     （荷主の画面に届いているレートは物流会社の画面から確かめられないため、言い切れる場合だけにする）
+   cat：now がある＝"wait"（荷主が画面を開くと、いまのレートで組み直される）／無くて仕出港違い＝"pol"（依頼の仕出港発のレートを登録）／無くて期限切れ＝"renew"（この区間を入れ直す） */
+function v101fPolKey(s) { try { if (typeof v82fPolKey === "function") return v82fPolKey(s); } catch (e) { /* 下で */ } return String(s || "").replace(/\s+/g, "").replace(/(?:国際)?(?:空港|港)$/, "").toLowerCase(); }
+function v101fRateOk(x) { try { if (typeof fwdRateValid === "function") return !!fwdRateValid(x); } catch (e) { /* 下で */ } return !v101fExpD(x && x.valid); }
+function v101fIsFob(r) { try { if (typeof v56shipTermCode === "function") return v56shipTermCode(String((r && r.term) || "")) === "FOB"; } catch (e) { /* 下で */ } return /^FOB/i.test(String((r && r.term) || "")); }
+function v101fOwnLegInfo(r, l, ow) {
+  const o = { exp: false, pol: false, valid: "", lanePol: "", cat: "", now: null, fob: false };
+  try {
+    const q = (ow && ow.quote) || {}, rt = (ow && ow.rate) || {};
+    o.valid = String(rt.valid || q.valid || "");
+    o.exp = v101fExpD(o.valid);
+    o.lanePol = typeof v82fLanePol === "function" ? v82fLanePol(q) : ((/^(.*?)\s*→/.exec(String(q.lane || "")) || [])[1] || "").trim();
+    o.pol = !!(r && r.pol && o.lanePol && !q.v56shipFob && v101fPolKey(o.lanePol) !== v101fPolKey(r.pol));
+    o.fob = v101fIsFob(r);
+    const me = v101fMe(), md = String((r && r.mode) || q.mode || "LCL").toUpperCase();
+    const K = typeof v101fLaneKey === "function" ? v101fLaneKey(l.pod || l.cty, md).key : "";
+    const cand = ((typeof FWDB !== "undefined" && FWDB && FWDB.rates) || []).filter((x) => x && (x.co || me) === me && String(x.mode || "").toUpperCase() === md && v101fPolKey(x.pol) === v101fPolKey(r && r.pol) && v101fRateOk(x)
+      && ([l.pod, l.cty].indexOf(x.pod) >= 0 || (K && typeof v101fLaneKey === "function" && v101fLaneKey(x.pod, md).key === K)));
+    if (cand.length) { const x = cand.slice().sort((a, b) => String(b.valid || "").localeCompare(String(a.valid || "")))[0]; o.now = { pol: x.pol, pod: x.pod, mode: md, valid: x.valid || "", price: x.price, cur: x.cur || "¥", unit: x.unit || "", fob: o.fob }; }
+    o.cat = o.now ? "wait" : o.pol ? "pol" : "renew";
+  } catch (e) { v101fErr("ownleginfo", e); }
+  return o;
+}
+window.v101fOwnLegInfo = v101fOwnLegInfo;
+/* 期限切れのレートが、いまの見積（どの会社の見積の写しでも）に使われているか（x3 X1：16本は COURIER で、LCL の見積には使われていない） */
+function v101fExpRatesUse() {
+  const o = { exp: [], used: 0, modes: {} };
+  try {
+    const R = ((typeof FWDB !== "undefined" && FWDB && FWDB.rates) || []).filter((x) => x && !v101fRateOk(x));
+    o.exp = R; R.forEach((x) => { const m = String(x.mode || "").toUpperCase(); o.modes[m] = (o.modes[m] || 0) + 1; });
+    const me = v101fMe();
+    v101fReqs().forEach((r) => (r.legs || []).forEach((l) => {
+      if (!l || !l.ok) return;
+      const ow = (l.offers || []).find((x) => x && x.co === me); if (!ow || !ow.rate) return;
+      if (R.some((x) => String(x.mode || "").toUpperCase() === String(ow.rate.mode || r.mode || "").toUpperCase() && v101fPolKey(x.pol) === v101fPolKey(ow.rate.pol) && String(x.pod) === String(ow.rate.pod) && String(x.valid || "") === String(ow.rate.valid || ""))) o.used++;
+    }));
+  } catch (e) { v101fErr("expuse", e); }
+  return o;
+}
+window.v101fExpRatesUse = v101fExpRatesUse;
 /* 1件の依頼の貴社の回答状況
    kind: "open"（どの会社も見積を出せなかった）／"own"（貴社が全部の国に回答）／"part"（一部の国だけ）／"others"（他社だけが回答・貴社は未回答）
    22.01.1：othersSel の各国に stale（荷主の画面で取り下げになる他社の見積）を足す。stale＝他社の見積が全部そう（kind は変えない＝貴社は未回答のまま） */
@@ -79,8 +123,17 @@ function v101fOwnSt(r) {
       if (ow) {
         /* 22.01.2（w3 W2）：貴社の見積の国にも同じ決まり（荷主の画面で取り下げになるか）。仮押さえ中の国は取り下げにならない */
         const ST = v101fLegStale(r, l);
-        o.own.push({ l, o: ow, stale: ST.stale, ST });
-        if (ST.stale) { o.ownStaleN++; const X = o.ownSt; if (ST.exp) X.exp = true; if (ST.pol) X.pol = true; if (ST.valid && (!X.valid || ST.valid > X.valid)) X.valid = ST.valid; if (ST.lanePol && X.lanePols.indexOf(ST.lanePol) < 0) X.lanePols.push(ST.lanePol); }
+        /* 22.01.3（x3 X1・X2）：貴社の見積そのものの期限（他社の期限と混ぜない）と、荷主が画面を開いたときに貴社のいまのレートで組み直せるか（cat） */
+        const OI = ST.stale ? v101fOwnLegInfo(r, l, ow) : null;
+        o.own.push({ l, o: ow, stale: ST.stale, ST, OI });
+        if (ST.stale) {
+          o.ownStaleN++; const X = o.ownSt;
+          if (OI.exp) X.exp = true; if (OI.pol) X.pol = true;
+          if (OI.valid && (!X.valid || OI.valid > X.valid)) X.valid = OI.valid;
+          if (OI.lanePol && X.lanePols.indexOf(OI.lanePol) < 0) X.lanePols.push(OI.lanePol);
+          X.cats = X.cats || {}; X.cats[OI.cat] = (X.cats[OI.cat] || 0) + 1;
+          if (OI.now && !X.now) X.now = OI.now;
+        }
       }
       (Array.isArray(l.offers) ? l.offers : []).forEach((x) => { if (x && x.co && x.co !== me) cos.add(x.co); });
       if (!ow) {
@@ -97,6 +150,8 @@ function v101fOwnSt(r) {
     o.kind = !o.ownN ? "others" : o.ownN < o.okN ? "part" : "own";
     o.stale = o.kind === "others" && o.othersSel.length > 0 && o.staleN === o.othersSel.length;
     o.ownStale = o.ownN > 0 && o.ownStaleN === o.ownN;
+    /* 依頼ごとの次の一手：pol＝依頼の仕出港発の貴社のレートが無い（登録する）／renew＝この区間の有効なレートが無い（入れ直す）／wait＝貴社のレート表にいまの有効なレートがあり、荷主が画面を開くと組み直される */
+    if (o.ownStale) { const c = o.ownSt.cats || {}; o.ownSt.cat = c.pol ? "pol" : c.renew ? "renew" : "wait"; }
   } catch (e) { v101fErr("ownst", e); }
   return o;
 }
@@ -124,10 +179,21 @@ function v101fStLabel(r) {
     } else if ((O.kind === "own" || O.kind === "part") && O.ownStale && /回答済み|AI回答/.test(st)) {
       /* 22.01.2（w3 W2）：貴社の見積が全部、荷主の画面の決まり（21.82 v82fBad）で取り下げになる＝期限切れ・依頼と違う仕出港のレートで組んだ見積。
          「回答済み（荷主が検討中）」と書かない（他社の見積の N2 と同じ決まり）。荷主の画面では、依頼の仕出港発の有効なレートで組み直す（無ければレーン未登録） */
-      const why = v101fOwnStaleWhy(O, r);
-      out.txt = v101fM(`取り下げ（貴社の見積は${O.ownSt.exp && O.ownSt.pol ? "期限切れ・仕出港違い" : O.ownSt.exp ? "期限切れ" : "仕出港違い"}）`, `Withdrawn (your quote ${O.ownSt.exp ? "expired" : "from another port"})`, `已撤回（贵司报价${O.ownSt.exp ? "已过期" : "起运港不同"}）`, `Retirada (su cotización ${O.ownSt.exp ? "vencida" : "de otro puerto"})`);
-      out.sub = v101fM(`貴社の見積は${why}のレートで組んだもの・荷主の画面では取り下げ（${(r && r.pol) || "依頼の仕出港"}発の有効なレートで組み直し・無ければレーン未登録）`, `Your quote uses ${O.ownSt.exp ? "an expired rate" : "a rate from another port"}; withdrawn on the shipper's screen`);
-      out.ownStale = 1;
+      /* 22.01.3（x3 X1・X2）：日付は貴社の見積のレートの写しの期限（他社の期限ではない）。次の一手で言い分ける */
+      const X = O.ownSt, pol = (r && r.pol) || v101fM("依頼の仕出港", "the request's port");
+      const copy = v101fM(`${X.lanePols.length ? X.lanePols.join("・") + "発の" : ""}レートの写し（期限 ${X.valid || "—"}${X.exp ? "・期限切れ" : ""}）で組まれたまま${X.pol ? `（依頼は${pol}発）` : ""}`, `built from a copy of ${X.lanePols.join(", ") || "a"} rate (valid ${X.valid || "—"})`);
+      if (X.cat === "wait") {
+        const N = X.now || {};
+        out.txt = v101fM("組み直し待ち（貴社の見積は古いレートの写し）", "Waiting to be rebuilt (old rate copy)", "等待重新报价（旧费率副本）", "Pendiente de recalcular (copia de tarifa antigua)");
+        out.sub = v101fM(`貴社の見積は${copy}。貴社のレート表の同じ区間（${N.pol} → ${N.pod}）は ${N.valid} まで有効に更新済みで、荷主が画面を開くと、いまのレートで組み直されます`, `Your quote is ${copy}; the shipper's screen rebuilds it with your current rate (valid until ${N.valid}).`);
+      } else if (X.cat === "pol") {
+        out.txt = v101fM("取り下げ（貴社の見積は仕出港違い）", "Withdrawn (your quote is from another port)", "已撤回（贵司报价起运港不同）", "Retirada (cotización de otro puerto)");
+        out.sub = v101fM(`貴社の見積は${copy}。${pol}発の貴社のレートが無いため、荷主の画面では取り下げ → ${pol}発のレートを登録`, `Your quote is ${copy}; you have no rate from ${pol}, so it is withdrawn. Register a rate from ${pol}.`);
+      } else {
+        out.txt = v101fM("取り下げ（貴社の見積は期限切れ）", "Withdrawn (your quote expired)", "已撤回（贵司报价已过期）", "Retirada (su cotización venció)");
+        out.sub = v101fM(`貴社の見積は${copy}。この区間の貴社の有効なレートが無いため、荷主の画面では取り下げ → この区間のレートを入れ直す`, `Your quote is ${copy}; no valid rate of yours for this lane. Renew it.`);
+      }
+      out.ownStale = 1; out.ownCat = X.cat;
     } else if (O.kind === "part" && /回答済み/.test(st)) {
       out.txt = v101fM(`回答済み（貴社 ${O.ownN}/${O.okN}か国）・荷主が検討中`, `Answered (${O.ownN}/${O.okN} countries by you); shipper reviewing`, `已回复（贵司 ${O.ownN}/${O.okN} 国）`, `Respondida (${O.ownN}/${O.okN} países)`);
       out.sub = v101fM(`ほかの ${O.okN - O.ownN}か国は他社だけが回答（貴社のレートなし）`, `The other ${O.okN - O.ownN} only by other forwarders`, `其余 ${O.okN - O.ownN} 国仅其他公司回复`, `Las otras ${O.okN - O.ownN} solo por otras`);
@@ -162,7 +228,7 @@ function v101fCellParts(r) {
       const mn = T.length ? Math.min(...T) : 0;
       P.own = O.okN > 1 || O.ownN > 1 ? v101fM(`貴社 ${O.ownN}/${O.okN}か国 ${v101fY(mn)}〜`, `Yours ${O.ownN}/${O.okN}: from ${v101fY(mn)}`) : v101fM(`貴社 ${v101fY(mn)}`, `Yours ${v101fY(mn)}`);
       /* 22.01.2（w3 W2）：貴社の見積が荷主の画面で取り下げになる（期限切れ・仕出港違い）ときは、金額のそばにもそう書く */
-      if (O.ownStale) { P.own += v101fM("（取り下げ）", " (withdrawn)", "（已撤回）", " (retirada)"); P.ownStale = 1; }
+      if (O.ownStale) { P.own += O.ownSt.cat === "wait" ? v101fM("（組み直し待ち）", " (to be rebuilt)", "（等待重新报价）", " (pendiente)") : v101fM("（取り下げ）", " (withdrawn)", "（已撤回）", " (retirada)"); P.ownStale = 1; }
       /* 選択中が他社の国 */
       const oth = O.own.filter((x) => x.l && (x.l.sel || x.l.co) && (x.l.sel || x.l.co) !== v101fMe()).map((x) => { const s = (x.l.offers || []).find((y) => y && y.co === (x.l.sel || x.l.co)); return s && s.quote ? { co: s.co, total: +s.quote.total } : null; }).filter(Boolean);
       if (oth.length) { P.other = v101fM(`選択中は他社 ${oth.length > 1 ? v101fY(Math.min(...oth.map((x) => x.total))) + "〜" : v101fY(oth[0].total)}`, `Selected: another forwarder ${v101fY(oth[0].total)}`); P.otherShort = P.other; }
@@ -287,6 +353,71 @@ function v101fAutoWhy() {
   return out;
 }
 window.v101fAutoWhy = v101fAutoWhy;
+/* 22.01.3（x3 X5・X1）：貴社の見積の「取り下げ／組み直し待ち」の数を1か所で数える（ホーム・受信箱の見方・行で同じ数） */
+function v101fOwnSummary() {
+  const o = { total: 0, wait: 0, pol: 0, renew: 0, other: 0, ports: {}, polIds: [], waitIds: [], valids: {}, now: null, decided: 0, held: 0 };
+  try {
+    const A = v101fAutoRate();
+    o.total = A.warn;
+    v101fReqs().forEach((r) => {
+      const O = v101fOwnSt(r);
+      if (O.kind !== "own" && O.kind !== "part") return;
+      const L = v101fStLabel(r);
+      O.own.forEach((x) => {
+        if (!x.OI) return;
+        if (x.OI.valid) o.valids[x.OI.valid] = (o.valids[x.OI.valid] || 0) + 1;
+        if (x.OI.lanePol) (o.lanePolSet = o.lanePolSet || {})[x.OI.lanePol] = 1;
+        /* レート表の同じ区間（写しと同じ仕出港・仕向け・形態）の、いまの有効期限 */
+        try { const N = v101fLaneNow(r, { ok: 1, quote: x.o.quote, pod: x.l && x.l.pod, cty: x.l && x.l.cty }); if (N && N.valid && (!o.tableValid || N.valid > o.tableValid)) o.tableValid = N.valid; } catch (e) { /* 無視 */ }
+      });
+      if (L.ownStale) {
+        o[L.ownCat] = (o[L.ownCat] || 0) + 1;
+        if (L.ownCat === "pol") { const p = String(r.pol || "—"); o.ports[p] = (o.ports[p] || 0) + 1; o.polIds.push(r.id); }
+        if (L.ownCat === "wait") { o.waitIds.push(r.id); if (!o.now && O.ownSt.now) o.now = O.ownSt.now; }
+      } else if (O.ownStaleN) { if (/他社に決定/.test(L.base)) o.decided++; else if (/仮押さえ/.test(L.base)) o.held++; }
+    });
+    o.other = Math.max(0, o.total - o.wait - o.pol - o.renew);
+    o.portList = Object.keys(o.ports).map((k) => ({ pol: k, n: o.ports[k] })).sort((a, b) => b.n - a.n);
+    o.validList = Object.keys(o.valids).sort();
+    o.lanePolList = Object.keys(o.lanePolSet || {});
+  } catch (e) { v101fErr("ownsum", e); }
+  return o;
+}
+window.v101fOwnSummary = v101fOwnSummary;
+/* 22.01.3（x3 X1）：明細の注意「有効なレートがありません（…2026-09-30など）…新しい期限のレートを登録してください」が、レート表（同じ区間は 2026-12-31 まで有効）と食い違っていた
+   → 見積に入っているレートの写しの期限の話だと書き、レート表の同じ区間にいまの有効なレートがあれば、そう書く（21.82 の v82fLegNotes を包む） */
+function v101fLaneNow(r, l) {
+  try {
+    const q = (l && l.quote) || {};
+    const lp = typeof v82fLanePol === "function" ? v82fLanePol(q) : ((/^(.*?)\s*→/.exec(String(q.lane || "")) || [])[1] || "").trim();
+    const pod = ((/→\s*(.+)$/.exec(String(q.lane || "")) || [])[1] || l.pod || l.cty || "").trim();
+    const md = String(q.mode || (r && r.mode) || "LCL").toUpperCase();
+    const R = ((typeof FWDB !== "undefined" && FWDB && FWDB.rates) || []).filter((x) => x && String(x.mode || "").toUpperCase() === md && v101fPolKey(x.pol) === v101fPolKey(lp) && String(x.pod || "") === pod && v101fRateOk(x));
+    if (!R.length) return null;
+    const best = R.slice().sort((a, b) => String(b.valid || "").localeCompare(String(a.valid || "")))[0];
+    return { pol: lp, pod, valid: best.valid || "", n: R.length };
+  } catch (e) { return null; }
+}
+window.v101fLaneNow = v101fLaneNow;
+if (typeof v82fLegNotes === "function" && !window.__v101fLegNotes) {
+  window.__v101fLegNotes = 1;
+  const __ln101 = v82fLegNotes;
+  window.v82fLegNotes = function (r, l) {
+    const out = __ln101.apply(this, arguments);
+    try {
+      if (!Array.isArray(out) || !l || !l.ok || !v101fOn()) return out;
+      const N = v101fLaneNow(r, l);
+      if (!N) return out;
+      const polMis = !!(r && r.pol && N.pol && v101fPolKey(N.pol) !== v101fPolKey(r.pol) && !((l.quote || {}).v56shipFob));
+      return out.map((x) => {
+        if (!Array.isArray(x) || typeof x[1] !== "string" || !/有効なレートがありません（/.test(x[1])) return x;
+        const t = x[1].replace(/有効なレートがありません（(\d+)社とも有効期限切れ・([^）]*)）。推奨・仮押さえの対象外です。「物流レート管理」で新しい期限のレートを登録してください。/,
+          (m, n, d) => v101fM(`この見積に入っているレートの写しは期限切れです（${n}社とも・${d}）。推奨・仮押さえの対象外です。レート表の同じ区間（${N.pol} → ${N.pod}）は、いまは ${N.valid} まで有効です${polMis ? `。ただし依頼は${r.pol}発のため、荷主の画面では${r.pol}発のレートで組み直します（無ければ取り下げ）` : "（荷主が画面を開くと、いまのレートで組み直されます）"}。`, `The rate copies in this quote expired (${d}); the rate table already has this lane valid until ${N.valid}.`));
+        return t === x[1] ? x : [x[0], t].concat(x.slice(2));
+      });
+    } catch (e) { v101fErr("legnotes", e); return out; }
+  };
+}
 
 /* ═══ No.626 容積の出どころ ═══════════════════════════════════════════ */
 /* 容積の文字を数に（「1.11m3」→ 1.11。21.99 は数字だけを残して 1.113 と読んでいた） */
@@ -510,7 +641,25 @@ if (typeof v90fAnsLeg === "function" && !window.__v101fAnsLeg) {
   const __al101 = v90fAnsLeg;
   window.v90fAnsLeg = function (id, i) {
     try { V101FWD.prefill = { id: String(id || ""), i: +i || 0, at: Date.now() }; } catch (e) { v101fErr("ansleg", e); }
-    return __al101.apply(this, arguments);
+    const out = __al101.apply(this, arguments);
+    /* 22.01.3（x3 X3）：貴社の見積が依頼と違う仕出港のレートの写し（横浜港→香港 など）の国は、21.90 が入れる写しの区間（横浜港発）では、この依頼の見積に使われない
+       → 21.90 が欄に入れた後（350ms）に、仕出港を依頼の仕出港（神戸港 など）に直し、そう知らせる（「追加」は押さない） */
+    try {
+      const r = v101fReqs().find((x) => x.id === id), l = r && (r.legs || [])[+i];
+      const ow = l && v101fOwnOffer(l), OI = ow ? v101fOwnLegInfo(r, l, ow) : null;
+      if (r && OI && OI.pol && r.pol) {
+        setTimeout(() => {
+          try {
+            const e = document.getElementById("frPol"); if (!e) return;
+            e.value = String(r.pol); e.dispatchEvent(new Event("input", { bubbles: true }));
+            V101FWD.prefill = Object.assign({}, V101FWD.prefill || {}, { polFix: r.pol, at: Date.now() });
+            const pod = (document.getElementById("frPod") || {}).value || "";
+            if (typeof toast === "function") toast(v101fM(`${id}：依頼の仕出港 ${r.pol} 発の区間（${r.pol} → ${pod}）にしました（貴社の見積は ${OI.lanePol} 発のレートの写しだったため）。運賃・日数・有効期限を確かめて「追加」を押すと、${r.pol} 発のレートとして登録され、荷主が次に画面を開いたときにこの依頼の見積が組み直されます`, `${id}: set to the request's port ${r.pol}. Check and press Add.`));
+          } catch (e2) { v101fErr("anslegpol", e2); }
+        }, 650);
+      }
+    } catch (e) { v101fErr("anslegpol0", e); }
+    return out;
   };
 }
 /* 同じ区間（仕出港・仕向け〔同じ国・港〕・形態）の依頼：区間のレートを登録・直すと、どの依頼の見積に使われるか */
@@ -535,8 +684,11 @@ function v101fCtxAdd(s) {
     const C = v101fCounts(), A = v101fAutoRate();
     const others = v101fReqs().filter((r) => v101fOwnSt(r).kind === "others").map((r) => { const O = v101fOwnSt(r); return `・${r.id}（${r.pol || ""}→${r.cty || ""}・${r.mode || ""}）：貴社は未回答（貴社のレートなし）。届いている見積は他社だけ（${O.cos.join("・")}${O.othersMin != null ? "・他社の最安 " + v101fY(O.othersMin) : ""}）。${O.stale ? `他社の見積は${v101fStaleWhy(O, r)}で、荷主の画面では取り下げ（レーン未登録）。荷主はこの見積を検討していない` : "荷主が検討しているのは他社の見積"}`; });
     /* 22.01.2（w3 W2）：貴社の見積の取り下げ */
-    const ownSt = v101fReqs().filter((r) => v101fOwnSt(r).ownStale).map((r) => { const O = v101fOwnSt(r); return `・${r.id}（${r.pol || ""}→${r.cty || ""}）：貴社の見積は${v101fOwnStaleWhy(O, r)}のレートで組んだもの。荷主の画面では取り下げ（${r.pol || ""}発の有効なレートで組み直し・無ければレーン未登録）。「荷主が検討中」ではない`; });
-    if (ownSt.length) s += `\n## 貴社の見積の取り下げ（v22.01.2）\n貴社の見積 ${ownSt.length}件は、期限切れ・依頼と違う仕出港のレートで組んだため、荷主の画面では取り下げになる（荷主の画面と同じ決まり）。期限切れのレートを入れ直す・依頼の仕出港発のレートを登録すると組み直される。\n${ownSt.slice(0, 30).join("\n")}`;
+    const ownSt = v101fReqs().filter((r) => v101fOwnSt(r).ownStale).map((r) => { const L = v101fStLabel(r); return `・${r.id}（${r.pol || ""}→${r.cty || ""}）：${L.txt}。${L.sub}`; });
+    if (ownSt.length) {
+      const SM = v101fOwnSummary(), EU = v101fExpRatesUse();
+      s += `\n## 貴社の見積の取り下げ・組み直し待ち（v22.01.3）\n貴社の見積は、レートの写し（期限 ${SM.validList.join("・")}）で組まれたまま。荷主の画面は、期限切れ・依頼と違う仕出港の見積をそのまま出さず、いまの有効なレートで組み直す（無ければ取り下げ）。組み直し待ち ${SM.wait}件（貴社のレート表に依頼の仕出港発の有効なレートがある）・取り下げ ${SM.pol + SM.renew}件（依頼の仕出港発の貴社のレートが無い：${SM.portList.map((p) => p.pol + " " + p.n + "件").join("・")}）。本当の一手は、依頼の仕出港発のレートを登録すること。期限切れのレート ${EU.exp.length}本（${Object.keys(EU.modes).join("・")}）は、いまの見積に使われているのは ${EU.used}区間（入れ直しても、いまの見積は変わらない）。\n${ownSt.slice(0, 30).join("\n")}`;
+    }
     s += `\n## 貴社の回答状況（v22.01）\n受信 ${C.all}件のうち、貴社のレートで AI が見積を出した依頼 ${C.own}件・他社だけが見積を出した依頼（貴社は未回答）${C.others}件（うち他社の見積も期限切れなどで荷主の画面では取り下げ ${C.othersStale}件）・どの会社も見積を出せなかった依頼 ${C.open}件。AI自動回答率は貴社の見積で数える：そのまま出せる ${A.clean} / ${A.recv}件＝${A.rate}%（期限切れの貴社のレートで組んだ見積 ${A.exp}件・依頼と違う仕出港のレートで組んだ見積 ${A.port}件）。「回答済み」と聞かれたら、貴社が回答したかどうかを分けて答える。他社の金額を貴社の見積として答えない。見積は区間のレート（仕出港→仕向け・形態）で答えるしくみで、この依頼だけの金額（スポット見積）を出す機能はいまの版にない（できると答えない。区間のレートを登録・直すと、同じ区間のほかの依頼にも使われる）。\n${others.join("\n")}`;
     /* 容積の出どころ（B/L のある案件） */
     const C2 = typeof v33Cases === "function" ? (v33Cases() || []) : [];
@@ -599,7 +751,7 @@ if (typeof fwdBrain === "function" && !window.__v101fBrain) {
    N4 B/L と荷主の共有を、容積だけでなく総重量・箱数・数量でも比べる（v101fBlCmp）。
    N5 「B/L の容積で反映する」の対象を B/L の仕向地の国の区間に（v97fVolAuto を包む。B/L は1回の出荷＝仕向地は1つ。ほかの国の見積は、この B/L の出荷ではない）。
    N3 荷主の「物流会社に見積を依頼（相見積）」の確かめの窓に、送る中身と同じ容積・箱数・総重量を出す（v101fShipPlan。見せ方は rd_v101fwd.js）。 */
-V101FWD.v = "22.01.2";
+V101FWD.v = "22.01.3";
 function v101fNumOf(s) {
   if (s == null || s === "") return null;
   if (typeof s === "number") return isFinite(s) ? s : null;

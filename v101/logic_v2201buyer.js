@@ -787,7 +787,17 @@
     (Array.isArray(T.extraQA) ? T.extraQA : []).forEach((x) => { if (x && x.q && UNKW.test(String(x.a || "")) && String(x.a).length <= 30) qs.push(String(x.q)); });
     (Array.isArray(T.v101unk) ? T.v101unk : []).forEach((u) => { if (u && u.q) qs.push(String(u.q)); });
     const add = (k, lab, q, o) => { if (!out.some((x) => x.k === k)) out.push(Object.assign({ k, lab, q, a: "不明" }, o || {})); };
-    qs.forEach((q) => { if (/適合|車種|対応車|対応機種|互換|純正品番/.test(q)) add("fit", "適合（車種・機種・品番）", q); if (/アスベスト|石綿|asbestos/i.test(q)) add("asbestos", "アスベスト不使用", q); });
+    // 22.01.3 x2-1：問いの言い方に左右されない（「適合車種・年式・型式・純正互換番号」「対応車種」「fitment」「compatible」も適合）
+    // 22.01.3：hear の担当が問いに付けた事柄の印（TEN.extraQA[i].v101tp・window.v101qaTopics(問い)）も並べて使う（どちらかで当たれば「不明」の事柄）
+    const tpOf = (x) => { let a = []; try { if (x && Array.isArray(x.v101tp)) a = a.concat(x.v101tp); } catch (e) { /* 無視 */ } try { if (x && x.q && typeof W.v101qaTopics === "function") { const r = W.v101qaTopics(String(x.q)); if (Array.isArray(r)) a = a.concat(r); } } catch (e) { /* 無視 */ } return a.map((k) => String((k && k.k) || k)); };
+    (Array.isArray(T.extraQA) ? T.extraQA : []).concat(Array.isArray(T.v101unk) ? T.v101unk : []).forEach((x) => {
+      if (!x || !x.q) return;
+      if (x.a != null && !(UNKW.test(String(x.a)) && String(x.a).length <= 30)) return;
+      const tp = tpOf(x);
+      if (tp.includes("fit")) add("fit", "適合（車種・機種・品番）", String(x.q));
+      if (tp.includes("asbestos")) add("asbestos", "アスベスト不使用", String(x.q));
+    });
+    qs.forEach((q) => { if (/適合|車種|対応車|対応機種|適用機種|適用車|互換|純正品番|純正番号|fitment|compatib|applicable\s+(?:vehicle|model)/i.test(q)) add("fit", "適合（車種・機種・品番）", q); if (/アスベスト|石綿|asbestos/i.test(q)) add("asbestos", "アスベスト不使用", q); });
     let O = null; try { O = fn("v101origin") ? W.v101origin(T) : null; } catch (e) { O = null; }
     const known = O ? !!O.known : !!(String(T.origin || "").trim() && !UNKW.test(String(T.origin)));
     if (!known) add("origin", "原産国・製造国", "原産地・製造国", { origin: 1 });
@@ -799,6 +809,11 @@
     let L = null;
     try { if (W.V101FACT && typeof W.V101FACT.unkTopics === "function") L = W.V101FACT.unkTopics(T) || []; } catch (e) { err("unkTopics", e); L = null; }
     if (!L) L = unkFallback(T);
+    else {
+      // 22.01.3 x2-1：fact の見分けは問いの言い方で適合を落とすことがある（x2：「FP-201の適合車種・年式・型式・純正互換番号を…」→「不明」を見分けなかった）。
+      // 問いの言葉から見分けた適合・アスベストを足す（原産地は fact の判定のまま。足すのは fact に無い話題だけ）
+      try { unkFallback(T).forEach((x) => { if ((x.k === "fit" || x.k === "asbestos") && !L.some((y) => y && y.k === x.k)) L = L.concat([Object.assign({ v101q: 1 }, x)]); }); } catch (e) { err("unkTopics2", e); }
+    }
     return L.filter((x) => x && x.k && x.k !== "shelflife");
   }
   V.unkTopicsOf = unkTopicsOf;
@@ -1241,8 +1256,8 @@
       if (!run || run.how === "smp" || run.v100smp) return h;
       if (busyRun(run)) {
         const n = (run.leads || []).filter((l) => l && !l.smp && !l.v79x).length;
-        const t = V.chk && V.chk.phase === "split" ? F(M("公式サイト・窓口：1回目は{w}。5社ずつに分けて確かめ直しています…（〜2分）。終わるまで、各行は「確かめています」です", "Websites/contacts: the first check {w}. Re-checking in groups of 5… (up to 2 min)", "官网・联系窗口：第一次{w}。正在每 5 家分批重新核实…（约2分钟）", "Sitios/contactos: la primera verificación {w}. Verificando de nuevo en grupos de 5… (hasta 2 min)"), { w: obWhyText(run.v79chk && run.v79chk.v101) })
-          : F(M("公式サイト・窓口を確かめています…（{n}社・1〜2分）。終わるまで、各行は「確かめています」です", "Checking websites and contacts… ({n} companies, 1–2 min). Rows show “Checking” until it finishes", "正在核实官网和联系窗口…（{n} 家・约1〜2分钟）。完成前各行显示“正在核实”", "Verificando sitios y contactos… ({n} empresas, 1–2 min). Las filas muestran «Verificando» hasta terminar"), { n });
+        const t = V.chk && V.chk.phase === "split" ? F(M("公式サイト・窓口：1回目は{w}。5社ずつに分けて確かめ直しています…（〜2分）。確かめ終わった会社から、各行に結果を出します（まだの行は「確かめています」）", "Websites/contacts: the first check {w}. Re-checking in groups of 5… (up to 2 min). Each row shows its result as soon as it is checked", "官网・联系窗口：第一次{w}。正在每 5 家分批重新核实…（约2分钟）。核实完的公司会依次在各行显示结果", "Sitios/contactos: la primera verificación {w}. Verificando de nuevo en grupos de 5… (hasta 2 min). Cada fila muestra su resultado en cuanto se verifica"), { w: obWhyText(run.v79chk && run.v79chk.v101) })
+          : F(M("公式サイト・窓口を確かめています…（{n}社・1〜2分）。確かめ終わった会社から、各行に結果を出します（まだの行は「確かめています」）", "Checking websites and contacts… ({n} companies, 1–2 min). Each row shows its result as soon as it is checked (rows not yet checked show “Checking”)", "正在核实官网和联系窗口…（{n} 家・约1〜2分钟）。核实完的公司会依次在各行显示结果（尚未核实的行显示“正在核实”）", "Verificando sitios y contactos… ({n} empresas, 1–2 min). Cada fila muestra su resultado en cuanto se verifica (las pendientes muestran «Verificando»)"), { n });
         return `<div class="v79chk v101b-chkbusy" role="status" data-v101-buyer-chk="busy" data-noi18n="1">⏳ <span>${E(t)}</span></div>`;
       }
       if (OLD178.test(h)) { h = h.replace(OLD178, E(M("公式サイト・窓口：まだ確かめていません。右の「公式サイトを確かめる」を押すと確かめます", "Websites/contacts: not checked yet. Press “Check websites” on the right", "官网・联系窗口：尚未核实。按右侧的“核实官网”即可核实", "Sitios/contactos: aún sin verificar. Pulse «Verificar sitios» a la derecha"))); h = h.replace(/<div class="v79chk"/, '<div class="v79chk" data-v101-buyer-chk="notyet"'); }
@@ -1640,9 +1655,9 @@
      上限（cap）・取り置き（reserve）のときだけ「0時以降」。AI が応答しない・つながらない（error・off）は一時的なことが多いので「少し待ってから」 */
   const OFF_JA = /0時（日本時間）以降に「AI で作り直す」で(?:新しいリストを)?作れます。?/g;
   const OFF_EN = /Rebuild with AI after midnight JST\.?/g;
-  const OFF_TO_JA = "少し待ってから「AI で作り直す」を押すと作り直せます（通信の切れ目など、一時的に AI につながらなかったことがあります）。";
-  const OFF_TO_EN = "Wait a moment, then press “Rebuild with AI” (the AI may have been unreachable only briefly).";
-  dictAdd(OFF_TO_JA, OFF_TO_EN, "请稍等片刻后按“用 AI 重新生成”（可能只是暂时无法连接 AI）。", "Espere un momento y pulse «Rehacer con IA» (puede que la IA no estuviera disponible solo un momento).");
+  const OFF_TO_JA = "少し待ってから「AI で作り直す」を押すと作り直せます（通信の切れ目など、一時的に AI が答えないことがあります）。";
+  const OFF_TO_EN = "Wait a moment, then press “Rebuild with AI” (the AI sometimes does not answer for a short time).";
+  dictAdd(OFF_TO_JA, OFF_TO_EN, "请稍等片刻后按“用 AI 重新生成”（AI 有时会暂时没有回应）。", "Espere un momento y pulse «Rehacer con IA» (a veces la IA no responde durante un momento).");
   function offTemp(run) { return !!(run && run.v100 && !/^(cap|reserve)$/.test(String(run.v100.reason || ""))); }
   V.offTemp = offTemp;
   V.offFix = function (h, run) { if (!offTemp(run)) return h; return String(h).replace(OFF_JA, OFF_TO_JA).replace(OFF_EN, OFF_TO_EN); };
@@ -1659,7 +1674,7 @@
           if (fn("v71obSave")) W.v71obSave();
           if (fn("v71obPaint")) W.v71obPaint();
           const n = (run.leads || []).length;
-          try { if (typeof toast === "function") toast(n ? F(M("AI の新しいリストは作れませんでした。前のリストの {n}社を出しています。少し待ってから「AI で作り直す」を押してください", "No new AI list. Showing {n} companies from earlier lists. Wait a moment, then press “Rebuild with AI”"), { n }) : M("AI のリストは作れませんでした。少し待ってから「AI で作り直す」を押してください（一時的に AI につながらなかったことがあります）", "The AI list could not be made. Wait a moment, then press “Rebuild with AI”")); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+          try { if (typeof toast === "function") toast(n ? F(M("AI の新しいリストは作れませんでした。前のリストの {n}社を出しています。少し待ってから「AI で作り直す」を押してください", "No new AI list. Showing {n} companies from earlier lists. Wait a moment, then press “Rebuild with AI”"), { n }) : M("AI のリストは作れませんでした（AI が答えませんでした）。少し待ってから「AI で作り直す」を押してください（通信の切れ目など、一時的なことがあります）", "The AI list could not be made. Wait a moment, then press “Rebuild with AI”")); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
         }
       } catch (e) { err("offBuild", e); }
       return r;
@@ -1725,5 +1740,108 @@
     };
     g.__v101b2 = 1; g.__v101buyer = 1;
     W.v79obCheckHtml = g;
+  })();
+
+  /* ══════ 22.01.3（22.01.2 の公開後の検証 x2 の直し）══════
+     x2-1【高・戻り】適合の「不明」の見分けを問いの言い方に左右されないように（上の unkFallback・unkTopicsOf）
+     x2-6 AI につながらないときの知らせの食い違い（「STANDAGE の AI につながりました」のすぐ後に「AI のリストは作れませんでした」）
+     x2-7 確かめ中の言い方（上の表の上の帯）・AI の答えが届いた時点の「✅ 完了しました」（確かめはまだ続く）
+     x2-8 署名が未登録の知らせに【差出人の名前（英字）】を入れる・行に残る古い知らせを今の署名で言い直す */
+  V.ver3 = "22.01.3";
+  function obBusyNow() { try { return !!(typeof V71OB !== "undefined" && V71OB && V71OB.busy); } catch (e) { return false; } } // eslint-disable-line no-undef
+  // x2-6：リストを作っている間と、作れなかった直後（30秒）は「STANDAGE の AI につながりました」を出さない（AI が答えなかった知らせと食い違うため）
+  (function () {
+    const o = W.v63aToast;
+    if (typeof o !== "function" || o.__v101b3) return;
+    const g = function (k) {
+      try {
+        if (k === "on" && ((V.obBuilding && obBusyNow()) || Date.now() - (+V.obFailAt || 0) < 30000)) { V.airOnQuiet = (V.airOnQuiet || 0) + 1; return; }
+      } catch (e) { err("airToast", e); }
+      return o.apply(this, arguments);
+    };
+    g.__v101b3 = 1; g.__v101buyer = 1;
+    W.v63aToast = g;
+  })();
+  (function () {
+    const o = W.v71obBuild;
+    if (typeof o !== "function" || o.__v101b3) return;
+    const g = async function () {
+      let before = null; try { before = fn("v71obRun") ? W.v71obRun() : null; } catch (e) { before = null; }
+      V.obBuilding = Date.now();
+      let r;
+      try { r = await o.apply(this, arguments); } finally { V.obBuilding = 0; }
+      try { const run = fn("v71obRun") ? W.v71obRun() : null; if (run && run !== before && offTemp(run)) V.obFailAt = Date.now(); } catch (e) { err("offBuild3", e); }
+      return r;
+    };
+    g.__v101b3 = 1; g.__v101buyer = 1;
+    W.v71obBuild = g;
+  })();
+  // x2-7：リストの AI の答えが届いた時点で「✅ 完了しました／結果を画面に反映しました」と出ていた（このあと公式サイトの確かめが続く）
+  (function () {
+    const o = W.aiThinkEnd;
+    if (typeof o !== "function" || o.__v101b3) return;
+    const g = function (id, ok) {
+      const busy = !!V.obBuilding && obBusyNow(); // リストを作っている間だけ（「選んだ n社の文面を作る」などは今までどおり）
+      const r = o.apply(this, arguments);
+      try {
+        const A = typeof AIT !== "undefined" ? AIT : null; // eslint-disable-line no-undef
+        if (ok && busy && A && A.el && !(A.items || []).length && !A.hidden) {
+          const a = A.el.querySelector(".att"), s = A.el.querySelector(".ats");
+          if (a) a.textContent = M("✅ AI の答えが届きました", "✅ The AI answered", "✅ AI 已回答", "✅ La IA respondió");
+          if (s) s.textContent = M("リストにして、公式サイト・窓口を確かめます（表の上に経過を出します）", "Making the list and checking websites and contacts (progress is shown above the table)", "正在整理名单并核实官网和联系窗口（进度显示在表格上方）", "Preparando la lista y verificando sitios y contactos (el progreso se muestra sobre la tabla)");
+          V.n.aiEnd = (V.n.aiEnd || 0) + 1;
+        }
+      } catch (e) { err("aiThinkEnd", e); }
+      return r;
+    };
+    g.__v101b3 = 1; g.__v101buyer = 1;
+    W.aiThinkEnd = g;
+  })();
+  // x2-8：署名が未登録の知らせ（「📋 コピーしてフォームを開く」などの関所）に、英字でない名前も「お名前（英字）」として入れる
+  function sigMissNow(s) {
+    s = s || (fn("v79obSig") ? W.v79obSig() : {}) || {};
+    let ms = [];
+    try { ms = fn("v79obSigMiss") ? (W.v79obSigMiss(s) || []).slice() : []; } catch (e) { ms = []; }
+    const tr = (x) => { try { return fn("v71obT") ? W.v71obT(x) : x; } catch (e) { return x; } };
+    const NM = M("お名前（英字）", "name (in Latin letters)", "姓名（英文）", "nombre (en letras latinas)");
+    const nm = String(s.name || "").trim();
+    let out = ms.map((x) => (x === "お名前" ? NM : tr(x)));
+    if (nm && !latinName(nm) && out.indexOf(NM) < 0) out = [NM].concat(out);
+    return out;
+  }
+  V.sigMissNow = sigMissNow;
+  const SIGMSG = (f) => F(M("署名の {f} が未登録です。「✍ 署名」に入れてから送ってください", "Signature: {f} not registered. Fill in “✍ Signature” before sending", "签名的 {f} 未登记。请在“✍ 签名”中填写后再发送", "Firma: falta {f}. Complete «✍ Firma» antes de enviar"), { f: f.join(M("・", ", ")) });
+  (function () {
+    const o = W.v79obGate;
+    if (typeof o !== "function" || o.__v101b3) return;
+    const g = function () {
+      const r = o.apply(this, arguments);
+      try {
+        if (r && r.k === "sig") { const f = sigMissNow(); if (f.length) r.t = SIGMSG(f); }
+      } catch (e) { err("gate3", e); }
+      return r;
+    };
+    g.__v101b3 = 1; g.__v101buyer = 1;
+    W.v79obGate = g;
+  })();
+  // 行に残る「署名の … が未登録です」（L.v79block・1時間残る）：表を描くたびに今の署名で言い直し、署名がそろったら消す
+  V.sigBlockFix = function (run) {
+    try {
+      const f = sigMissNow();
+      (run && run.leads || []).forEach((L) => {
+        if (!L || !L.v79block || L.v79block.k !== "sig") return;
+        if (!f.length) delete L.v79block; else L.v79block.t = SIGMSG(f);
+      });
+    } catch (e) { err("sigBlockFix", e); }
+  };
+  (function () {
+    const o = W.v71obInner;
+    if (typeof o !== "function" || o.__v101b3) return;
+    const g = function () {
+      try { const run = fn("v71obRun") ? W.v71obRun() : null; if (run) V.sigBlockFix(run); } catch (e) { err("inner3", e); }
+      return o.apply(this, arguments);
+    };
+    g.__v101b3 = 1; g.__v101buyer = 1;
+    W.v71obInner = g;
   })();
 })();

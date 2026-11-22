@@ -126,3 +126,7 @@ html.rd #rddbsel .v101d-chip { white-space: normal; text-overflow: clip; overflo
 .v101d-ctnmsg { margin: 4px 0 0; font-weight: 700; color: var(--good, #1a7f37); }
 .v101d-ctnmsg.bad { color: var(--crit, #c62828); }
 .v101d-ctnmsg:empty { display: none; }
+/* 22.01.3（x1 新規10）：PC で用語集が左に出ているとき、見出しの下の「（一覧は「用語集」）」はボタンだけ隠れて「（一覧は「」）」が残った → 括弧ごと替える */
+.v101d-glk-b { display: none; }
+html.k-r9b-glside .rd-hero.k-slim p.k-termhint.k-hint2 .v101d-glk-a { display: none; }
+html.k-r9b-glside .rd-hero.k-slim p.k-termhint.k-hint2 .v101d-glk-b { display: inline; }

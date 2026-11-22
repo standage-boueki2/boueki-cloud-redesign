@@ -172,8 +172,8 @@
           let en = [];
           const rec = D3.v101cover && D3.v101cover[lg]; // 22.01.2：資料を組んだときの表紙のバッジ（fact の層の直しの後）＝資料の表紙と同じ
           if (rec && Array.isArray(rec.b) && rec.b.length) {
-            rec.b.forEach((t0) => { const t = plainT(t0); if (t && en.indexOf(t) < 0) en.push(t); });
-            en = en.filter((t) => !/[぀-ヿ一-鿿]/.test(t) || /^zh/.test(lg)).slice(0, Math.max(1, lis.length));
+            rec.b.forEach((t0) => { const t = plainT(t0).replace(/\s*・\s*/g, ", "); if (t && en.indexOf(t) < 0) en.push(t); }); // 22.01.3（x2-3）全角の中黒は資料の校正と同じく「, 」（日本語と数えて落とさない）
+            en = en.filter((t) => !/[぀-ヿ一-鿿]/.test(t) || /^zh/.test(lg)).slice(0, 3); // 22.01.3：資料の表紙と同じ数（登録の強みの数に合わせない）
           } else if (plan) {
             // 資料の表紙に出るバッジ（根拠の確かめで外した文を除いた控え）だけ＝見本と資料の表紙が同じ言葉になる
             ((plan.hero && plan.hero.badges) || []).forEach((b) => { const t = plainT(b && b.t); if (t && en.indexOf(t) < 0) en.push(t); });

@@ -55,6 +55,8 @@
           if (d0 && d0.set) d0.set.call(RD, v); else cur = v;
           // 下の層（v100 flow）が数え直さない版でも、いまここ・抜け・次の一手を同じ手順で
           try { if (v && !v.v100) V.recompute(v); } catch (e) { err("recompute", e); }
+          // 22.01.3：「まだ分からない」にした寸法・入数を、次の一手に選ばない（下の層が数え直したあとにも）
+          try { if (v && V.skipLater) V.skipLater(v); } catch (e) { err("skipLater", e); }
           post(v);
         },
       });
@@ -453,10 +455,10 @@
     const t = ten() || {};
     const was = t.v101hunk && t.v101hunk.ctn && t.v101hunk.ctn.v ? t.v101hunk.ctn.v : "";
     return `<div class="v101d-ctn" data-v101-deal-ctn="1" role="group" aria-label="${E(M("パレット・コンテナ入数を入れる", "Enter pallet/container load", "填写托盘・集装箱装载数", "Introducir la carga por palé"))}" data-noi18n>
-      ${inWin ? "" : `<p class="v101d-ctnh"><b>${E(M("パレット・コンテナ入数を入れる", "Enter pallet/container load", "填写托盘・集装箱装载数", "Introducir la carga por palé"))}</b></p>`}
-      <p class="v101d-src">${E(M("1パレットに外装（カートン）が何箱載るか、コンテナに何パレット入るか（分かる所だけ）。運賃の見積・FCL／LCL の判断に使います。", "How many cartons per pallet and pallets per container (what you know). Used for freight quotes and FCL/LCL.", "每托盘装几箱、每个集装箱装几托盘（填写已知部分）。用于运费报价和整箱/拼箱判断。", "Cajas por palé y palés por contenedor (lo que sepa)."))}</p>
+      ${inWin ? "" : `<p class="v101d-ctnh"><b>${E(M("パレット・コンテナ入数を入れる（1パレット・1コンテナに載る箱の数）", "Enter pallet/container load (cartons per pallet / container)", "填写托盘・集装箱装载数（每托盘・每集装箱的箱数）", "Carga por palé/contenedor (cajas por palé/contenedor)"))}</b></p>`}
+      <p class="v101d-src">${E(M("1パレットに外装（カートン）が何箱載るか、1コンテナに何パレット入るか（分かる所だけ）。運賃の見積・FCL／LCL の判断に使います。寸法・重量の欄の「1箱の入数」（1箱に入る商品の数）とは別です。", "Cartons per pallet and pallets per container (what you know). Used for freight quotes and FCL/LCL. Different from “units per carton” in the dimensions form.", "每托盘装几箱、每个集装箱装几托盘（填写已知部分）。用于运费报价和整箱/拼箱判断。与尺寸栏中的“每箱入数”不同。", "Cajas por palé y palés por contenedor. Distinto de «unidades por caja»."))}</p>
       ${was ? `<p class="v101dim-was">${E(F(M("前に「{v}」と答えた分は、入数として登録せず「未確認」として控えています。", "Your earlier answer “{v}” is kept as “not confirmed”."), { v: was }))}</p>` : ""}
-      <label class="v101d-ctnf"><span>${E(M("パレット・コンテナ入数", "Pallet/container load", "托盘・集装箱装载数", "Carga por palé/contenedor"))}</span><input type="text" autocomplete="off" data-v101-deal-ctnv="1" value="" placeholder="${E(M("例：外装40ケース／パレット、20ftで18パレット", "e.g. 40 cartons per pallet, 18 pallets per 20ft"))}" aria-label="${E(M("パレット・コンテナ入数", "Pallet/container load"))}"></label>
+      <label class="v101d-ctnf"><span>${E(M("1パレット・1コンテナの箱数（パレット・コンテナ入数）", "Cartons per pallet / container", "每托盘・每集装箱的箱数", "Cajas por palé/contenedor"))}</span><input type="text" autocomplete="off" data-v101-deal-ctnv="1" value="" placeholder="${E(M("例：外装40ケース／パレット、20ftで18パレット", "e.g. 40 cartons per pallet, 18 pallets per 20ft"))}" aria-label="${E(M("パレット・コンテナ入数", "Pallet/container load"))}"></label>
       <p class="v101d-ctnmsg" role="status" aria-live="polite"></p>
       <div class="rw v101d-btns"><button type="button" class="btn" data-v101-deal-ctnsave="1">${E(M("入数を登録する", "Register the load", "登记装载数", "Registrar"))}</button><button type="button" class="btn g" data-v101-deal-ctnlater="1">${E(M("まだ分からない（入数は未確認のまま先へ進む）", "Not known yet (move on, not confirmed)", "还不知道（以“未确认”继续）", "Aún no lo sé (seguir sin confirmar)"))}</button></div>
     </div>`;
@@ -506,6 +508,16 @@
         if (!need) { if (nx) nx.remove(); return; }
         if (nx || !vis(f)) return;
         const tmp = document.createElement("div"); tmp.innerHTML = ctnHtml(false); f.after(tmp.firstElementChild);
+      });
+      // 22.01.3（x1-9）：入数が2つ並ぶので、寸法・重量の欄の「入数」は「1箱の入数」と書き分ける（hear の欄の名前だけ・値と働きはそのまま）
+      $$(".v101dim").forEach((f) => {
+        const nx = f.nextElementSibling;
+        if (!(nx && nx.matches && nx.matches("[data-v101-deal-ctn]"))) return;
+        const i = $('input[data-f="cn"]', f); if (!i) return;
+        const lab = i.closest("label"); const sp = lab && $("span", lab);
+        const want = M("1箱の入数", "Units per carton", "每箱入数", "Unid. por caja");
+        if (sp && sp.textContent !== want) { sp.textContent = want; sp.setAttribute("data-v101-deal-cnlab", "1"); }
+        if (i.getAttribute("aria-label") !== want) i.setAttribute("aria-label", want);
       });
     } catch (e) { err("paintCtn", e); }
   }
@@ -561,18 +573,25 @@
       const r = S && S.has && S.next ? S.next : null;
       // 本番ではヒアリングのあとも FILL.cur（今の問い）が残るので、ヒアリングの途中かどうかでは分けない（どの時点でも同じ言葉・同じ行き先）
       const mine = !!(r && !r.done && (r.v101dims || r.v101miss));
-      if (!mine) {
+      /* 22.01.3（x1-3）：寸法も入数も「まだ分からない」にすると、ほかの画面の「次は」は先の手順（例「規制を調べる」）なのに、
+         商品情報は「必須の項目を入れる（あと1件）」（v92item）、商品情報を登録は「足りない情報に答える（残り 2項目）」（r4c）のままだった
+         → はじめの設定の「次」が1つ目より先のときも、ほかの画面と同じ手順の名前・行き先にする */
+      const ahead = !!(r && !r.done && S.idx > 0);
+      if (!mine && !ahead) {
         if (nb.hasAttribute("data-v101-deal-go")) { nb.removeAttribute("data-v101-deal-go"); if (nb.hasAttribute("data-v101-deal-v92i")) { delete nb.dataset.v92i; nb.removeAttribute("data-v101-deal-v92i"); } }
         return;
       }
       if (!nb.dataset.v92i) { nb.dataset.v92i = "1"; nb.setAttribute("data-v101-deal-v92i", "1"); }
-      const go = r.v101dims ? "dims" : "fill";
+      const go = r.v101dims ? "dims" : (r.v101miss || r.id === "fill") ? "fill" : String(r.key || "");
       if (nb.getAttribute("data-v101-deal-go") !== go) nb.setAttribute("data-v101-deal-go", go);
       if (nb.hasAttribute("data-kbc")) nb.removeAttribute("data-kbc");
       if (nb.hasAttribute("data-v92iact")) nb.removeAttribute("data-v92iact");
-      if (bb.textContent !== r.t) bb.textContent = r.t;
+      // 名前：deal が実際の抜けにした名前はそのまま。ほかの手順は、ほかの層（r6a）と同じく手順の決まった名前を画面の言語で
+      const def = mine ? {} : ((W.V92CORE_STEPS || []).find((x) => x.id === r.id) || {});
+      const nm = mine ? r.t : M(r.t, def.en || r.t, def.zh, def.es);
+      if (bb.textContent !== nm) bb.textContent = nm;
       if (bb.getAttribute("data-noi18n") == null) bb.setAttribute("data-noi18n", "1");
-      const title = M("次の手順：", "Next: ") + r.t + (r.sub ? M("（", " (") + r.sub + M("）", ")") : "");
+      const title = M("次の手順：", "Next: ") + nm + (mine && r.sub ? M("（", " (") + r.sub + M("）", ")") : M("（はじめの設定の、まだの手順）", " (the next unfinished setup step)"));
       if (nb.title !== title) nb.title = title;
     } catch (e) { err("unifyNext", e); }
   }
@@ -582,7 +601,9 @@
     const b = e.target && e.target.closest ? e.target.closest(".k-next[data-v101-deal-go]") : null;
     if (!b) return;
     e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-    if (b.getAttribute("data-v101-deal-go") === "dims") { RD.goKey("v101:dims"); return; }
+    const g = b.getAttribute("data-v101-deal-go");
+    if (g === "dims") { RD.goKey("v101:dims"); return; }
+    if (g && g !== "fill") { try { RD.goKey(g); } catch (x) { err("goNext", x); } return; }
     try { if (curKey() !== "up") RD.goKey("up"); setTimeout(() => { try { if (typeof W.v92upHearGo === "function") W.v92upHearGo(); } catch (x) { /* 無視 */ } }, 700); } catch (x) { err("goFill", x); }
   }, true);
   const gk0 = RD.goKey;
@@ -774,8 +795,34 @@
     } catch (e) { err("paintHome", e); }
   }
 
+  /* 22.01.3（まとめ役・x1 新規10）：PC で用語集が左に出ているとき（html.k-r9b-glside）、見出しの下の「点線の言葉は…（一覧は「用語集」）」の
+     「用語集」のボタンだけが rd_v92all.css で隠れ、「（一覧は「」）」と中身の無い括弧が残った（取り込んだ情報・STANDAGE のサービスなど）。
+     → 括弧の部分（ボタンを含む）を1つの部品にまとめ、その条件のときは括弧ごと隠して「（一覧は左の「用語集（貿易のことば）」）」に替える（CSS）。
+       スマホ（その印が無い）は今まで通り「用語集」のボタン。土台の rd のファイルは触らない。文字は分けるだけで、言葉は変えない */
+  function fixTermHint() {
+    try {
+      $$("p.k-termhint").forEach((p) => {
+        if (p.dataset.v101glk) return;
+        const btn = $(".k-link[data-kgloss]", p); if (!btn) return;
+        const pv = btn.previousSibling, nx = btn.nextSibling;
+        if (!pv || pv.nodeType !== 3) return;
+        const m = String(pv.nodeValue).match(/[（(][^（()）]*$/); if (!m) return;
+        const open = pv.splitText(m.index); // 「（一覧は「」の部分
+        let close = null;
+        if (nx && nx.nodeType === 3) { const c = String(nx.nodeValue).match(/^[^（()）]*[）)]/); if (c) { close = nx; if (c[0].length < nx.nodeValue.length) nx.splitText(c[0].length); } }
+        const a = document.createElement("span"); a.className = "v101d-glk-a";
+        p.insertBefore(a, open); a.appendChild(open); a.appendChild(btn); if (close) a.appendChild(close);
+        const sb = document.createElement("span"); sb.className = "v101d-glk-b"; sb.setAttribute("data-noi18n", "1");
+        sb.textContent = M("（一覧は左の「用語集（貿易のことば）」）", " (full list: “Glossary” on the left)", "（一览见左侧“术语集”）", " (lista completa: «Glosario» a la izquierda)");
+        a.after(sb);
+        p.dataset.v101glk = "1";
+      });
+    } catch (e) { err("termHint", e); }
+  }
+  V.fixTermHint = fixTermHint;
+
   /* いつ描くか：画面を描いたあと（RD.after）・#well の中が変わったとき（上の見張り） */
   const a0 = RD.after;
-  RD.after = function () { const r = a0.apply(this, arguments); try { paintDb(); paintDeal(); paintHome(); unifyNext(); paintCtn(); } catch (e) { err("after", e); } try { setTimeout(() => { paintDb(); paintDeal(); paintHome(); decoBar(); unifyNext(); paintCtn(); }, 50); } catch (e) { err("after2", e); } return r; };
-  setInterval(() => { if (document.hidden) return; const k = curKey(); if (k === "db") paintDb(); else if (k === "deal") paintDeal(); else if (k === "dash:home") paintHome(); else if (k === "item" || k === "up") unifyNext(); if ($(".v101dim")) paintCtn(); }, 1500);
+  RD.after = function () { const r = a0.apply(this, arguments); try { paintDb(); paintDeal(); paintHome(); unifyNext(); paintCtn(); fixTermHint(); } catch (e) { err("after", e); } try { setTimeout(() => { paintDb(); paintDeal(); paintHome(); decoBar(); unifyNext(); paintCtn(); fixTermHint(); }, 50); } catch (e) { err("after2", e); } return r; };
+  setInterval(() => { if (document.hidden) return; const k = curKey(); if (k === "db") paintDb(); else if (k === "deal") paintDeal(); else if (k === "dash:home") paintHome(); else if (k === "item" || k === "up") unifyNext(); if ($(".v101dim")) paintCtn(); fixTermHint(); }, 1500);
 })();

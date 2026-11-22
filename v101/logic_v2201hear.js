@@ -1249,6 +1249,15 @@ window.V101HEAR = V101HEAR;
         return r.replace("医療機器ではありません（登録の答え）", "医療機器ではありません（資料の記載）").replace("登録の答えから", "資料から" + (t.v98md.file ? "（" + E(t.v98md.file) + "）" : ""))
           .replace("Not a medical device (your answer)", "Not a medical device (stated in your file)").replace("From your answer", "From your file");
       }
+      // 22.01.3（x2-13）：本人の答えのときは、規制の画面の決め手（V98REG.mdWhyTxt「本人の答え」）と同じ呼び名にそろえる。
+      //   資料で控えたあとに本人も同じ答えをしたときは「本人の答え・資料の記載とも同じ」
+      if (f && f.k === "mdUse" && typeof r === "string" && /data-v100n8/.test(r) && t && t.v98md && t.v98md.from !== "doc" && /登録の答え|your answer/.test(r)) {
+        const both = !!t.v98md.doc;
+        cnt("mdUseName");
+        return r.replace("医療機器ではありません（登録の答え）", both ? "医療機器ではありません（本人の答え・資料の記載とも同じ）" : "医療機器ではありません（本人の答え）")
+          .replace("登録の答えから", both ? "本人の答え・資料" + (t.v98md.doc.file ? "（" + E(t.v98md.doc.file) + "）" : "") + "から" : "本人の答えから")
+          .replace("Not a medical device (your answer)", both ? "Not a medical device (your answer; same as your file)" : "Not a medical device (your answer)");
+      }
       if (!f || typeof r !== "string" || r.indexOf('class="mute"') < 0 || /data-v100n8/.test(r)) return r;
       const x = optDerived(t, f.k);
       if (!x) return r;
@@ -1446,8 +1455,9 @@ window.V101HEAR = V101HEAR;
   function whyFix(w) {
     let s = String(w == null ? "" : w).trim().replace(/[。．.]+$/, "");
     if (!s) return null;
-    if (/(?:ための|のための)$/.test(s)) return s.replace(/の$/, "") + "に伺っています";
-    if (/ため$/.test(s)) return s + "に伺っています";
+    // 22.01.3（x2-11）：「〜に必要なために伺っています」も硬いので、「ため」で終わる理由は「〜ため、伺っています」にそろえる
+    if (/(?:ための|のための)$/.test(s)) return s.replace(/の$/, "") + "、伺っています";
+    if (/ため$/.test(s)) return s + "、伺っています";
     if (/ために$/.test(s)) return s + "伺っています";
     if (/(?:必要|重要|不可欠|大切|有用)$/.test(s)) return s + "なため、伺っています";
     if (/(?:必要|重要|不可欠|大切)な$/.test(s)) return s + "ため、伺っています";
@@ -1549,6 +1559,32 @@ window.V101HEAR = V101HEAR;
   }
   mdWhyFix();
   V.mdWhyFix = mdWhyFix;
+
+  /* ══════════════════════════════════════════════════════════════════════════════════════════════
+     22.01.3（x2・x1 の直し）：AI 追加ヒアリングの問いの「事柄」の印（fact・buyer が使う・取り決めを足しただけ）
+     x2 新規1（F）：問いが「FP-201の適合車種・年式・型式・純正互換番号をご提示いただけますか」の言い方だと、「不明」の答えの事柄（適合）が
+     見分けられないことがあった。問いの言い方に左右されにくい言葉で事柄を付ける：
+       window.v101qaTopics(問いの文) → ["fit"|"asbestos"|"origin"|"halal"|"organic"|"oem"|"capacity"|"shelflife"…]
+       TEN.extraQA[i].v101tp ＝ 同じ（記録したとき・画面を描くときに付ける。答えが「不明」かどうかは見ない＝使う側で TEN.extraQA[i].a を見る）
+     ══════════════════════════════════════════════════════════════════════════════════════════════ */
+  const QA_TOPICS = [
+    ["fit", /車種|年式|型式|互換(?:品|性|番号)?|純正(?:品)?(?:番号|品番|部品番号)|適合(?:車|表|機種|品番|リスト|一覧|する車|する機種|する型式)|対応(?:車|機種|表|品番)|フィッティング|fitment|compatib|application\s*(?:list|chart|guide|table)|cross[- ]?reference/i],
+    ["asbestos", /アスベスト|石綿|asbestos/i],
+    ["origin", /原産|製造国|生産国|産地|製造地|country\s*of\s*origin|made\s*in/i],
+    ["halal", /ハラール|ハラル|halal/i],
+    ["organic", /有機(?!溶剤|化合物|物|ハロゲン|EL)|オーガニック|organic/i],
+    ["oem", /OEM|ODM|プライベートブランド|受託(?:生産|製造)?/i],
+    ["capacity", /生産能力|月産|年産|供給(?:量|能力)|生産量|capacity/i],
+    ["shelflife", /賞味期限|消費期限|使用期限|有効期限|保存期間|shelf[- ]?life/i],
+  ];
+  function qaTopics(q) { const s = NF(q == null ? "" : q); return QA_TOPICS.filter(([, re]) => re.test(s)).map(([k]) => k); }
+  W.v101qaTopics = function (q) { try { return qaTopics(q); } catch (e) { err("qaTopics", e); return []; } };
+  function tagQA(t) {
+    try { (Array.isArray(t && t.extraQA) ? t.extraQA : []).forEach((x) => { if (x && typeof x === "object" && !Array.isArray(x.v101tp)) { const tp = qaTopics(x.q); x.v101tp = tp; } }); } catch (e) { err("tagQA", e); }
+  }
+  V.tagQA = tagQA;
+  wrap("llmExtraRecord", (o) => function () { const r = o.apply(this, arguments); try { const t = ten(); if (t) { tagQA(t); cnt("qaTag"); } } catch (e) { err("qaRec", e); } return r; });
+  wrap("tenantToD", (o) => function (t) { try { if (t && userT(t)) tagQA(t); } catch (e) { /* 無視 */ } return o.apply(this, arguments); });
 
   // 起動時と画面の描き直しの前に、今までに登録した商品も掃除する（保存はしない。次の保存で残る）
   wrap("render", (o) => function () { try { const t = ten(); if (t && userT(t)) { clean(t, "render"); strDedupe(t); compFix(t); } } catch (e) { err("render", e); } return o.apply(this, arguments); });

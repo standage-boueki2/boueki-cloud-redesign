@@ -295,6 +295,8 @@
         // 「商品情報を登録」の「残り N項目（a・b など）」「全体 c/d：あと a・b など」（同じ数え方 v92prodFill の missKeys と名前 v92prodNm）
         needM = K && Array.isArray(K.missKeys) ? K.missKeys.map((k) => (k === "hs" && K.hsGuess ? "HSコード（推定・要確認）" : (typeof W.v92prodNm === "function" ? String(W.v92prodNm(k, t)) : k))) : [];
       } catch (e) { optM = []; needM = []; }
+      // 22.01.3（x1-8）：商品情報・商品情報を登録の表（④ 業種ごとの項目・基本の項目など）の中も、読み上げで「取引条件（建値）」の建値・MOQ・T/T が抜けないよう用語の印を外す
+      try { const k = W.RDX && typeof W.RDX.curKey === "function" ? W.RDX.curKey() : ""; if (k === "item" || k === "up") well.querySelectorAll("table").forEach((tb) => { if (tb.querySelector(".tm, .v54term, abbr.k-term") || !tb.hasAttribute("data-noterm")) plainTerms(tb); }); } catch (e) { err("tblTerms", e); }
       // 一覧の文の中の用語の印を先に外す（読み上げで抜けないように）
       well.querySelectorAll(".k-v90optl span, li.ng, .rd-empty").forEach((el) => { if (/任意の項目で未登録 \d+件|任意 あと\d+件|残り \d+項目|：あと /.test(el.textContent || "")) plainTerms(el); });
       textNodes(well).forEach((nd) => {
@@ -321,10 +323,10 @@
       const lst = files.join(M("、", ", ", "、", ", "));
       const btn = `<button type="button" class="btn g" data-v101srcs="1" style="padding:2px 9px;font-size:11px;margin-left:6px">${E(M("取り込んだ資料の一覧", "Imported files", "已导入的资料", "Archivos importados"))}</button>`;
       const head = `<span class="src" data-v101src="${files.length}" data-noi18n>📄 ${E(M(`取り込んだ資料（${files.length}件）：${lst}（ヒアリングの答えと合わせて登録）`, `Imported files (${files.length}): ${lst} (registered together with your interview answers)`, `已导入的资料（${files.length}件）：${lst}（与问答的回答一起登记）`, `Archivos importados (${files.length}): ${lst} (registrados junto con sus respuestas)`))}${btn}</span>`;
-      h = h.replace(/<span class="src">(?:📄|✍) [^<]*?<\/span>/, head);
+      h = h.replace(/<span class="src">(?:📄|✍) [^<]*?<\/span>/g, head); // 22.01.3（x2-2）：写真のある商品は、隠れた見出し（v40hd）にも同じ出どころがあり、1つ目だけ直して見える方が残っていた → 全部直す
       // 成分・材質表の下：どの資料から入ったか（分からなければ「資料とヒアリングの答えから」）
       const cf = S.compRows ? M(`${S.compRows} から取り込み`, `Imported from ${S.compRows}`, `从 ${S.compRows} 导入`, `Importado de ${S.compRows}`) : M(`取り込んだ資料（${lst}）とヒアリングの答えから`, `From the imported files (${lst}) and your interview answers`, `来自已导入的资料（${lst}）和问答的回答`, `De los archivos importados (${lst}) y sus respuestas`);
-      h = h.replace(/(<p class="nn" style="margin-top:8px")>(?:手入力（資料なし） から取り込み|手入力で登録|Imported from 手入力（資料なし）)(<\/p>)/, (m0, a, b) => `${a} data-v101src="comp" data-noi18n>${E(cf)}${b}`);
+      h = h.replace(/(<p class="nn" style="margin-top:8px")>(?:手入力（資料なし） から取り込み|手入力で登録|Imported from 手入力（資料なし）)(<\/p>)/g, (m0, a, b) => `${a} data-v101src="comp" data-noi18n>${E(cf)}${b}`);
       V.n.srcShow = (V.n.srcShow || 0) + 1;
     } catch (e) { err("srcShow", e); }
     return h;
