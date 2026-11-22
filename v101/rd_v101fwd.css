@@ -54,3 +54,32 @@ b.v101ftt{display:block;font-weight:700}
   .v101famt{align-items:flex-start}
   .v101fnext li button{display:block;width:100%;white-space:normal}
 }
+/* 22.01.1（v3 の直し） */
+.v101fvtagx{display:block;font-size:9.5px;color:var(--rd-ink-3,#6b7280);font-weight:400}
+.k-tile.v101fnochk .k-ti{color:var(--rd-ink-3,#6b7280);background:var(--rd-bg-2,#f1f5f9)}
+.k-tile.v101fnochk .k-tn{white-space:normal;overflow:visible;text-overflow:clip}
+.v101fchkn{margin:6px 0 4px;font-size:12px;line-height:1.6;color:var(--rd-ink-2,#374151)}
+.v101fblcmp{margin:6px 0;padding:8px 10px;border-radius:8px;border:1px solid #f3c58a;background:#fff8ee;font-size:12px;line-height:1.6;color:#3b2a12}
+.v101fblcmp ul{margin:4px 0 2px 1.1em;padding:0}
+.v101fblcmp .ok,.v101fvolsrc .ok{color:#15803d;font-weight:600}
+.v101fblcmp .ng{color:#b45309;font-weight:600}
+.v101fblcmp .na{color:var(--rd-ink-3,#6b7280)}
+.v101fblcmp small{display:block;font-size:11px;color:#5b4524}
+.v101fblcmp.v101fblcmp1{margin:4px 0;padding:0;border:0;background:none;font-size:11.5px;line-height:1.55;color:var(--rd-ink-2,#374151)}
+.v101fvolscope{margin:6px 0 0;font-size:11.5px;line-height:1.55;font-weight:400}
+.v101fbasisl{font-size:11px;color:var(--rd-ink-2,#4b5563)}
+.v101fhid{display:none !important}
+table.v101fexponly tbody tr:not(.v89fexp){display:none !important}
+.v101fexpbar{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin:8px 0;padding:8px 11px;border-radius:8px;border:1px solid #f3c58a;background:#fff8ee;font-size:12px;line-height:1.55;color:#3b2a12}
+.v101fexpbar span{flex:1 1 260px}
+.v101fcos{margin-top:4px;font-size:10.5px;line-height:1.5;color:var(--rd-ink-2,#4b5563)}
+.v101fcosn{margin:4px 0;font-size:11px;line-height:1.55;color:var(--rd-ink-2,#4b5563)}
+@media (prefers-color-scheme: dark){
+  .v101fblcmp,.v101fexpbar{background:#2b2111;border-color:#7a5a24;color:#f6e7cf}
+  .v101fblcmp small{color:#e9d3ad}
+}
+@media (max-width:600px){
+  .v101fexpbar .btn{width:100%}
+}
+.rd-ts.v101fnlwhy{display:block;font-size:11.5px;color:var(--rd-ink2,#4a5560)}
+small.v101fnlwhy{display:block}

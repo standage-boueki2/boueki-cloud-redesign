@@ -603,7 +603,7 @@
           run.v101 = Object.assign({}, run.v101 || {}, { asked: B.asked, aiN: B.aiN == null ? null : B.aiN, aiNamed: B.aiNamed == null ? null : B.aiNamed, at: Date.now() });
           if (fn("v71obSave")) W.v71obSave();
           if (fn("v71obPaint")) W.v71obPaint();
-          const c = obCount(run);
+          const c = V.obCount ? V.obCount(run) : obCount(run); // 22.01.1：確かめに失敗した会社を「確かめられなかった」と二重に数えない
           const tl = B.toasts.filter(Boolean);
           let msg = "";
           if (run.how === "ai" && !run.v100) {
@@ -612,7 +612,10 @@
             if (c.asked && c.total < c.asked) msg += F(M("。頼んだのは {n}社でしたが、AI が挙げたのは {a}社でした", ". You asked for {n}; the AI listed {a}"), { n: c.asked, a: c.total });
             if (c.unchk) msg += F(M("。公式サイトを確かめられなかった {u}社は下に並べています", ". {u} not verified on their website are listed at the bottom"), { u: c.unchk });
             const ng = tl.find((x) => /確かめられませんでした|could not be checked|Could not check/i.test(x));
-            if (ng) msg = ng + " " + msg;
+            const sp = tl.find((x) => /5社ずつに分けて確かめ直しました|groups of 5/.test(x));
+            const end = (x) => (/[。.!?！？]\s*$/.test(x) ? x + " " : x + M("。", ". "));
+            if (sp) msg = end(sp) + msg;
+            else if (ng) msg = end(ng) + msg;
           } else msg = tl[tl.length - 1] || "";
           if (msg) { try { if (typeof toast === "function") toast(msg); } catch (e) { /* 無視 */ } } // eslint-disable-line no-undef
           log({ k: "build", asked: B.asked, aiN: B.aiN, total: c.total, shown: c.shown, gone: c.gone });
@@ -744,4 +747,557 @@
     } catch (e) { err("checkAfter", e); }
     return r;
   });
+
+  /* ═════════════════════════════════════════════════════════════════════════════════════════════
+     22.01.1（22.01 の公開後の検証で見つけた所の直し）
+     ═════════════════════════════════════════════════════════════════════════════════════════════ */
+  V.ver = "22.01.1";
+  Object.assign(V.n, { unkFix: 0, unkHit: 0, unkCtx: 0, chkBusy: 0, chkSplit: 0, chkWhy: 0, epaFlag: 0 });
+  function djb(s) { let h = 5381; s = String(s || ""); for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+
+  /* ═════════ v2-2：バイヤー宛ての文面（AI バイヤー開拓の文面・DM・返信の案）で、「不明」と答えた事柄・未登録の原産地を断定しない ═════════
+     原因：618 の直し（fact の担当）は英語の営業資料・表紙の見本・書類だけ。AI バイヤー開拓の文面は AI が別に書く（v71obApproach）ので、
+           F の繁體中文の文面に「可對應主要汽車品牌車款」（登録の強み「主要メーカー対応」の訳）が残った。照合の仕組みは文面には掛かっていなかった。
+     直し：①AI への頼み（v71obCtx の商品の段）に「不明」と答えた事柄を書く（頼みの文だけには頼らない）
+           ②文面ができたら（v79obFinish）、文の中の断定を入力と突き合わせて直す：英・中（繁・簡）・西・日の言い回しで、
+             「不明」と答えた話題（fact の担当の unkTopics と同じ話題：適合・アスベスト不使用・原産地・ハラール・有機・OEM・生産能力・認証の名前）の断定の句を外し、
+             その話題の「待確認／to be confirmed／por confirmar」を1回だけ書く（同じ文の中で「確認」とすでに書いていれば足さない）。NAO などの材質名は残し、証明は要確認と付ける。
+           ③利用者が手で直した文面は勝手に書き換えない（知らせだけ出す）。DM・返信の AI の案も同じ直しを掛ける（rd_v101buyer.js） */
+  function unkFallback(T) {
+    const out = [], qs = [];
+    const UNKW = /(?:わから|分から|不明|未定|未確認|知らない|unknown|not sure)/i;
+    (Array.isArray(T.extraQA) ? T.extraQA : []).forEach((x) => { if (x && x.q && UNKW.test(String(x.a || "")) && String(x.a).length <= 30) qs.push(String(x.q)); });
+    (Array.isArray(T.v101unk) ? T.v101unk : []).forEach((u) => { if (u && u.q) qs.push(String(u.q)); });
+    const add = (k, lab, q, o) => { if (!out.some((x) => x.k === k)) out.push(Object.assign({ k, lab, q, a: "不明" }, o || {})); };
+    qs.forEach((q) => { if (/適合|車種|対応車|対応機種|互換|純正品番/.test(q)) add("fit", "適合（車種・機種・品番）", q); if (/アスベスト|石綿|asbestos/i.test(q)) add("asbestos", "アスベスト不使用", q); });
+    let O = null; try { O = fn("v101origin") ? W.v101origin(T) : null; } catch (e) { O = null; }
+    const known = O ? !!O.known : !!(String(T.origin || "").trim() && !UNKW.test(String(T.origin)));
+    if (!known) add("origin", "原産国・製造国", "原産地・製造国", { origin: 1 });
+    return out;
+  }
+  function unkTopicsOf(T) {
+    T = T || ten();
+    if (!T) return [];
+    let L = null;
+    try { if (W.V101FACT && typeof W.V101FACT.unkTopics === "function") L = W.V101FACT.unkTopics(T) || []; } catch (e) { err("unkTopics", e); L = null; }
+    if (!L) L = unkFallback(T);
+    return L.filter((x) => x && x.k && x.k !== "shelflife");
+  }
+  V.unkTopicsOf = unkTopicsOf;
+  // 文の言語（文面の言語の名前 hint を先に、無ければ文字から）：en・zht（繁）・zhs（簡）・es・ja
+  const ZHT = /[們這為與貴車產國請對應裝價時間際關於會個發開門東來說樣點業務經過還讓從處單號額質機現圍種輪級齊廠歐韓檢證書]/g;
+  const ZHS = /[们这为与贵车产国请对应装价时间际关于会个发开门东来说样点业务经过还让从处单号额质机现围种轮级齐厂欧韩检证书]/g;
+  function zhKind(t, hint) { const a = (String(t).match(ZHT) || []).length, b = (String(t).match(ZHS) || []).length; if (a > b) return "zht"; if (b > a) return "zhs"; return /繁|Traditional|Hant|台|臺|香港|HK|TW/i.test(String(hint || "")) ? "zht" : "zhs"; }
+  function langOf(t, hint) {
+    const s = String(t || ""), h = String(hint || "");
+    if (/[ぁ-ゖ]/.test(s) || (/[ァ-ヺー]{2,}/.test(s) && !/[們这們這]/.test(s))) return "ja";
+    if (/[一-龥]/.test(s)) return zhKind(s, h);
+    if (/[ñ¿¡áéíóú]/i.test(s) || /\b(?:para|con|nuestros?|nuestras?|productos?|empresa|marcas|sin|por)\b/i.test(s)) return "es";
+    if (/Españ|Spanish|西/.test(h) && !/[A-Za-z]{3,}\s+(?:the|and|of|with)\b/.test(s)) return "es";
+    return "en";
+  }
+  V.langOf = langOf;
+  // 話題ごとの断定の言い回し（言語ごと）
+  const CL = {
+    fit: {
+      en: [/\b(?:compatible|compatibility|fits?|fitting|suitable|suits?|designed|applicable|available)\s+(?:with|for|to|on)?\s*(?:the\s+)?(?:(?:most|all|major|leading|many|popular|main|various|numerous|a\s+wide\s+range\s+of|a\s+broad\s+range\s+of)\s+){1,3}(?:of\s+the\s+)?(?:japanese\s+|european\s+|asian\s+|korean\s+|german\s+|american\s+)?(?:passenger[- ]car\s+|car\s+|vehicle\s+|auto(?:motive)?\s+|automobile\s+)?(?:makers?|brands?|manufacturers?|models?|OEMs?|vehicles?|cars?|makes)\b/i,
+        /\b(?:supports?|covers?|covering|fits?|suits?)\s+(?:the\s+)?(?:(?:most|all|major|leading|many|popular|main|various|numerous|a\s+wide\s+range\s+of|a\s+broad\s+range\s+of)\s+){1,3}(?:japanese\s+|european\s+|asian\s+)?(?:passenger[- ]car\s+|car\s+|vehicle\s+|auto(?:motive)?\s+|automobile\s+)?(?:makers?|brands?|manufacturers?|models?|OEMs?|vehicles?|cars?|makes)\b/i,
+        /\b(?:major|leading|main|popular)\s+(?:japanese\s+|european\s+)?(?:passenger[- ]car\s+|car\s+|vehicle\s+|auto(?:motive)?\s+|automobile\s+)?(?:makers?|brands?|manufacturers?|OEMs?)\s+(?:support|coverage|compatib\w+|fitment|applications?)\b/i,
+        /\bOEM[- ](?:equivalent|replacement|compatible)\b|\bdirect[- ]fit\b|\bwide\s+(?:application|vehicle|model)\s+coverage\b|\bmulti[- ](?:vehicle|model)\s+(?:fit|compatib\w+)\b/i],
+      zh: [/(?:對應|对应|適用|适用|適配|适配|兼容|相容|匹配|支援|支持|配合|涵蓋|涵盖|覆蓋|覆盖)\s*(?:於|于)?\s*(?:市面上|市場上|市场上)?(?:的)?(?:主要|主流|多數|多数|大多數|大多数|大部分|各大|眾多|众多|多款|多種|多种|全部|所有|各種|各种|常見|常见|日系|歐系|欧系|德系|美系|韓系|韩系|日本|歐洲|欧洲)[^。；;！!？?\n，,（(]{0,12}?(?:品牌|廠牌|厂牌|車廠|车厂|製造商|制造商|車款|车款|車型|车型|車種|车种|車系|车系|機種|机种|機型|机型)/,
+        /(?:主要|主流|各大|多數|多数|眾多|众多)(?:汽車|汽车|車|车)?(?:品牌|廠牌|厂牌|車廠|车厂|製造商|制造商)(?:車款|车款|車型|车型)?\s*(?:均|皆|都)?\s*(?:可|能)?\s*(?:適用|适用|對應|对应|使用|安裝|安装|兼容)/,
+        /原廠同等|原厂同等|OEM\s*同等|直接替換|直接替换|多車種適用|多车种适用/],
+      es: [/\bcompatibles?\s+con\s+(?:la\s+mayor[ií]a|las\s+principales|los\s+principales|muchas|muchos|numerosas|numerosos|diversas|diversos|todas|todos)\b/i, /\b(?:las|los)\s+principales\s+(?:marcas|fabricantes)\b/i, /\b(?:apto|aptas?|v[aá]lido|adecuado)s?\s+para\s+(?:la\s+mayor[ií]a|las\s+principales|los\s+principales|todos?\s+los)\b/i, /\bequivalente\s+(?:a\s+)?OEM\b/i],
+      ja: [/主要(?:な)?(?:自動車)?メーカー(?:に)?対応|主要メーカー(?:の車種)?に対応|主要車種(?:に)?対応|多車種(?:に)?対応|幅広い車種(?:に)?対応|全車種(?:に)?対応|純正同等|主要メーカー対応/] },
+    asbestos: {
+      en: [/\bnon-?asbestos\b(?:\s+organic)?|\basbestos[- ]free\b(?!\s+certificate)|\bfree\s+(?:of|from)\s+asbestos\b|\b(?:without|no|zero|contains?\s+no)\s+asbestos\b/i],
+      zh: [/(?:無石棉|无石棉|不含石棉|零石棉|非石棉)(?!證明|证明)/], es: [/(?<!certificado\s)\bsin\s+(?:amianto|asbesto)\b|\blibre\s+de\s+(?:amianto|asbesto)\b|\bno\s+contiene\s+(?:amianto|asbesto)\b/i],
+      ja: [/ノンアスベスト|アスベスト(?:不使用|フリー|を含まない|ゼロ|なし)(?!の証明)|石綿(?:不使用|を含まない)|非石綿/] },
+    origin: {
+      en: [/\bmade\s+in\s+japan\b|\bjapan(?:ese)?[- ]made\b|\b(?:produced|manufactured|made|crafted|built|brewed|processed|assembled)\s+(?:\w+\s+){0,2}in\s+(?:[A-Z][\w-]+(?:\s+Prefecture)?\s*,\s*)?japan\b|\bjapan(?:ese)?\s+quality\b|\bjapanese[- ]origin\b|\bproducts?\s+of\s+japan\b/i],
+      zh: [/日本(?:製造|制造|生產|生产|製(?!造)|制(?!造))(?![商業业者廠厂家])|(?:產|产)(?:自|於|于)日本|日本原(?:裝|装)|日本(?:品質|品质)|在日本(?:製造|制造|生產|生产|加工|製作|制作)|日本(?:國產|国产)/],
+      es: [/\b(?:hecho|hecha|fabricad[oa]s?|producid[oa]s?|elaborad[oa]s?)\s+en\s+jap[oó]n\b|\bde\s+origen\s+japon[eé]s\b|\bcalidad\s+japonesa\b/i],
+      ja: [/日本製|国産(?!化)|国内(?:で)?(?:生産|製造)|日本国内の工場で(?:生産|製造)/] },
+    halal: { en: [/\bhalal\b/i], zh: [/清真|halal/i], es: [/\bhalal\b/i], ja: [/ハラ[ーｰ]?ル/] },
+    organic: { en: [/\borganic\b/i], zh: [/有機|有机/], es: [/\borg[aá]nic[oa]s?\b/i], ja: [/有機|オーガニック/] },
+    oem: { en: [/\b(?:OEM|ODM|private[- ]label)\b/i], zh: [/OEM|ODM|代工|貼牌|贴牌/], es: [/\b(?:OEM|ODM|marca\s+(?:blanca|propia|privada))\b/i], ja: [/OEM|ODM|PB|受託/] },
+    capacity: { en: [/\b(?:monthly|annual|production)\s+capacity\b|\bstable\s+supply\b|\blarge[- ]volume\s+supply\b/i], zh: [/[月年]?(?:產能|产能)|穩定供(?:貨|應)|稳定供(?:货|应)|大量供(?:應|应)/], es: [/\bcapacidad\s+de\s+producci[oó]n\b|\bsuministro\s+estable\b/i], ja: [/生産能力|月産|年産|安定供給/] }
+  };
+  // 「確認する」の言い回し（断定ではない・この句と同じ節にあれば外さない）
+  const HEDGE = /to be confirmed|\bTBC\b|\bunconfirmed\b|not (?:yet )?(?:confirmed|verified)|待確認|待确认|需[^。；;\n，,]{0,6}確認|需[^。；;\n，,]{0,6}确认|須[^。；;\n，,]{0,6}確認|须[^。；;\n，,]{0,6}确认|確認後|确认后|請(?:告知|提供)|请(?:告知|提供)|(?:we|I)\s+(?:will|can|would|'ll|shall)\s+(?:be\s+(?:happy|glad)\s+to\s+)?(?:confirm|check|verify)|(?:please|kindly)\s+(?:share|provide|send|let\s+us\s+know|tell\s+us|advise)|subject\s+to\s+confirmation|por\s+confirmar|a\s+confirmar|confirmaremos|pendiente\s+de\s+confirmaci|要確認|確認中|確認します|ご確認|未確認|certificate:\s*to be confirmed/i;
+  V.HEDGE = HEDGE;
+  // はっきり「確認が要る・未確認」と書いている（「待確認」を足さなくてよい）。「請告知車型」のような頼みだけでは足す
+  const HEDGE2 = /to be confirmed|\bTBC\b|\bunconfirmed\b|not (?:yet )?(?:confirmed|verified)|待確認|待确认|需[^。；;\n，,]{0,6}確認|需[^。；;\n，,]{0,6}确认|須[^。；;\n，,]{0,6}確認|须[^。；;\n，,]{0,6}确认|確認後|确认后|(?:we|I)\s+(?:will|can|would|'ll|shall)\s+(?:be\s+(?:happy|glad)\s+to\s+)?(?:confirm|check|verify)|subject\s+to\s+confirmation|por\s+confirmar|a\s+confirmar|confirmaremos|pendiente\s+de\s+confirmaci|要確認|確認中|未確認/i;
+  // 話題の語（同じ行で「確認」と書いているかを見る）
+  const TOPW = { fit: /車型|车型|車款|车款|適用|适用|適配|适配|model|vehicle|fitment|compatib|modelo|veh[ií]culo|車種|機種|品番|part number|零件號碼|零件号码/i, asbestos: /石棉|asbestos|amianto|asbesto|アスベスト|石綿/i, origin: /原產|原产|原産|origin|origen|製造國|制造国/i };
+  function vehOf(T, tp) { return /車|vehicle|car\b/i.test(String((tp && tp.q) || "") + " " + String((T && (T.cat || T.catKey)) || "") + " " + String((T && T.item) || "")); }
+  function tbcText(tp, lg, T) {
+    const k = tp.k;
+    const veh = vehOf(T, tp);
+    const P = {
+      fit: veh ? { en: "Applicable vehicle models: to be confirmed", zht: "適用車型：待確認", zhs: "适用车型：待确认", es: "Modelos de vehículo compatibles: por confirmar", ja: "適合車種：要確認" }
+        : { en: "Compatible models: to be confirmed", zht: "適用機型：待確認", zhs: "适用机型：待确认", es: "Modelos compatibles: por confirmar", ja: "適合機種：要確認" },
+      asbestos: { en: "asbestos-free certificate: to be confirmed", zht: "無石棉證明：待確認", zhs: "无石棉证明：待确认", es: "certificado sin amianto: por confirmar", ja: "アスベスト不使用の証明：要確認" },
+      origin: { en: "Country of origin: to be confirmed", zht: "原產國：待確認", zhs: "原产国：待确认", es: "País de origen: por confirmar", ja: "原産国：要確認" },
+      halal: { en: "Halal certification: to be confirmed", zht: "清真認證：待確認", zhs: "清真认证：待确认", es: "Certificación halal: por confirmar", ja: "ハラール認証：要確認" },
+      organic: { en: "Organic certification: to be confirmed", zht: "有機認證：待確認", zhs: "有机认证：待确认", es: "Certificación orgánica: por confirmar", ja: "有機の認証：要確認" },
+      oem: { en: "OEM / private label: to be confirmed", zht: "OEM／貼牌：待確認", zhs: "OEM／贴牌：待确认", es: "OEM / marca blanca: por confirmar", ja: "OEM・PB の受託：要確認" },
+      capacity: { en: "Production capacity: to be confirmed", zht: "產能：待確認", zhs: "产能：待确认", es: "Capacidad de producción: por confirmar", ja: "生産能力：要確認" }
+    };
+    const o = P[k] || { en: String(tp.lab || "") + ": to be confirmed", zht: String(tp.lab || "") + "：待確認", zhs: String(tp.lab || "") + "：待确认", es: String(tp.lab || "") + ": por confirmar", ja: String(tp.lab || "") + "：要確認" };
+    return o[lg] || o.en;
+  }
+  V.tbcText = tbcText;
+  function claimRes(tp, lg) {
+    if (CL[tp.k]) { const c = CL[tp.k]; return (c[lg === "zht" || lg === "zhs" ? "zh" : lg] || []).concat(lg === "en" ? [] : (c.en || [])); }
+    if (tp.en instanceof RegExp) return [tp.en]; // 認証・試験の名前（ISO 13485・BFE など）は言語によらない
+    return [];
+  }
+  function claimHit(tp, s, lg) {
+    const L = claimRes(tp, lg);
+    for (const re of L) { re.lastIndex = 0; const m = String(s).match(re); if (m) return m[0]; }
+    if (tp.k === "origin" && lg === "en") { try { if (W.V101FACT && typeof W.V101FACT.originHits === "function" && W.V101FACT.originHits(s)) return "origin"; } catch (e) { /* 無視 */ } }
+    return "";
+  }
+  // 文に分ける（。！？!?；; と、英語の「. 」＋大文字。略語では切らない）
+  function sents2(s) {
+    const out = []; let cur = "";
+    const t = String(s || "");
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i]; cur += ch;
+      if (/[。！？!?；;]/.test(ch)) { while (i + 1 < t.length && /[\s」』”"）)]/.test(t[i + 1]) && !/\n/.test(t[i + 1])) { cur += t[++i]; } out.push(cur); cur = ""; continue; }
+      if (ch === "." && (i === t.length - 1 || (/\s/.test(t[i + 1] || "") && /[A-Z¿¡"“(]/.test(t[i + 2] || ""))) && !/\b(?:Co|Ltd|Inc|No|e\.g|i\.e|approx|U\.S|Mr|Ms|Dr|vs|etc|Corp|St)\.$/i.test(cur)) { if (i + 1 < t.length) cur += t[++i]; out.push(cur); cur = ""; }
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+  // 節に分ける（，,；;（）():：）。区切りは奇数の番号に
+  const SUBSEP = /([，,；;（）()：:])/;
+  function tidy(s, lg) {
+    let x = String(s);
+    x = x.replace(/[（(]\s*[)）]/g, "").replace(/([，,；;：:])\s*([，,；;。.!?！？])/g, "$2").replace(/^[\s，,；;：:、]+/, "").replace(/[\s，,；;：:、]+([。.!?！？]?)\s*$/, "$1").replace(/\s{2,}/g, " ").replace(/\s+([,.;:!?)])/g, "$1");
+    if (lg === "en" || lg === "es") { x = x.replace(/^(?:and|but|while|so|which|that|y|pero|que)\s+/i, ""); if (/^[a-z]/.test(x)) x = x.charAt(0).toUpperCase() + x.slice(1); }
+    return x;
+  }
+  function meaningful(s, lg) { const t = String(s || "").replace(/[\s。.!?！？，,；;：:、・•\-*（）()]/g, ""); if (!t) return false; return (lg === "en" || lg === "es") ? String(s).trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length >= 3 : t.length >= 3; }
+  function nonEmpty(s, lg) { const t = String(s || "").replace(/[\s。.!?！？，,；;：:、・•\-*（）()]/g, ""); return (lg === "en" || lg === "es") ? /[A-Za-z]{2,}/.test(t) : t.length >= 2; }
+  function stripOriginWords(s, lg) {
+    let x = String(s);
+    if (lg === "en") { try { if (W.V101FACT && typeof W.V101FACT.stripOrigin === "function") { const y = W.V101FACT.stripOrigin(x); if (y != null) x = y; } } catch (e) { /* 無視 */ } x = x.replace(/\bJapan(?:ese)?[- ]quality\b/gi, "quality").replace(/\bJapan(?:ese)?[- ]made\s+/gi, "").replace(/\s*[-–—,]?\s*\bmade in japan\b/gi, ""); }
+    else if (lg === "zht" || lg === "zhs") x = x.replace(/日本(?=品質|品质)/g, "").replace(/(?:於|于|在)?日本(?:製造|制造|生產|生产|製(?!造)|制(?!造))(?![商業业者廠厂家])(?:的)?/g, "").replace(/(?:產|产)(?:自|於|于)日本(?:的)?/g, "").replace(/日本原(?:裝|装)(?:的)?/g, "").replace(/日本(?:國產|国产)(?:的)?/g, "");
+    else if (lg === "es") x = x.replace(/\s*,?\s*\b(?:hecho|hecha|fabricad[oa]s?|producid[oa]s?|elaborad[oa]s?)\s+en\s+jap[oó]n\b/gi, "").replace(/\s*\bde\s+origen\s+japon[eé]s\b/gi, "").replace(/\bcalidad\s+japonesa\b/gi, "calidad");
+    else if (lg === "ja") x = x.replace(/日本製(?:の)?|国産(?!化)(?:の)?|国内(?:で)?(?:生産|製造)(?:の|した|された)?/g, "");
+    return x;
+  }
+  // 1つの文を直す：返す値は直した文（"" は文ごと外す）
+  function fixSent(sent, L, ctx) {
+    const lg = langOf(sent, ctx.hint);
+    let s = sent;
+    // ① 札の形「原產地：日本」「Origin: Japan」は、札を残して値を要確認に
+    if (L.some((tp) => tp.k === "origin")) {
+      const tw = lg === "zht" ? "待確認" : lg === "zhs" ? "待确认" : lg === "es" ? "por confirmar" : lg === "ja" ? "要確認" : "to be confirmed";
+      const s1 = s.replace(/((?:country\s+of\s+)?origin|原產(?:國|地)|原产(?:国|地)|原産(?:国|地)|產地|产地|製造國|制造国|製造国|pa[ií]s\s+de\s+origen|origen)(\s*[:：]\s*)(?:japan\b|日本|jap[oó]n\b)(?:\s*[（(][^）)]{0,20}[)）])?/gi, (m0, a, b) => a + b + tw);
+      if (s1 !== s) { s = s1; ctx.hit("origin", m0Of(sent), true); }
+    }
+    const parts = s.split(SUBSEP);
+    const segs = [];
+    for (let i = 0; i < parts.length; i += 2) segs.push({ t: parts[i], d: parts[i + 1] || "", drop: false });
+    let changed = s !== sent;
+    const need = {}; // TBC を足す話題
+    segs.forEach((sg) => {
+      if (!sg.t || !sg.t.trim() || HEDGE.test(sg.t)) return;
+      // 「無石棉證明：待確認」のように、札の後ろが「確認」なら、札は断定ではない
+      { const j = segs.indexOf(sg); if (/^[:：]$/.test(sg.d) && segs[j + 1] && HEDGE.test(segs[j + 1].t)) return; }
+      const lgs = langOf(sg.t, ctx.hint);
+      for (const tp of L) {
+        const m = claimHit(tp, sg.t, lgs);
+        if (!m) continue;
+        // 原産地：形容の語だけを外せるなら、節は残す（「日本品質」→「品質」・「Made in Japan」だけを外す）
+        if (tp.k === "origin") {
+          const y = stripOriginWords(sg.t, lgs);
+          const frag = (lgs === "en" || lgs === "es") && /^\s*(?:with|in|at|for|by|from|and|con|en|de|y)\b/i.test(y); // 「With strict quality control.」のような切れ端は残さない
+          if (!frag && y !== sg.t && nonEmpty(y, lgs) && !claimHit(tp, y, lgs)) { sg.t = y; changed = true; ctx.hit("origin", m, false); continue; }
+        }
+        // アスベスト：「NAO（無石棉有機）」「non-asbestos organic」の言い切りだけを外し、材質の名前（NAO）は残す
+        if (tp.k === "asbestos") {
+          const y = sg.t.replace(/\bnon-?asbestos(?:\s+organic)?\s*/gi, "").replace(/\s*\basbestos[- ]free\b\s*/gi, " ").replace(/(?:為|为|是|採用|采用|使用)?(?:無石棉|无石棉|不含石棉|非石棉)(?:有機|有机)?(?:的)?(?:配方|材料|材質|材质)?/g, "").replace(/\bsin\s+(?:amianto|asbesto)\b/gi, "").replace(/ノンアスベスト|アスベスト(?:不使用|フリー)/g, "");
+          // 「…is asbestos-free」「…為無石棉」のように言い切りが述語のときは、述語（is・為）も外して「材質の名前（証明は要確認）」の形にする
+          let y2 = y;
+          if (/\b(?:is|are|was|were|be|being|es|son|está|están)\s*[.,;:!?]*\s*$/i.test(y.trim())) y2 = y.replace(/\s*\b(?:is|are|was|were|be|being|es|son|está|están)\s*([.,;:!?]*)\s*$/i, "$1");
+          else if (/(?:是|為|为|係)\s*[。，,.]?\s*$/.test(y.trim())) y2 = y.replace(/(?:是|為|为|係)(\s*[。，,.]?)\s*$/, "$1");
+          // 中・日は「採用無石棉配方」→「採用配方」のように語の途中が抜けて意味が変わるので、NAO（材質の名前）が無い文では節ごと外す
+          const partOk = /\bNAO\b/.test(s) || ((lgs === "en" || lgs === "es") && y2 === y && meaningful(y2, lgs));
+          if (partOk && y2 !== sg.t && nonEmpty(y2, lgs) && !claimHit(tp, y2, lgs) && (y2 === y || /\bNAO\b/.test(s))) { sg.t = y2; changed = true; ctx.hit("asbestos", m, false); ctx.naoQual = true; continue; }
+        }
+        sg.drop = true; changed = true;
+        ctx.hit(tp.k, m, true);
+        if (!ctx.lineHedge[tp.k] && !ctx.done[tp.k]) need[tp.k] = tp;
+        break;
+      }
+    });
+    if (!changed) return sent;
+    // 組み立て直す（外す節は、その区切りと一緒に。かっこの中だけを外すときは、かっこも外す）
+    const lgS = langOf(sent, ctx.hint);
+    let out = "";
+    segs.forEach((sg, j) => {
+      if (!sg.drop) { out += sg.t + sg.d; return; }
+      const prevD = j > 0 ? segs[j - 1].d : "";
+      if (/[（(]/.test(prevD) && /[)）]/.test(sg.d)) { out = out.replace(/\s*[（(]\s*$/, ""); return; }
+      const tail = (sg.t.match(/[。.!?！？]+\s*$/) || [""])[0]; // 文の終わりの「。」は残す
+      if (/[，,；;：:]/.test(sg.d)) return;
+      out = out.replace(/[，,；;：:、]\s*$/, "");
+      out += tail + sg.d;
+    });
+    const kept = segs.filter((x) => !x.drop && x.t.trim());
+    // 英語・西語で主語の節（最初の節）が断定なら、文ごと外す（「…, so you can …」だけ残さない）。残りが「確認」の文なら、その文は残す
+    let wholeDrop = !kept.length, leadAdds = false;
+    if (!wholeDrop && (lgS === "en" || lgS === "es") && segs[0].drop && segs.length > 1) {
+      if (HEDGE.test(out)) out = out.replace(/[()（）]/g, " ");
+      else {
+        // 残りが主語から始まる文（「…, and the NAO friction material …」→「The NAO friction material …」）なら残し、「確認」の文は前に1文で置く
+        const rest = tidy(out, lgS);
+        if (/^(?:The|Our|This|These|It|Its|We|They|Each|All|El|La|Los|Las|Nuestr\w*|Este|Esta|[A-Z]{2,}|[A-Z]+-\d)/.test(rest) && meaningful(rest, lgS)) { out = rest; leadAdds = true; }
+        else wholeDrop = true;
+      }
+    }
+    if (!wholeDrop) { out = tidy(out, lgS); if (!meaningful(out, lgS)) wholeDrop = true; }
+    const adds = Object.keys(need).map((k) => { ctx.done[k] = 1; return tbcText(need[k], lgS, ctx.T); });
+    const cap = (x) => (lgS === "en" || lgS === "es") ? x.charAt(0).toUpperCase() + x.slice(1) : x;
+    if (wholeDrop) {
+      if (!adds.length) return "";
+      const end = /[。！？]$/.test(sent.trim()) || lgS === "zht" || lgS === "zhs" || lgS === "ja" ? "。" : ".";
+      const lead = (sent.match(/^\s*/) || [""])[0];
+      return lead + cap(adds.join(lgS === "en" || lgS === "es" ? "; " : "；")) + (/[。.!?！？；;]\s*$/.test(sent) ? end : "") + (/\s$/.test(sent) && !/\n$/.test(sent) ? " " : "");
+    }
+    if (adds.length && leadAdds) {
+      const lead = (sent.match(/^\s*/) || [""])[0];
+      return lead + cap(adds.join("; ")) + ". " + out + ((/\s$/.test(sent) && !/\s$/.test(out)) ? " " : "");
+    }
+    if (adds.length) {
+      const q = lgS === "en" || lgS === "es" ? " (" + adds.join("; ") + ")" : "（" + adds.join("；") + "）";
+      out = out.replace(/([。.!?！？；;]?)\s*$/, (m0, pu) => q + pu);
+    }
+    return out + ((/\s$/.test(sent) && !/\s$/.test(out)) ? " " : "");
+  }
+  function m0Of(s) { return String(s || "").slice(0, 40); }
+  // NAO（材質の名前）には、証明は要確認と1回だけ付ける
+  function naoQualify(text, ctx) {
+    if (!ctx.naoQual && !(ctx.L.some((tp) => tp.k === "asbestos") && /\bNAO\b/.test(text))) return text;
+    const nl = (text.match(/[^\n]*\bNAO\b[^\n]*/) || [""])[0];
+    if (HEDGE.test(nl) && /石棉|asbestos|amianto|asbesto|アスベスト|石綿/i.test(nl)) return text;
+    let done = false;
+    // 言語は行全体で決める（「NAO材」だけでは中国語と見分けられない）
+    return text.replace(/([^\n。.!?！？；;]*\bNAO\b[^\n，,。.!?！？；;（(]*)/, (m) => { if (done) return m; done = true; const lg = langOf(nl, ctx.hint); const tp = ctx.L.find((x) => x.k === "asbestos") || { k: "asbestos" }; return m.replace(/\s+$/, "") + (lg === "en" || lg === "es" ? " (" + tbcText(tp, lg, ctx.T) + ")" : "（" + tbcText(tp, lg, ctx.T) + "）"); });
+  }
+  const BUL = /^(\s*(?:[・•\-*‧●◆▪■□◦▶►✓✔]|\d{1,2}[.)、．]|[（(]\d{1,2}[)）])\s*)/;
+  function unkFix(text, hint, T) {
+    const s0 = String(text == null ? "" : text);
+    T = T || ten();
+    let L = [];
+    try { L = unkTopicsOf(T); } catch (e) { L = []; }
+    if (!s0.trim() || !L.length) return { text: s0, hits: [] };
+    const hits = [];
+    const ctx = { hint, T, L, done: {}, lineHedge: {}, naoQual: false, hit: (k, m, dropped) => { hits.push({ k, m: String(m || "").slice(0, 60), dropped: !!dropped }); } };
+    // 同じ文面の中で、その話題を「確認」とすでに書いている（前に入れた「待確認」も）なら、もう足さない
+    //   「確認」の文＝その話題の語と「確認」が同じ文にあり、その文に断定が無いもの（例：「具體車型…需按需求確認」）。ほかの話題の「確認」では足すのをやめない
+    const hedgeOf = (txt) => { const o = {}; sents2(txt).forEach((x) => L.forEach((tp) => { if (TOPW[tp.k] && TOPW[tp.k].test(x) && HEDGE2.test(x) && !x.split(SUBSEP).some((sub, i) => !(i % 2) && sub.trim() && !HEDGE.test(sub) && claimHit(tp, sub, langOf(sub, hint)))) o[tp.k] = 1; })); return o; };
+    s0.split("\n").forEach((line) => Object.assign(ctx.done, hedgeOf(line)));
+    const lines = s0.split("\n");
+    const out = [];
+    for (const line of lines) {
+      try {
+        if (!line.trim()) { out.push(line); continue; }
+        const m = line.match(BUL); const pre = m ? m[1] : ""; const body = line.slice(pre.length);
+        ctx.lineHedge = hedgeOf(body);
+        const S = sents2(body);
+        let ch = false; const keep = [];
+        for (const x of S) { const r = fixSent(x, L, ctx); if (r !== x) ch = true; if (r) keep.push(r); }
+        if (!ch) { out.push(line); continue; }
+        const nb = keep.join("").replace(/^\s+/, "");
+        if (!nb.trim()) continue; // 行ごと外す
+        out.push(pre + nb);
+      } catch (e) { err("unkLine", e); out.push(line); }
+    }
+    let t = out.join("\n").replace(/\n{3,}/g, "\n\n");
+    try { t = naoQualify(t, ctx); } catch (e) { err("nao", e); }
+    if (t !== s0) { V.n.unkFix++; V.n.unkHit += hits.length; }
+    return { text: t, hits };
+  }
+  V.unkFix = unkFix;
+  // 残っている断定（知らせ用）：[{k, lab, m}]
+  function unkScan(text, hint, T) {
+    T = T || ten();
+    const L = unkTopicsOf(T), out = [];
+    if (!L.length) return out;
+    String(text || "").split("\n").forEach((line) => sents2(line).forEach((x) => x.split(SUBSEP).forEach((sub, i, arr) => {
+      if (i % 2 || !sub.trim() || HEDGE.test(sub)) return;
+      if (/^[:：]$/.test(arr[i + 1] || "") && HEDGE.test(arr[i + 2] || "")) return;
+      L.forEach((tp) => { const lg = langOf(sub, hint); const m = claimHit(tp, sub, lg); if (m && !out.some((o) => o.k === tp.k)) out.push({ k: tp.k, lab: tp.lab, m: String(m).slice(0, 40) }); });
+    })));
+    return out;
+  }
+  V.unkScan = unkScan;
+  // 取り決め（ほかの担当の文面も同じ扱いに）：window.v101unkFix(text, 言語の名前) → 直した文
+  W.v101unkFix = function (t, hint) { try { return unkFix(t, hint).text; } catch (e) { err("unkFixApi", e); return t; } };
+  // 文面の1通を直す（利用者が窓で手を入れた文面〈m.v101typed〉は書き換えない＝知らせだけ）
+  function unkFixMsg(m, hint) {
+    if (!m || typeof m.body !== "string" || m.v101typed) return false;
+    const r = unkFix(m.body, hint);
+    const r2 = unkFix(String(m.subj || ""), hint);
+    let ch = false;
+    if (r.text !== m.body) { m.body = r.text; ch = true; }
+    if (r2.text !== String(m.subj || "")) { m.subj = r2.text; ch = true; }
+    if (r.hits.length || r2.hits.length) { const old = Array.isArray(m.v101unk) ? m.v101unk : []; m.v101unk = old.concat(r.hits, r2.hits).filter((x, i, a) => a.findIndex((y) => y.k === x.k && y.m === x.m) === i).slice(0, 20); }
+    if (ch) m.v101uf = djb(m.body);
+    return ch;
+  }
+  V.unkFixMsg = unkFixMsg;
+  wrap("v79obFinish", (o) => function (L, run) {
+    const r = o.apply(this, arguments);
+    try {
+      const ap = L && L.ap;
+      if (ap && Array.isArray(ap.seq)) { const hint = ap.lang || (run && run.lang) || ""; ap.seq.forEach((m) => { try { unkFixMsg(m, hint); } catch (e) { err("unkMsg", e); } }); }
+    } catch (e) { err("finishUnk", e); }
+    return r;
+  });
+  // AI への頼み（商品と会社の段）に、「不明」と答えた事柄を書く
+  function unkPrompt(T) {
+    const L = unkTopicsOf(T);
+    if (!L.length) return "";
+    const ex = { fit: "「主要メーカー対応」「compatible with major brands」「可對應主要汽車品牌」などと書かない", asbestos: "「non-asbestos」「asbestos-free」「無石棉」と書かない（NAO という材質の名前はそのまま）", origin: "「Made in Japan」「日本製造」「Japanese quality」と書かない（会社が日本にあることは書いてよい）" };
+    return "■【v101unk】利用者が「不明」「わからない」と答えた事柄（文面で断定しない。触れるときは「to be confirmed／待確認」と書く）\n" +
+      L.map((tp) => "・" + (tp.origin ? "原産国・製造国：未登録" : String(tp.lab) + "：「" + String(tp.q || "").slice(0, 50) + "」に「" + String(tp.a || "不明").slice(0, 10) + "」") + (ex[tp.k] ? "（" + ex[tp.k] + "）" : "")).join("\n");
+  }
+  V.unkPrompt = unkPrompt;
+  wrap("v71obCtx", (o) => function () {
+    let s = String(o.apply(this, arguments) || "");
+    try { const a = unkPrompt(ten()); if (a && s.indexOf("【v101unk】") < 0) { s = s + "\n\n" + a; V.n.unkCtx++; } } catch (e) { err("ctx", e); }
+    return s;
+  });
+
+  /* ═════════ v2-6：バイヤーリストを作った直後、確かめが終わるまでの表示・E の「通信できませんでした」 ═════════
+     原因：①リストを作ると表を先に描き、そのあと公式サイトを確かめる（v79obCheck・最長 90秒）。その間、土台の v79obCheckHtml は
+             確かめの記録（run.v79chk）が無いのを「21.78 までに作ったリスト」と決めつけて出していた。
+           ②22.01 の件数の注記（この層の cntNote）は、まだ確かめていない会社も「確かめられなかった」と数えていた。行の理由も「まだ確かめていません」。
+           ③確かめの通信が失敗したとき（E）、土台は理由を「通信できませんでした」にまとめ（本当の理由〈時間切れ・つながらない・答えが読めない〉を捨てる）、
+             行には「まだ確かめていません」と出ていた。E は作り始めから約 90秒で失敗＝確かめの依頼（ob_url・10社まとめて）の時間切れ（90秒）と見ている。
+     直し：確かめている間は「確かめています…」（表の上・注記・各行）。確かめの記録が無いだけなら「まだ確かめていません（「公式サイトを確かめる」を押す）」。
+           失敗したら本当の理由を残して表の上と各行に出す。時間切れのときは、5社ずつに分けて1回だけ確かめ直す（1分に4回の上限の内） */
+  V.chk = null; // 確かめている run（{run, at, n}）
+  function busyRun(run) { return !!(V.chk && run && (V.chk.run === run || (V.chk.at0 && run.at === V.chk.at0))); }
+  V.busyRun = busyRun;
+  // （かっこの中に入れて出すので、文の中にかっこを入れない）
+  const OBW = { timeout: ["{n}社まとめた確かめが時間内に終わりませんでした・{s}秒", "checking {n} companies at once did not finish in time, {s}s", "一次核实 {n} 家未能在时限内完成・{s}秒", "la verificación de {n} empresas a la vez no terminó a tiempo, {s} s"],
+    offline: ["同期サーバーにつながりませんでした・ネットワーク", "could not reach the sync server, network", "无法连接同步服务器・网络", "no se pudo conectar con el servidor, red"],
+    http: ["同期サーバーが応答しませんでした・HTTP {c}", "the sync server did not respond, HTTP {c}", "同步服务器未响应・HTTP {c}", "el servidor no respondió, HTTP {c}"],
+    badres: ["同期サーバーの答えが読めませんでした", "could not read the sync server's reply", "无法读取同步服务器的回复", "no se pudo leer la respuesta del servidor"],
+    net: ["通信できませんでした・{r}", "communication failed, {r}", "通信失败・{r}", "falló la comunicación, {r}"] };
+  function obWhyText(x) { if (!x) return ""; const t = OBW[x.kind] || OBW.net; return F(M(t[0], t[1], t[2], t[3]), { s: Math.round((x.ms || 0) / 1000), n: x.n || 0, c: x.code || "", r: String(x.raw || "").slice(0, 40) }); }
+  V.obWhyText = obWhyText;
+  function obKind(msg, ms, timeout) {
+    const m = String(msg || "");
+    if (/abort/i.test(m) || (timeout && ms >= timeout - 3000)) return { kind: "timeout" };
+    const h = m.match(/HTTP\s*(\d{3})/); if (h) return { kind: "http", code: +h[1] };
+    if (/Failed to fetch|NetworkError|Load failed|TypeError/i.test(m)) return { kind: "offline" };
+    if (/応答が読めません|接続先の応答/.test(m)) return { kind: "badres" };
+    return { kind: "net" };
+  }
+  V.obKind = obKind;
+  // 確かめの依頼（ob_url）の本当の失敗の理由を控える（土台は「通信できませんでした」にまとめるため）
+  //   本番で E と同じ 10社をまとめて確かめると 117.6秒かかった（同期サーバーは答えを返したが、アプリは 90秒で打ち切っていた＝E の 0/10 の原因）。
+  //   6社以上をまとめて確かめるときは、待つ時間を 150秒にする（それでも時間切れなら、下の包みで 5社ずつに分けて確かめ直す）
+  V.obTimeout = 150000;
+  wrap("v79obCall", (o) => async function (op, body, opt) {
+    if (op !== "ob_url") return o.apply(this, arguments);
+    const n = (body && Array.isArray(body.items)) ? body.items.length : 0;
+    const o2 = Object.assign({ timeout: 90000 }, opt || {});
+    if (n > 5 && o2.timeout < V.obTimeout) o2.timeout = V.obTimeout;
+    const t0 = Date.now(), to = o2.timeout;
+    const r = await o.call(this, op, body, o2);
+    try { if (r && r.ok === false && r.reason === "net") { const ms = Date.now() - t0; V.obErr = Object.assign({ raw: String(r.msg || ""), ms, n, at: Date.now() }, obKind(r.msg, ms, to)); log({ k: "obErr", e: V.obErr }); } else if (r && r.ok) V.obErr = null; } catch (e) { err("obCall", e); }
+    return r;
+  });
+  // 一番外側で包む（22.01 の包みの外）：確かめている間の印・失敗の理由・時間切れの分け直し
+  (function () {
+    const o = W.v79obCheck;
+    if (typeof o !== "function" || o.__v101buyerB) return;
+    const g = async function (run, quiet) {
+      if (!run || run.how === "smp" || V.inRetry || V.inSplit) return o.apply(this, arguments);
+      V.chk = { run, at0: run.at, at: Date.now(), n: (run.leads || []).filter((l) => l && !l.smp && !l.v79x).length };
+      V.n.chkBusy++;
+      V.obErr = null;
+      try { if (fn("v71obPaint")) W.v71obPaint(); } catch (e) { /* 無視 */ }
+      let r;
+      try {
+        // 1回目は知らせを出さずに確かめる（失敗したときの土台の知らせは「通信できませんでした」だけで、分けて確かめ直す前に出てしまうため）。知らせはこのあとで1つだけ
+        r = await o.call(this, run, true);
+        // 失敗の本当の理由を残す
+        const ck = run.v79chk;
+        if (ck && ck.st !== "ok" && (ck.why || "net") === "net" && V.obErr && Date.now() - V.obErr.at < 300000) {
+          ck.v101 = { kind: V.obErr.kind, code: V.obErr.code || 0, ms: V.obErr.ms, n: V.obErr.n, raw: String(V.obErr.raw || "").slice(0, 80) };
+          ck.msg = obWhyText(V.obErr); V.n.chkWhy++;
+          // 時間切れ（まとめて確かめる数が多い）：5社ずつに分けて1回だけ確かめ直す
+          const rest = (run.leads || []).filter((l) => l && !l.smp && !l.v79x && !(l.v79u && /^(ok|redir|dead)$/.test(l.v79u.st)));
+          if (/^(timeout|badres)$/.test(ck.v101.kind) && rest.length > 5 && !run.v101split) {
+            run.v101split = { at: Date.now(), n: rest.length };
+            V.n.chkSplit++;
+            V.chk.phase = "split";
+            try { if (fn("v71obPaint")) W.v71obPaint(); } catch (e) { /* 無視 */ }
+            const chunks = []; for (let i = 0; i < rest.length; i += 5) chunks.push(rest.slice(i, i + 5));
+            V.inSplit = 1;
+            try {
+              for (const c of chunks.slice(0, 4)) { const sub = { how: run.how, cty: run.cty, at: run.at, leads: c }; await o.call(this, sub, true); }
+            } finally { V.inSplit = 0; }
+            const L = (run.leads || []).filter((l) => l && !l.smp);
+            const done = L.filter((l) => l.v79u && /^(ok|redir|dead)$/.test(l.v79u.st)).length;
+            run.v101split.done = done;
+            if (done) {
+              const at = Date.now();
+              run.v79chk = { at, st: "ok", n: done, v101split: chunks.length, v101first: ck.v101 };
+              L.forEach((l) => { if (!(l.v79u && /^(ok|redir|dead)$/.test(l.v79u.st))) l.verify = true; });
+              run.v100chk = { done, total: L.length, capped: false, reuse: L.filter((l) => l.v100reuse).length, left: (W.V100AI && W.V100AI.ob && W.V100AI.ob.left != null) ? W.V100AI.ob.left : null, at };
+              try { orderLeads(run); } catch (e) { /* 無視 */ }
+              if (!quiet) { const c = (fn("v79obCounts") ? W.v79obCounts(run) : { ok: done, dead: 0, unk: 0 }); V.splitToasted = run.v101split.at; try { if (fn("v71obToast")) W.v71obToast(F(M("1回目は{w}。5社ずつに分けて確かめ直しました：届いた {a}社・届かない {d}社（外しました）・未確認 {u}社", "The first check {w}. Re-checked in groups of 5: reached {a}, unreachable {d} (removed), unverified {u}", "第一次{w}。已每 5 家分批重新核实：可访问 {a} 家・无法访问 {d} 家（已移除）・未确认 {u} 家", "La primera verificación {w}. Se verificó de nuevo en grupos de 5: accesibles {a}, inaccesibles {d} (quitadas), sin verificar {u}"), { w: obWhyText(ck.v101), a: c.ok, d: c.dead, u: c.unk })); } catch (e) { /* 無視 */ } }
+            } else run.v79chk.msg = obWhyText(V.obErr || ck.v101);
+            log({ k: "split", n: rest.length, chunks: chunks.length, done });
+          }
+          if (fn("v71obSave")) W.v71obSave();
+        }
+        // 知らせ（土台と同じ文。失敗は本当の理由で）
+        if (!quiet && !(run.v101split && run.v79chk && run.v79chk.st === "ok" && run.v101split.at > Date.now() - 600000 && V.splitToasted === run.v101split.at)) {
+          const ck2 = run.v79chk;
+          const c = fn("v79obCounts") ? W.v79obCounts(run) : { ok: 0, dead: 0, unk: 0 };
+          const tf = (s, o2) => { try { return fn("v71obF") ? W.v71obF(s, o2) : F(s, o2); } catch (e) { return F(s, o2); } };
+          let t = "";
+          if (ck2 && ck2.st === "ok") t = tf("公式サイトを確かめました：届いた {a}社・届かない {d}社（外しました）・未確認 {u}社", { a: c.ok, d: c.dead, u: c.unk });
+          else if (ck2) t = ck2.v101 ? F(M("公式サイトを確かめられませんでした（{w}）。「確かめ直す」でもう一度確かめるか、送る前に1社ずつ確かめてください", "Could not check the websites ({w}). Use “Check again”, or check each company before sending", "无法核实官网（{w}）。请按“重新核实”，或在发送前逐家确认", "No se pudieron verificar los sitios ({w}). Use «Verificar de nuevo» o verifique cada empresa antes de enviar"), { w: ck2.msg }) : tf("公式サイトを確かめられませんでした（{w}）。送る前に1社ずつ確かめてください", { w: ck2.msg || "" });
+          if (t) { try { if (fn("v71obToast")) W.v71obToast(t); } catch (e) { /* 無視 */ } }
+        }
+      } finally {
+        V.chk = null;
+        try { if (fn("v71obPaint")) W.v71obPaint(); } catch (e) { /* 無視 */ }
+      }
+      return r;
+    };
+    g.__v101buyerB = 1; g.__v101buyer = 1;
+    W.v79obCheck = g;
+  })();
+  // 行の理由：確かめている間・失敗したとき・まだのとき を分ける（22.01 の whyNot を包む）
+  (function () {
+    const o = V.whyNot;
+    V.whyNot = function (l, run) {
+      if (!l || l.smp || l.v79x) return "";
+      const st = l.v79u && l.v79u.st;
+      if (l.v79ok || st === "ok" || st === "redir") return "";
+      if (busyRun(run) && !st) return M("公式サイトを確かめています…", "Checking the website…", "正在核实官网…", "Verificando el sitio web…");
+      const ck = run && run.v79chk;
+      if (!st && ck && ck.st !== "ok" && ck.why !== "cap" && String(l.url || "").trim()) return F(M("公式サイトを確かめられませんでした（{w}）。表の上の「確かめ直す」を押してください", "Could not check the website ({w}). Press “Check again” above the table", "无法核实官网（{w}）。请按表格上方的“重新核实”", "No se pudo verificar el sitio ({w}). Pulse «Verificar de nuevo» encima de la tabla"), { w: ck.msg || obWhyText(ck.v101) || M("通信できませんでした", "communication failed") });
+      if (!st && !ck && !(run && run.v100chk) && String(l.url || "").trim()) return M("公式サイトを、まだ確かめていません（表の上の「公式サイトを確かめる」を押してください）", "The website has not been checked yet (press “Check websites” above the table)", "尚未核实官网（请按表格上方的“核实官网”）", "Aún no se ha verificado el sitio (pulse «Verificar sitios» encima de la tabla)");
+      return o.apply(this, arguments);
+    };
+  })();
+  // 件数：確かめている間・確かめの記録が無いときは、未確認の数を「確かめられなかった」と数えない
+  (function () {
+    const o = V.obCount;
+    V.obCount = function (run) {
+      const c = o.apply(this, arguments);
+      try {
+        if (busyRun(run)) { c.busy = c.unchk; c.unchk = 0; }
+        else if (run && !run.v79chk && !run.v100chk) { c.notyet = c.unchk; c.unchk = 0; }
+        else if (run && run.v79chk && run.v79chk.st !== "ok" && !(run.leads || []).some((l) => l && l.v79u && /^(ok|redir|dead)$/.test(l.v79u.st))) { c.failAll = c.unchk; c.failMsg = run.v79chk.msg || ""; c.unchk = 0; }
+      } catch (e) { err("obCount2", e); }
+      return c;
+    };
+  })();
+  // 表の上の確かめの行（土台の v79obCheckHtml・v100 の包みの外）
+  const OLD178 = /公式サイト・窓口：まだ確かめていません（21\.78 までに作ったリスト）|Websites\/contacts: not checked yet \(list made before 21\.79\)|官网・联系窗口：尚未核实（21\.78之前生成的名单）|Sitios\/contactos: aún sin verificar \(lista anterior a 21\.79\)/;
+  wrap("v79obCheckHtml", (o) => function (run) {
+    let h = String(o.apply(this, arguments) || "");
+    try {
+      if (!run || run.how === "smp" || run.v100smp) return h;
+      if (busyRun(run)) {
+        const n = (run.leads || []).filter((l) => l && !l.smp && !l.v79x).length;
+        const t = V.chk && V.chk.phase === "split" ? F(M("公式サイト・窓口：1回目は{w}。5社ずつに分けて確かめ直しています…（〜2分）。終わるまで、各行は「確かめています」です", "Websites/contacts: the first check {w}. Re-checking in groups of 5… (up to 2 min)", "官网・联系窗口：第一次{w}。正在每 5 家分批重新核实…（约2分钟）", "Sitios/contactos: la primera verificación {w}. Verificando de nuevo en grupos de 5… (hasta 2 min)"), { w: obWhyText(run.v79chk && run.v79chk.v101) })
+          : F(M("公式サイト・窓口を確かめています…（{n}社・1〜2分）。終わるまで、各行は「確かめています」です", "Checking websites and contacts… ({n} companies, 1–2 min). Rows show “Checking” until it finishes", "正在核实官网和联系窗口…（{n} 家・约1〜2分钟）。完成前各行显示“正在核实”", "Verificando sitios y contactos… ({n} empresas, 1–2 min). Las filas muestran «Verificando» hasta terminar"), { n });
+        return `<div class="v79chk v101b-chkbusy" role="status" data-v101-buyer-chk="busy" data-noi18n="1">⏳ <span>${E(t)}</span></div>`;
+      }
+      if (OLD178.test(h)) { h = h.replace(OLD178, E(M("公式サイト・窓口：まだ確かめていません。右の「公式サイトを確かめる」を押すと確かめます", "Websites/contacts: not checked yet. Press “Check websites” on the right", "官网・联系窗口：尚未核实。按右侧的“核实官网”即可核实", "Sitios/contactos: aún sin verificar. Pulse «Verificar sitios» a la derecha"))); h = h.replace(/<div class="v79chk"/, '<div class="v79chk" data-v101-buyer-chk="notyet"'); }
+      const ck = run.v79chk;
+      if (ck && ck.st !== "ok" && !/data-v101-buyer-chkwhy/.test(h)) {
+        const w = ck.msg || obWhyText(ck.v101);
+        const t = F(M("⚠ 公式サイトを確かめられませんでした（{w}）。「確かめ直す」で、もう一度確かめられます。確かめるまで、各行は「要確認」のままです", "⚠ Could not check the websites ({w}). Use “Check again” to try again. Rows stay “to be confirmed” until checked", "⚠ 无法核实官网（{w}）。可按“重新核实”再试。核实前各行保持“需确认”", "⚠ No se pudieron verificar los sitios ({w}). Use «Verificar de nuevo». Las filas siguen «por confirmar»"), { w });
+        h = h.replace(/(<div class="(?:v100ai-chk|v79chk)[^"]*"[^>]*>)/, `$1<span class="v101b-chkwhy" data-v101-buyer-chkwhy="1" data-noi18n="1">${E(t)}</span>`);
+        // 22.00 の行の「まだ確かめていません」は、失敗の後は「確かめられていません」に（上の理由と食い違わないように）
+        h = h.replace(/(\d+)社はまだ確かめていません（「要確認」のまま）。/, "$1社は確かめられていません（「要確認」のまま）。").replace(/(\d+) companies not checked yet \(still “to be confirmed”\)\./, "$1 companies could not be checked (still “to be confirmed”).");
+      }
+    } catch (e) { err("chkHtml", e); }
+    return h;
+  });
+
+  /* ═════════ v3 S3：除菌・抗菌をうたう商品を米国で売るとき（EPA の抗菌剤の登録・FIFRA）を、書類の判断の表と規制の画面に「条件つき」で出す ═════════
+     原因：書類の判断の表（V85DOC_D.rules）に、米国の殺菌・除菌剤（抗菌剤）の登録の行が無かった。B（除菌スプレー・HS 3808.94）でアメリカを確定すると、
+           STEP03 は「規制の表・SDS・Non-DG・COA」の4項目だけで 100%「済み」になっていた。
+     直し：商品の印「除菌・抗菌・殺菌をうたう」（品名・強み・成分などの語から自動・書類の画面で切り替えられる）を足し、印のある商品で米国が相手のとき、
+           「米国 EPA の登録（抗菌剤・FIFRA）」を条件つきの行として出す。規制の画面（この商品と送り先で確かめる点）・書類の画面・STEP03 は同じ表を読むので、
+           数え方（22.00 の v100 の sepReq：必須・条件つきの行を数える）は変えずに、米国の項目が1つ増える（「確かめました」で済み）。
+     出どころ：EPA の公式の頁（2026-11-22 に開いて、下の文に書いた中身だけを確かめた）。登録が要るかは商品のうたい文句・使い方ごとに違うので「要確認」のまま（確認済みと書かない） */
+  (function () {
+    try {
+      if (typeof V85DOC_D === "undefined" || !V85DOC_D || !Array.isArray(V85DOC_D.rules)) return; // eslint-disable-line no-undef
+      const D85 = V85DOC_D; // eslint-disable-line no-undef
+      D85.flags = D85.flags || {}; D85.docs = D85.docs || {}; D85.issuers = D85.issuers || {};
+      const FLAG = "antimicrobial_claim";
+      const FLAG_JA = "除菌・抗菌・殺菌をうたう（菌・ウイルスを減らす・殺す）";
+      if (!D85.flags[FLAG]) D85.flags[FLAG] = FLAG_JA;
+      const DOC_JA = "米国環境保護庁（USEPA）の登録（除菌・抗菌をうたう製品＝抗菌剤・FIFRA）"; // 「EPA」だけだと用語の説明（経済連携協定）が付いてしまうので、USEPA と書く
+      const DOC_EN = "US EPA registration (antimicrobial pesticide, FIFRA)";
+      if (!D85.docs.US_EPA_FIFRA) D85.docs.US_EPA_FIFRA = [DOC_JA, DOC_EN, "importer", "external", 90];
+      const C_JA = "除菌・抗菌・殺菌をうたう商品を米国で売る時（物の表面・空間・布などに使い、菌・ウイルスを殺す・減らすとうたうもの）";
+      const N_JA = "米国では、販売・流通する殺虫剤・殺菌剤などの「農薬（pesticide）」は、連邦の法律（FIFRA）で米国環境保護庁（USEPA）の登録が要る。物の表面などの菌・ウイルスを殺す・減らすとうたう消毒剤・除菌剤は「抗菌剤（antimicrobial pesticide）」に当たる。この商品が当たるか（うたい文句・使い方）と、登録の名義（米国の輸入者か、メーカーが米国の代理人を立てるか）を、輸入者と確かめる。手や肌に使うもの（手指の消毒など）は別の決まりになることがある（要確認）";
+      const S_JA = "米国環境保護庁（USEPA）『About Pesticide Registration』（頁の更新 2026-10-15）／米国環境保護庁（USEPA）『What are Antimicrobial Pesticides?』・『Antimicrobial Pesticide Registration』（頁の更新 2026-01-29）";
+      const OK_JA = "要確認（登録が要るかは、商品のうたい文句・使い方ごとに USEPA の頁と輸入者に確かめる）";
+      if (!D85.rules.some((r) => r && r.id === "v101b01")) {
+        D85.rules.push({ id: "v101b01", k: ["US_EPA_FIFRA"], w: { h: ["*"], d: ["US"], f: [FLAG] }, lv: "conditional", c: C_JA, is: "輸入者（米国）・メーカー（米国の代理人を通じて）", ld: 90, n: N_JA, s: S_JA, u: "https://www.epa.gov/pesticide-registration/about-pesticide-registration", ok: OK_JA });
+      }
+      dictAdd(FLAG_JA, "Claims to sanitize / kill germs (antibacterial, disinfecting)", "宣称除菌・抗菌・杀菌（减少或杀灭细菌・病毒）", "Afirma desinfectar / eliminar gérmenes (antibacteriano)");
+      dictAdd(DOC_JA, DOC_EN, "美国 EPA 注册（宣称除菌・抗菌的产品＝抗菌剂・FIFRA）", "Registro EPA de EE. UU. (plaguicida antimicrobiano, FIFRA)");
+      dictAdd(C_JA, "When selling in the US a product that claims to sanitize, disinfect or kill germs (used on surfaces, air, fabrics, etc. and claimed to kill or reduce bacteria/viruses)", "在美国销售宣称除菌・抗菌・杀菌的商品时（用于物体表面・空间・布料等，宣称杀灭或减少细菌・病毒）", "Al vender en EE. UU. un producto que afirma desinfectar o eliminar gérmenes (en superficies, aire, tejidos, etc.)");
+      dictAdd(N_JA, "In the US, pesticides sold or distributed must be registered by EPA under federal law (FIFRA). Disinfectants and sanitizers claimed to kill or reduce bacteria/viruses on surfaces are antimicrobial pesticides. Check with the importer whether this product is covered (claims and use) and who will hold the registration (the US importer, or the maker through a US agent). Products used on hands or skin may fall under different rules (to be confirmed).", "在美国，销售・流通的农药（pesticide）须依联邦法律（FIFRA）在 EPA 注册。宣称杀灭或减少物体表面细菌・病毒的消毒剂・除菌剂属于“抗菌剂（antimicrobial pesticide）”。请与进口商确认本商品是否适用（宣传用语・用途）以及注册名义人（美国进口商，或制造商通过美国代理人）。用于手部・皮肤的产品可能适用其他规定（需确认）。", "En EE. UU., los plaguicidas que se venden o distribuyen deben registrarse ante la EPA (ley FIFRA). Los desinfectantes que afirman eliminar o reducir bacterias/virus en superficies son plaguicidas antimicrobianos. Confirme con el importador si el producto está incluido y quién será el titular del registro. Los productos para manos o piel pueden tener otras normas (por confirmar).");
+      dictAdd(S_JA, "US EPA “About Pesticide Registration” (page updated 2026-10-15) / US EPA “What are Antimicrobial Pesticides?” and “Antimicrobial Pesticide Registration” (pages updated 2026-01-29)");
+      dictAdd(OK_JA, "To be confirmed (whether registration is needed depends on the product's claims and use — check the EPA pages and with the importer)", "需确认（是否需要注册取决于商品的宣传用语和用途，请查看 EPA 页面并与进口商确认）", "Por confirmar (depende de las afirmaciones y el uso del producto — consulte la EPA y al importador)");
+      dictAdd("輸入者（米国）・メーカー（米国の代理人を通じて）", "Importer (US) / maker (through a US agent)", "进口商（美国）・制造商（通过美国代理人）", "Importador (EE. UU.) / fabricante (mediante agente en EE. UU.)");
+      V.epa = { flag: FLAG, rule: "v101b01", doc: "US_EPA_FIFRA" };
+    } catch (e) { err("epaRule", e); }
+  })();
+  // 商品の印を自動で付ける：品名・英名・区分・強み・成分・説明に除菌・抗菌・殺菌の語（食品・化粧品・医薬品・石けんの HS は除く。加熱殺菌などの工程の語は除く）
+  const AMC = /除菌|抗菌|殺菌|消毒|抗ウイルス|ウイルス(?:を)?(?:除去|不活化|対策|99)|sanitiz\w*|disinfect\w*|anti-?bacterial|anti-?microbial|anti-?viral|germicid\w*|bactericid\w*|kills?\s+(?:\d+(?:\.\d+)?\s*%\s+of\s+)?(?:germs|bacteria|viruses)/i;
+  const AMC_NOT = /加熱殺菌|殺菌済|殺菌処理|低温殺菌|高温殺菌|殺菌工程|レトルト殺菌|UHT|pasteuri[sz]/i;
+  function amcText(d) {
+    const t = d || {};
+    const rows = (Array.isArray(t.compRows) ? t.compRows : []).map((r) => (Array.isArray(r) ? r.join(" ") : String(r || ""))).join(" ");
+    const st = (Array.isArray(t.strengths) ? t.strengths : []).map((s) => (Array.isArray(s) ? s.join(" ") : String(s || ""))).join(" ");
+    return [t.item, t.itemEn, t.cat, t.desc, rows, st].filter(Boolean).join(" ／ ");
+  }
+  function amcWhy(d, hs) {
+    const h = String(hs || "").replace(/\D/g, "");
+    const ch = +h.slice(0, 2);
+    if ((ch >= 1 && ch <= 24) || ch === 30 || ch === 33 || /^3401/.test(h)) return "";
+    const txt = amcText(d).split(/[／\/、。,.;；\n]/).filter((x) => !AMC_NOT.test(x)).join(" ／ ");
+    const m = txt.match(AMC);
+    if (!m) return "";
+    const near = txt.slice(m.index, m.index + m[0].length + 6);
+    if (/^(?:[^／]{0,4})(?:なし|無し|不使用|ではない)/.test(txt.slice(m.index + m[0].length, m.index + m[0].length + 6)) || /\bnot\b/i.test(near)) return "";
+    return "品名・強みに「" + m[0] + "」";
+  }
+  V.amcWhy = amcWhy;
+  if (fn("v85docFlagsAuto") && !W.v85docFlagsAuto.__v101buyer) {
+    const __fa = W.v85docFlagsAuto;
+    const g = function (d, hs) {
+      const o = __fa.apply(this, arguments);
+      try { if (o && !o.antimicrobial_claim) { const why = amcWhy(d || (ten() || {}), hs); if (why) { o.antimicrobial_claim = why; V.n.epaFlag++; } } } catch (e) { err("amcFlag", e); }
+      return o;
+    };
+    g.__v101buyer = 1;
+    W.v85docFlagsAuto = g;
+  }
 })();

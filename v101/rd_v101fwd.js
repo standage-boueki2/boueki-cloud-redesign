@@ -81,6 +81,13 @@
           cnt("amt");
         } else { const f = cur.nextSibling; if (f && f.nodeType === 3 && /¥|〜|か国/.test(f.data || "")) f.remove(); }
       }
+      /* 22.01.1（v3 N6）：21.97 の「容積の食い違い：B/L なら ¥… 安い」の金額が他社の見積（期限切れ）から計算したものと書く */
+      const vt = tr.querySelector(".v97fvtag");
+      if (vt && (L.kind === "others" || L.kind === "part") && !vt.querySelector(".v101fvtagx")) {
+        const s = document.createElement("small"); s.className = "v101fvtagx"; s.setAttribute("data-noi18n", "");
+        s.textContent = L.kind === "others" ? M(L.O.stale ? "（他社の見積・期限切れから計算）" : "（他社の見積から計算）", L.O.stale ? " (from another forwarder's expired quote)" : " (from another forwarder's quote)") : M("（他社の見積を含む）", " (includes other forwarders' quotes)");
+        vt.appendChild(s);
+      }
       /* 日数：他社だけの依頼は、他社の見積の日数と書く */
       const dd = tr.querySelector(":scope > td.v99fdtd");
       if (dd) put(dd, ":scope > .v101fothd", L.kind === "others" ? `<small class="v101fothd" data-noi18n>${E(M("（他社の見積の日数）", "(other forwarder's quote)", "（其他公司报价的天数）", "(cotización de otra)"))}</small>` : "");
@@ -108,8 +115,21 @@
       if (after) after.after(b); else bar.appendChild(b);
     }
     setText(b, M(`貴社は未回答 ${C.others}`, `Not answered by you ${C.others}`, `贵司未回复 ${C.others}`, `Sin respuesta suya ${C.others}`));
-    const ti = M(`他社だけが見積を出した依頼 ${C.others}件（貴社のレートが無い区間）。「AI回答済み」${C.own}件＋「貴社は未回答」${C.others}件＋「レーン未登録」${C.open}件＝受信 ${C.all}件`, `Requests quoted only by other forwarders: ${C.others}`);
+    const ti = M(`他社だけが見積を出した依頼 ${C.others}件（貴社のレートが無い区間${C.othersStale ? `。うち ${C.othersStale}件は他社の見積も期限切れなどで、荷主の画面では取り下げ` : ""}）。「AI回答済み」${C.own}件＋「貴社は未回答」${C.others}件＋「レーン未登録」${C.open}件＝受信 ${C.all}件`, `Requests quoted only by other forwarders: ${C.others}`);
     if (b.title !== ti) b.title = ti;
+    /* 22.01.1（v3 N1）：画面を描き直したとき（ほかの画面から戻った・同期で描き直した）に、チップの印と表の行がずれないようにする。
+       押したままなら、ほかのチップの印を外し、表をもう一度しぼる（行がずれているときだけ）。押していなければ印を外す */
+    if (CH.on) {
+      bar.querySelectorAll("[data-uxf].on").forEach((x) => x.classList.remove("on"));
+      try {
+        const card = b.closest(".c"); const t = card && card.querySelector("table tbody");
+        if (t) {
+          const ids = new Set(C.ids.others);
+          const bad = [...t.rows].some((tr) => { const id = tr.dataset.v99rid || (/RQ-[A-Za-z0-9]+/.exec(tr.textContent || "") || [""])[0]; const shown = !tr.hidden && !tr.classList.contains("v100pgoff"); return id && shown && !ids.has(id); });
+          if (bad && Date.now() - (CH.syncAt || 0) > 800) { CH.syncAt = Date.now(); if (typeof uxApplyFilter === "function") uxApplyFilter(card); else chipFilter(card); cnt("chipSync"); }
+        }
+      } catch (e) { err("chipsync", e); }
+    }
     b.classList.toggle("on", CH.on);
     b.setAttribute("aria-pressed", CH.on ? "true" : "false");
   }
@@ -167,6 +187,55 @@
   }
 
   /* ═══ 明細の窓（#dw）═══════════════════════════════════════════════════ */
+  /* 22.01.1（v3 N8）：貴社の見積が無い依頼の、窓の上の段（手順・タイル「確認状況」・AIの判断と確認ポイント） */
+  function paintNoOwnTop(dw, O) {
+    try {
+      const top = dw.querySelector(".k-qhd"); if (!top) return;
+      /* 手順：2・3 を、貴社の見積が無いときの次の一手に */
+      const st = [...top.querySelectorAll(".k-steps .k-step")];
+      if (st.length >= 3) {
+        const b2 = st[1].querySelector("b"), b3 = st[2].querySelector("b");
+        if (b2) setText(b2, M("貴社のレートを登録（貴社の見積はまだ）", "Register your lane rate (no quote yet)", "登记贵司费率（尚无报价）", "Registre su tarifa (aún sin cotización)"));
+        if (b3) setText(b3, M("登録の後、貴社の見積が荷主に届く（自動）", "Then your quote reaches the shipper (auto)", "登记后贵司报价自动送达货主", "Luego su cotización llega al cargador"));
+      }
+      /* タイル「確認状況」 */
+      const tile = [...top.querySelectorAll(".k-tile")].find((t) => ((t.querySelector(".k-tl") || {}).textContent || "").trim() === "確認状況" || t.dataset.v101chk === "1");
+      const notes = [...dw.querySelectorAll(".k-card")].find((c) => /AIの判断と確認ポイント/.test(((c.querySelector("h2") || {}).textContent || "")));
+      if (tile && tile.dataset.v101n == null) { const m = /要確認\s*(\d+)/.exec((tile.querySelector(".k-tn") || {}).textContent || ""); tile.dataset.v101n = m ? m[1] : "0"; }
+      const nNote = tile ? +tile.dataset.v101n || 0 : 0;
+      if (tile) {
+        tile.dataset.v101chk = "1";
+        if (tile.classList.contains("gr")) tile.classList.remove("gr");
+        if (!tile.classList.contains("v101fnochk")) tile.classList.add("v101fnochk");
+        const tn = tile.querySelector(".k-tn"), ts = tile.querySelector(".k-ts");
+        if (tn) { const f = [...tn.childNodes].find((n) => n.nodeType === 3); const t = M("対象なし", "None to check", "无需确认", "Nada que revisar"); if (f) { if (f.data !== t) f.data = t; } else tn.insertBefore(document.createTextNode(t), tn.firstChild); if (tn.title !== t) tn.title = t; }
+        if (ts) setText(ts, O.kind === "others" ? (nNote ? M(`貴社の見積なし（下の注意 ${nNote}件は他社の見積について）`, `No quote of yours (${nNote} note(s) below are about other forwarders)`) : M("貴社の見積がありません", "You have no quote")) : M("どの会社も見積なし", "No quote from anyone"));
+        const ti = tile.querySelector(".k-ti");
+        if (ti && !ti.dataset.v101) { ti.dataset.v101 = "1"; ti.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12h8"></path></svg>'; }
+      }
+      /* AIの判断と確認ポイント */
+      if (notes) {
+        const em = notes.querySelector(".k-empty");
+        const t = O.kind === "others"
+          ? (nNote ? M("貴社の見積はありません。下の注意は、他社の見積（届いた見積）についてです。", "You have no quote. The notes below are about other forwarders' quotes.") : M("貴社の見積がないため、確かめる点はありません（他社の見積は下の明細）。", "You have no quote, so there is nothing to check (other forwarders' quotes are in the details below)."))
+          : M("どの会社の見積もないため、確かめる点はありません。この区間のレートを登録すると、見積が出ます。", "No quote from anyone; register a lane rate to quote.");
+        if (em && /確認が要る点はありません|確かめる点はありません/.test(em.textContent || "")) { if (!em.dataset.v101 || em.textContent !== t) { em.dataset.v101 = "1"; em.textContent = t; } }
+        else put(notes, ":scope > .v101fchkn", `<p class="v101fchkn" data-noi18n role="note">${E(t)}</p>`, "afterend", notes.querySelector(".k-h"));
+      }
+    } catch (e) { err("noowntop", e); }
+  }
+  /* 22.01.1（v3 N4）：B/L と荷主の共有の照らし合わせ（容積・総重量・箱数・数量）の一覧 */
+  function blCmpHtml(r, cs, short) {
+    const X = typeof v101fBlCmp === "function" ? v101fBlCmp(r, cs) : null;
+    if (!X || !X.any) return { html: "", X };
+    if (!X.shared) {
+      const bl = X.items.filter((x) => x.bl != null && x.k !== "容積").map((x) => `${x.k} ${x.blTxt}`).join("・");
+      return { html: bl ? `<p class="v101fblcmp v101fblcmp1" data-noi18n>${E(M(`総重量・箱数・数量：荷主はこの依頼で入れていません（B/L：${bl}）。`, `Weight / cartons / quantity: not entered by the shipper (B/L: ${bl}).`))}</p>` : "", X };
+    }
+    const li = X.items.map((x) => `<li><b>${E(x.k)}</b>${E(M(`：荷主の共有 ${x.reqTxt} ／ B/L ${x.blTxt}`, `: shipper ${x.reqTxt} / B/L ${x.blTxt}`))} <span class="${x.same === true ? "ok" : x.same === false ? "ng" : "na"}">${E(x.same === true ? M("＝ 同じ", "= same") : x.same === false ? M(`≠ 違う${x.ratio && x.ratio > 1.5 ? `（荷主の共有は B/L の約${(Math.round(x.ratio * 10) / 10).toLocaleString("ja-JP")}倍）` : ""}`, "≠ differs") : M("比べられません", "cannot compare"))}</span></li>`).join("");
+    const how = X.diff.length ? `<small>${E(M("どちらが正しいかは荷主に確かめてください（B/L が正しい → 荷主に数量を直してもらう〔依頼ページ「荷主に出荷情報を頼む」〕／荷主の値が正しい → 「B/L・出荷の情報を入れる」で B/L を直す）。", "Check with the shipper which is right."))}</small>` : "";
+    return { html: `<div class="v101fblcmp" data-noi18n role="note"><b>${E(M(short ? "B/L と荷主の共有（容積だけでなく、総重量・箱数・数量も）" : "B/L と荷主の共有の照らし合わせ", "B/L vs. what the shipper shared"))}</b><ul>${li}</ul>${how}</div>`, X };
+  }
   function paintDetail() {
     if (!fwdOn()) return;
     const det = document.querySelector("#dw .v99fdet, .dwbody .v99fdet");
@@ -180,7 +249,11 @@
     if (O.kind === "others") {
       const sel = O.othersSel.map((x) => `${x.cty}：${x.co}${x.total != null ? " " + Y(x.total) : ""}`).join("／");
       const lane = (r.legs || []).filter((l) => l && l.ok).map((l) => `${r.pol || "—"} → ${l.cty || l.pod}・${r.mode || "LCL"}`).join("／");
-      html = `<div class="v101fownd" data-noi18n role="note"><b>${E(M(`貴社（${me()}）の回答：まだありません`, `Your answer (${me()}): none yet`, `贵司（${me()}）的回复：尚无`, `Su respuesta (${me()}): ninguna`))}</b>${E(M(`この依頼の区間（${lane}）の貴社のレートがないため、AI物流マンは貴社の見積を出していません。下の「届いた見積」（${sel}）は他社の見積で、状況の「回答済み（荷主が検討中）」も他社の見積のことです。この区間のレートを登録すると、貴社の見積が出ます（区間のレートで答えます。この依頼だけの金額＝スポット見積は、いまの版では出せません）。`, `You have no rate for this lane (${lane}), so no quote of yours was made. The quotes below (${sel}) are from other forwarders. Register a lane rate to quote (spot quotes for one request are not available).`))}</div>`;
+      /* 22.01.1（v3 N2・N6）：いま出ていない状況名（「回答済み（荷主が検討中）」）を指さない。他社の見積が期限切れ（荷主の画面では取り下げ）なら、そう書く */
+      const mid = O.stale
+        ? M(`下の「届いた見積」（${sel}）は他社の見積で、${typeof v101fStaleWhy === "function" ? v101fStaleWhy(O, r) : "期限切れ"}です。荷主の画面では、この見積は取り下げになり「レーン未登録」と出ています（荷主が検討している見積はありません）。`, `The quotes below (${sel}) are other forwarders' quotes and have expired; on the shipper's screen they are withdrawn (“no lane”), so the shipper is not reviewing any quote.`)
+        : M(`下の「届いた見積」（${sel}）は他社の見積です（状況の「他社 ${O.cos.length}社が回答済み・荷主が検討中」は、この見積のことです）。`, `The quotes below (${sel}) are other forwarders' quotes.`);
+      html = `<div class="v101fownd" data-noi18n role="note"><b>${E(M(`貴社（${me()}）の回答：まだありません`, `Your answer (${me()}): none yet`, `贵司（${me()}）的回复：尚无`, `Su respuesta (${me()}): ninguna`))}</b>${E(M(`この依頼の区間（${lane}）の貴社のレートがないため、AI物流マンは貴社の見積を出していません。`, `You have no rate for this lane (${lane}), so no quote of yours was made. `) + mid + M("この区間のレートを登録すると、貴社の見積が出ます（区間のレートで答えます。この依頼だけの金額＝スポット見積は、いまの版では出せません）。", " Register a lane rate to quote (spot quotes for one request are not available)."))}</div>`;
     } else if (O.kind === "part") {
       html = `<div class="v101fownd" data-noi18n role="note"><b>${E(M(`貴社（${me()}）の回答：${O.ownN}/${O.okN}か国`, `Your answer: ${O.ownN}/${O.okN} countries`))}</b>${E(M(`ほかの ${O.okN - O.ownN}か国（${O.othersSel.map((x) => x.cty).join("・")}）は、貴社のレートがなく、他社だけが見積を出しています。`, `The other ${O.okN - O.ownN} were quoted only by other forwarders.`))}</div>`;
     } else if (O.kind === "own") {
@@ -193,11 +266,9 @@
     if (dw) {
       const h = dw.querySelector("h3");
       if (h && L.txt !== L.base) [...h.querySelectorAll("span")].forEach((s) => { if ((s.textContent || "").trim() === L.base) setText(s, L.txt); if ((s.textContent || "").trim() === L.txt && !s.classList.contains("v101fstw")) s.classList.add("v101fstw"); });
-      /* 「確認状況 問題なし」：貴社の見積が無いときは、確かめる見積が無いと書く（問題がないのではない） */
-      if (O.kind === "others") {
-        const tw3 = document.createTreeWalker(dw, NodeFilter.SHOW_TEXT); let lab = null;
-        while (tw3.nextNode()) { const n = tw3.currentNode; const t = (n.data || "").trim(); if (t === "確認状況") lab = n; else if (lab && t === "問題なし") { n.data = M("貴社の見積なし（確かめる見積がありません）", "No quote of yours to check"); break; } else if (lab && t && t.length > 30) break; }
-      }
+      /* 22.01.1（v3 N8）：貴社の見積が無い依頼（他社だけ・どの会社も無し）の上の段：タイル「確認状況」・手順・「AIの判断と確認ポイント」を実態どおりに
+         （緑の ✓・「提出前に確認」・「AI見積の内容を確認 → 荷主に届く」と出さない。タイルの文字は切れない短さに） */
+      if (O.kind === "others" || O.kind === "open") paintNoOwnTop(dw, O);
       dw.querySelectorAll("option").forEach((op) => {
         const m = /(RQ-[A-Za-z0-9]+)/.exec(op.textContent || ""); if (!m) return;
         const x = reqs().find((y) => y.id === m[1]); if (!x) return;
@@ -220,15 +291,39 @@
         const tw2 = document.createTreeWalker(bl, NodeFilter.SHOW_TEXT);
         while (tw2.nextNode()) { const n = tw2.currentNode; const re = new RegExp(`荷主の共有 ${String(self.cbm).replace(/\./g, "\\.")} m³`); if (re.test(n.data)) n.data = n.data.replace(re, M(`見積に使った標準 ${CB(self.cbm)} m³（荷主は容積を入れていません）`, `standard ${self.cbm} m³ used (no volume from the shipper)`)); }
       }
+      /* 22.01.1（v3 N4）：容積だけでなく、総重量・箱数・数量も B/L と比べる */
+      const cs0 = c && typeof v101fCsOfCase === "function" ? v101fCsOfCase(c) : null;
+      const CM = cs0 && VV && VV.bl != null ? blCmpHtml(r, cs0, false) : { html: "", X: null };
+      const h4 = bl.previousElementSibling && bl.previousElementSibling.tagName === "H4" ? bl.previousElementSibling : null;
+      if (CM.X && CM.X.any && h4) setText(h4, M("B/L と荷主の共有（容積・総重量・箱数・数量）", "B/L vs. shipper (volume, weight, cartons, quantity)", "B/L 与货主共享（体积・毛重・箱数・数量）", "B/L y datos del cargador"));
+      if (CM.X && CM.X.diff.length && /^食い違いなし/.test((bl.textContent || "").trim())) {
+        const names = CM.X.diff.map((d) => d.k).join("・");
+        const t = M(`容積は同じ（荷主の共有 ${CB(r.cbm)} m³ ／ B/L ${CB(VV.bl)} m³）。${names}が B/L と違います（下の照らし合わせ）`, `Volume matches; ${names} differ from the B/L (see below)`);
+        setText(bl, t); bl.classList.add("warn"); bl.dataset.v101 = "1"; cnt("blcmp");
+      }
+      /* 22.01.1（v3 N6・N5）：「今の見積 ¥…」が他社の見積（期限切れ）であること・B/L の仕向地の区間だけで計算していること */
+      if (bl.classList.contains("warn") && (O.kind === "others" || O.kind === "part")) {
+        const tw4 = document.createTreeWalker(bl, NodeFilter.SHOW_TEXT);
+        const cos = [...new Set(O.othersSel.map((s) => s.co).filter(Boolean))].join("・");
+        const lab = O.kind === "others" ? M(`（他社 ${cos} の見積${O.stale ? "・" + (typeof v101fStaleWhy === "function" ? v101fStaleWhy(O, r) : "期限切れ") + "・荷主の画面では取り下げ" : ""}）`, ` (another forwarder's quote${O.stale ? ", expired" : ""})`) : M("（他社の見積を含む）", " (includes other forwarders)");
+        while (tw4.nextNode()) { const n = tw4.currentNode; if (/今の見積 ¥[\d,]+/.test(n.data) && n.data.indexOf(lab) < 0 && !/今の見積 ¥[\d,]+（他社/.test(n.data)) { n.data = n.data.replace(/(今の見積 ¥[\d,]+)/, "$1" + lab); break; } }
+      }
+      let scopeNote = "";
+      try {
+        const SC = c && cs0 && typeof v101fVolScope === "function" ? v101fVolScope(c, cs0) : null;
+        const dropHere = SC && SC.restricted ? SC.drop.filter((q) => q.rid === r.id) : [];
+        if (dropHere.length) scopeNote = M(`B/L の容積での計算は、B/L の仕向地（${SC.dest}）の区間だけです。この依頼の ${dropHere.map((q) => q.cty).join("・")} の区間は、この B/L の出荷ではないため入れていません（見積は今のまま）。`, `The B/L recalculation covers only the B/L destination (${SC.dest}); ${dropHere.map((q) => q.cty).join(", ")} are not part of this B/L shipment.`);
+      } catch (e) { err("scopenote", e); }
+      put(det, ":scope .v101fblcmp", CM.html, "afterend", bl);
       let x = "";
       if (VV && VV.bl != null) {
         const others = VV.reqs.filter((q) => q.id !== r.id);
         const grp = {};
         others.forEach((q) => { const k = q.cbm + "|" + q.kind; (grp[k] = grp[k] || { cbm: q.cbm, kind: q.kind, same: q.same, ids: [], trial: false }).ids.push(q.id); if (q.trial) grp[k].trial = true; });
         const li = Object.values(grp).map((g) => `<li>${E(`${g.ids.join("・")}：${g.cbm != null ? CB(g.cbm) + " m³" : "—"}（${g.kind === "default" ? M("標準値・荷主は容積を入れていない依頼") : g.kind === "shared" ? M("荷主の共有") : M("出どころ不明")}${g.trial ? M("・体験用の依頼") : ""}）→ ${g.same ? M("B/L と同じ") : M("B/L と違う")}`)}</li>`).join("");
-        x = `<div class="v101fblx" data-noi18n role="note"><b>${E(M("容積の出どころ", "Where the volumes come from", "体积的来源", "Origen de los volúmenes"))}</b>${E(M(`：B/L ${VV.blNo || ""}（案件の「B/L・出荷の情報」に入力：「${VV.blRaw}」）＝ ${CB(VV.bl)} m³。この依頼 ${r.id}：${typeof v101fVolLabel === "function" ? v101fVolLabel(r) : CB(r.cbm) + " m³"}。`, `: B/L ${VV.blNo || ""} (entered as “${VV.blRaw}”) = ${CB(VV.bl)} m³. This request: ${CB(r.cbm)} m³.`))}${li ? `<br>${E(M("同じ案件（同じ B/L）のほかの依頼：", "Other requests in the same case: "))}<ul>${li}</ul>` : ""}${others.some((q) => !q.same) ? `<button type="button" class="btn g" data-v101go="fcase" data-noi18n>${E(M("案件・出荷管理で容積の出どころを見る", "See volumes in Cases"))}</button>` : ""}</div>`;
+        x = `<div class="v101fblx" data-noi18n role="note"><b>${E(M("容積の出どころ", "Where the volumes come from", "体积的来源", "Origen de los volúmenes"))}</b>${E(M(`：B/L ${VV.blNo || ""}（案件の「B/L・出荷の情報」に入力：「${VV.blRaw}」）＝ ${CB(VV.bl)} m³。この依頼 ${r.id}：${typeof v101fVolLabel === "function" ? v101fVolLabel(r) : CB(r.cbm) + " m³"}。`, `: B/L ${VV.blNo || ""} (entered as “${VV.blRaw}”) = ${CB(VV.bl)} m³. This request: ${CB(r.cbm)} m³.`))}${scopeNote ? `<br>${E(scopeNote)}` : ""}${li ? `<br>${E(M("同じ案件（同じ B/L）のほかの依頼（容積）：", "Other requests in the same case (volume): "))}<ul>${li}</ul>` : ""}${others.some((q) => !q.same) ? `<button type="button" class="btn g" data-v101go="fcase" data-noi18n>${E(M("案件・出荷管理で容積の出どころを見る", "See volumes in Cases"))}</button>` : ""}</div>`;
       }
-      put(det, ":scope .v101fblx", x, "afterend", bl);
+      put(det, ":scope .v101fblx", x, "afterend", det.querySelector(":scope .v101fblcmp") || bl);
     }
     /* 荷主の書類（PI・インボイスなど）の下書きが見えない理由（期待以上） */
     const dl = det.querySelector(".v99fdl2");
@@ -236,6 +331,45 @@
   }
 
   /* ═══ 案件・出荷管理（No.625・626・期待以上）═══════════════════════════════ */
+  /* 22.01.1（v3 N5）：21.90 の「見積の前提」を、全部の区間で（依頼ごとに1行）。どの会社の見積か・期限切れか・B/L の仕向地の区間（＊）か */
+  function rebuildBasis(sec, c, VV, cid) {
+    const bx = sec.querySelector(".v90fbasis"); if (!bx || typeof v101fVolScope !== "function") return;
+    const cs = (typeof v33One === "function" ? v33One("cs", cid) : null) || {};
+    const SC = v101fVolScope(c, cs);
+    const keepK = new Set(SC.keep.map((x) => x.rid + "|" + x.cty));
+    const me0 = me();
+    const lines = []; let nLeg = 0;
+    (c.reqs || []).filter(Boolean).forEach((r) => {
+      const legs = (r.legs || []).filter((l) => l && l.ok);
+      const parts = [], who = new Set(); let st = 0, ex = 0, valid = "";
+      legs.forEach((l) => {
+        const o = (l.offers || []).find((x) => x && x.co === me0) || (l.offers || []).find((x) => x && x.co === (l.sel || l.co));
+        const q = (o && o.quote) || l.quote || {};
+        if (!q.total) return;
+        who.add(o && o.co === me0 ? "" : ((o && o.co) || l.sel || l.co || "—"));
+        const S0 = typeof v101fLegStale === "function" ? v101fLegStale(r, l) : { stale: false };
+        if (S0.stale) st++; if (S0.exp) ex++; if (S0.valid && S0.valid > valid) valid = S0.valid;
+        parts.push(`${l.cty} ${Y(q.total)}${SC.restricted && keepK.has(r.id + "|" + l.cty) ? "＊" : ""}`);
+      });
+      if (!parts.length) return;
+      let trial = false; try { trial = typeof v100fIsTempId === "function" && v100fIsTempId(r.id); } catch (e) { trial = false; }
+      if (!trial) nLeg += parts.length;
+      const S = typeof v101fVolSrc === "function" ? v101fVolSrc(r) : { kind: "" };
+      const vol = `${CB(r.cbm)}m³ ${r.mode || "LCL"}${S.kind === "default" ? M("・標準値") : S.kind === "shared" ? M("・荷主の共有") : ""}`;
+      const whoT = [...who].map((x) => (x ? M(`他社 ${x} の見積`, `${x}'s quote`) : M("貴社の見積", "your quote"))).join("・");
+      const stT = st && st === parts.length ? M(`・${ex === st ? `有効期限 ${valid} で期限切れ` : "期限切れ・依頼と違う仕出港"}（荷主の画面では取り下げ）`, " (expired; withdrawn on the shipper's screen)") : st ? M(`・うち ${st}区間は期限切れなど`, ` (${st} expired)`) : "";
+      lines.push(`${r.id}（${vol}）：${parts.join("／")} — ${whoT}${stT}${trial ? M("（体験用の依頼・3日で消えます。この案件の前提には入れていません）", " (trial request; not used for this case)") : ""}`);
+    });
+    if (!lines.length) return;
+    const b = bx.querySelector(":scope > b");
+    const legend = SC.restricted ? M(`＊＝B/L の仕向地（${SC.dest}）の区間。上の差額と「B/L の容積で反映する」は、この ${SC.keep.length}区間だけです（ここに並べた ${nLeg}区間のうち。体験用の依頼は除く）。`, `＊ = lanes to the B/L destination (${SC.dest}); only these ${SC.keep.length} are recalculated.`) : M(`ここに並べた区間：${nLeg}（体験用の依頼は除く）。`, `${nLeg} lanes listed.`);
+    const how = M("どちらが正しいかは、この画面では決めません。荷主に確かめてください：① B/L の値が正しい → 荷主に数量を直してもらい（依頼ページ「荷主に出荷情報を頼む」）、数量が変わる国は再見積 ② 荷主の値が正しい → 「B/L・出荷の情報を入れる」で B/L の値を直す。", "This screen does not decide which is correct. Check with the shipper.");
+    const html = (b ? b.outerHTML : "") + "<br>" + lines.map(E).join("<br>") + `<br><span class="v101fbasisl">${E(legend)}</span><br>` + E(how);
+    const sig = hash(html);
+    if (bx.dataset.v101 === sig) return;
+    bx.innerHTML = html; bx.dataset.v101 = sig;
+    cnt("basis");
+  }
   function paintCases(w) {
     const secs = [...w.querySelectorAll("section.v33case")]; if (!secs.length) return;
     const C = typeof v33Cases === "function" ? (v33Cases() || []) : [];
@@ -277,9 +411,33 @@
         let A = [];
         try { A = typeof v97fVolAuto === "function" ? (v97fVolAuto(c, (typeof v33One === "function" ? v33One("cs", cid) : null) || {}) || []) : []; } catch (e) { A = []; }
         const cos = [...new Set(A.map((a) => a.co).filter(Boolean))];
-        const note = A.length && cos.length && cos.every((co) => co !== me()) ? M(`下の金額は他社（${cos.join("・")}）の見積です。貴社（${me()}）の見積は、この案件の依頼にはありません（貴社のレートがない区間です）。`, `The amounts below are other forwarders' quotes (${cos.join(", ")}); you have no quote in this case.`) : "";
+        /* 22.01.1（v3 N2）：差額の元の金額が期限切れの他社の見積（荷主の画面では取り下げ）なら、そう書く */
+        const stl = A.map((a) => { const rq = reqs().find((x) => x.id === a.rid); const lg = rq && (rq.legs || []).find((l) => l && l.cty === a.cty); return rq && lg && typeof v101fLegStale === "function" ? v101fLegStale(rq, lg) : null; }).filter(Boolean);
+        const allStale = stl.length === A.length && stl.length > 0 && stl.every((s) => s.stale);
+        const vmax = stl.map((s) => s.valid).filter(Boolean).sort().pop() || "";
+        const note = A.length && cos.length && cos.every((co) => co !== me()) ? M(`下の金額は他社（${cos.join("・")}）の見積です${allStale ? `。有効期限が切れていて（${vmax}）、荷主の画面では取り下げ（レーン未登録）になっています（荷主はこの見積を検討していません）` : ""}。貴社（${me()}）の見積は、この案件の依頼にはありません（貴社のレートがない区間です）。`, `The amounts below are other forwarders' quotes (${cos.join(", ")})${allStale ? ", expired and withdrawn on the shipper's screen" : ""}; you have no quote in this case.`) : "";
         const head = bar.querySelector(".v97fvolbar-h");
         if (head) put(head, ":scope > .v101fvolbarx", note ? `<small class="v101fvolbarx" data-noi18n>${E(note)}</small>` : "");
+        /* 「今の見積 ¥…」に（他社・期限切れ）を */
+        const amt = bar.querySelector(".v97fvolbar-amt");
+        if (amt && note) {
+          const lab = allStale ? M("（他社の見積・期限切れ）", " (other forwarder, expired)") : M("（他社の見積）", " (other forwarder)");
+          const tw5 = document.createTreeWalker(amt, NodeFilter.SHOW_TEXT);
+          while (tw5.nextNode()) { const n = tw5.currentNode; if (/今の見積 ¥[\d,]+/.test(n.data) && !/今の見積 ¥[\d,]+（他社/.test(n.data)) { n.data = n.data.replace(/(今の見積 ¥[\d,]+)/, "$1" + lab); break; } }
+        }
+        /* 22.01.1（v3 N5）：反映の対象は B/L の仕向地の区間だけ（logic の v97fVolAuto の包み）。ボタンの数え方（「11か国」→ 依頼の数・国）と、外した区間 */
+        try {
+          const SC = typeof v101fVolScope === "function" ? v101fVolScope(c, (typeof v33One === "function" ? v33One("cs", cid) : null) || {}) : null;
+          const ab = bar.querySelector('[data-v97vol="apply"]');
+          if (ab && A.length) {
+            const nReq = new Set(A.map((a) => a.rid)).size, ctys = [...new Set(A.map((a) => a.cty))];
+            const t = M(`B/L の容積で反映する（${nReq}件の依頼・${ctys.join("・")}${A.length !== nReq ? `・${A.length}区間` : ""}）`, `Apply the B/L volume (${nReq} request(s), ${ctys.join(", ")})`);
+            setText(ab, t);
+          }
+          const sn = SC && SC.restricted ? M(`B/L ${VV.blNo || ""} の仕向地は${SC.dest}です。差額と反映は、${SC.dest}の区間（${new Set(SC.keep.map((x) => x.rid)).size}件の依頼）だけです。${[...new Set(SC.drop.map((x) => x.cty))].join("・")}の ${SC.drop.length}区間は、この B/L の出荷ではないため入れていません（その見積は今のまま）。`, `B/L destination: ${SC.dest}. Only ${SC.dest} lanes are recalculated; ${SC.drop.length} other lanes are not part of this B/L shipment.`) : "";
+          const act = bar.querySelector(".v97fvolbar-act");
+          put(bar, ":scope > .v101fvolscope", sn ? `<p class="v101fvolscope" data-noi18n role="note">${E(sn)}</p>` : "", "beforebegin", act);
+        } catch (e) { err("volscope", e); }
       }
       /* 21.69 の食い違いの1行：標準 2 m³（荷主が入れていない容積）を「荷主から共有された貨物情報」と書かない */
       sec.querySelectorAll(".v69fdiff").forEach((p) => {
@@ -298,10 +456,21 @@
           if (!sp) { const s = document.createElement("span"); s.className = "v101fbasisx"; s.setAttribute("data-noi18n", ""); s.textContent = add; b.appendChild(s); }
         }
       });
+      /* 22.01.1（v3 N5）：21.90 の「見積の前提」は 8行で切れていた（RQ-F61KZH の4区間が抜け、差額の 11行と合わない）→ 全部の区間を依頼ごとに1行で。
+         どの会社の見積か・期限切れか・B/L の仕向地の区間か（差額と反映の対象）も書く */
+      try { rebuildBasis(sec, c, VV, cid); } catch (e) { err("basis", e); }
       /* 容積の出どころの箱 */
       const grp = {};
-      VV.reqs.forEach((q) => { const k = q.cbm + "|" + q.kind + "|" + (q.trial ? 1 : 0); (grp[k] = grp[k] || { cbm: q.cbm, kind: q.kind, same: q.same, trial: q.trial, ids: [] }).ids.push(q.id); });
-      const li = Object.values(grp).map((g) => `<li>${E(`${g.ids.join("・")}：${g.cbm != null ? CB(g.cbm) + " m³" : "—"}（${g.kind === "default" ? M("標準値・荷主は容積を入れていない") : g.kind === "shared" ? M("荷主の共有（依頼の貨物の欄）") : M("出どころ不明")}${g.trial ? M("・体験用の依頼・3日で消えます") : ""}）`)} <span class="${g.same ? "ok" : "ng"}">${E(g.same ? M("＝ B/L と同じ") : M("≠ B/L と違う"))}</span></li>`).join("");
+      const cs1 = (typeof v33One === "function" ? v33One("cs", cid) : null) || {};
+      VV.reqs.forEach((q) => {
+        /* 22.01.1（v3 N4）：荷主が共有した依頼は、総重量・箱数・数量も B/L と比べる（同じ組にまとめない） */
+        const rq = reqs().find((x) => x.id === q.id);
+        const X = rq && q.kind === "shared" && typeof v101fBlCmp === "function" ? v101fBlCmp(rq, cs1) : null;
+        const dk = X && X.diff.length ? X.diff.map((d) => `${d.k} ${d.reqTxt}（B/L ${d.blTxt}）`).join("・") : "";
+        const k = q.cbm + "|" + q.kind + "|" + (q.trial ? 1 : 0) + "|" + dk;
+        (grp[k] = grp[k] || { cbm: q.cbm, kind: q.kind, same: q.same, trial: q.trial, ids: [], dk }).ids.push(q.id);
+      });
+      const li = Object.values(grp).map((g) => `<li>${E(`${g.ids.join("・")}：${g.cbm != null ? CB(g.cbm) + " m³" : "—"}（${g.kind === "default" ? M("標準値・荷主は容積を入れていない") : g.kind === "shared" ? M("荷主の共有（依頼の貨物の欄）") : M("出どころ不明")}${g.trial ? M("・体験用の依頼・3日で消えます") : ""}）`)} <span class="${g.same ? "ok" : "ng"}">${E(g.same ? (g.dk ? M("容積は B/L と同じ") : M("＝ B/L と同じ")) : M("≠ B/L と違う"))}</span>${g.dk ? `<br><span class="ng">${E(M(`≠ 容積のほかは B/L と違います：${g.dk}`, `Other values differ from the B/L: ${g.dk}`))}</span>` : ""}</li>`).join("");
       const html = `<div class="v101fvolsrc" data-noi18n role="note"><b>${E(M("容積の出どころ（この案件）", "Where the volumes come from (this case)", "体积的来源（本案件）", "Origen de los volúmenes (este caso)"))}</b><ul><li>${E(M(`B/L ${VV.blNo || ""}：${CB(VV.bl)} m³（貴社が「B/L・出荷の情報を入れる」で入力：「${VV.blRaw}」）`, `B/L ${VV.blNo || ""}: ${CB(VV.bl)} m³ (entered as “${VV.blRaw}”)`))}</li>${li}</ul><small>${E(M("見積受信箱の明細・この案件の帯・見積の前提は、どれも上の値と出どころで出しています（小数は小数第2位まで。B/L の「1.11m3」は 1.11 m³ と読みます）。相見積・AI推奨の「レーン別の集計」は、どの依頼とも別の標準 2m³ の目安です。", "Inbox details, this case and the quote basis all use these values. The lane summary in Comparison uses a standard 2 m³."))}</small></div>`;
       const ref = sec.querySelector(":scope > .v90fbasis") || sec.querySelector(":scope > .v69fdiff") || sec.querySelector(":scope > dl.v33dl") || sec.querySelector(".v97fvolbar");
       put(sec, ":scope > .v101fvolsrc", html, "afterend", ref);
@@ -317,15 +486,33 @@
     const A = W.A;
     if (!t1.classList.contains("v101fhide99")) t1.classList.add("v101fhide99");
     const box = t1.querySelector("b") ? t1.querySelector("b").parentElement : t1;
-    const why = M(`貴社のレートで答えた依頼で数えています（他社だけが答えた ${A.others}件は入りません）。理由と次の一手は下の箱に。`, `Counted on your own quotes (${A.others} quoted only by others are not counted). See the box below.`);
+    /* 22.01.1（v3 S6）：タイルに 13行の文が詰まっていた → 1行を短く・体験用を除いた数は下の箱の「数え方」へ（タイルでは隠す） */
+    const why = M(`他社だけが答えた ${A.others}件は数えません（理由は下の箱）`, `${A.others} answered only by others not counted (see below)`);
     put(box, ":scope > .v101fwhy", `<span class="rd-ts v101fwhy" data-noi18n>${E(why)}</span>`);
+    box.querySelectorAll(":scope > .v100ftrs").forEach((x) => { if (W.trial && !x.classList.contains("v101fhid")) x.classList.add("v101fhid"); });
+    /* 22.01.1（v3 N11）：タイル「要確認」の「理由：レートが無い区間 N件」は、どの会社のレートも無い区間の数（下の箱の「貴社のレートが無い区間」とは別の数）と分かる言い方に */
+    try {
+      /* 21.99 の「理由：レートが無い区間 N件」（v99fwhyn）は 21.99 が同じ文字に書き戻すので、書き換えずに隠し、この層の1行を横に置く（書き合いをしない） */
+      w.querySelectorAll('[data-v92ov="rv"] .v99fwhyn, [data-v70fgo="rv"] .v99fwhyn').forEach((n) => {
+        const m = /レートが無い区間 (\d+)件/.exec(n.textContent || "");
+        if (!m) return;
+        if (!n.classList.contains("v101fhid")) n.classList.add("v101fhid");
+        const t = M(`理由：どの会社のレートも無い区間 ${m[1]}件`, `Reason: no company has a rate (${m[1]})`);
+        let x = n.nextElementSibling && n.nextElementSibling.classList.contains("v101fnlwhy") ? n.nextElementSibling : null;
+        if (!x) { x = document.createElement(n.tagName === "SMALL" ? "small" : "span"); x.className = n.className.split(/\s+/).filter((c) => c && c !== "v99fwhyn" && c !== "v101fhid").concat("v101fnlwhy").join(" "); x.setAttribute("data-noi18n", ""); n.after(x); }
+        if (x.textContent !== t) x.textContent = t;
+        const tile = n.closest('[data-v92ov="rv"], [data-v70fgo="rv"]');
+        const ti = M(`見積を出せなかった依頼（どの会社のレートも無い区間）。貴社のレートだけが無い依頼（他社だけが答えた ${A.others}件）は、見積受信箱の「貴社は未回答」で数えます`, "");
+        if (tile && ti && tile.title !== ti) tile.title = ti;
+      });
+    } catch (e) { err("n11", e); }
     /* 次の一手の箱（タイルの外。タイルはボタンなので中にボタンを入れない） */
     const grid = t1.parentElement;
     if (!grid || !grid.parentElement) return;
     const items = [];
     if (A.exp) items.push(`<li>${E(M(`期限切れの貴社のレートで組んだ見積が ${A.exp}件あります（期限切れのレート ${W.expRates}本）。新しい運賃・有効期限で入れ直すと、荷主が次に画面を開いたときに組み直されます。`, `${A.exp} quotes use expired rates (${W.expRates} expired rates). Renew them.`))}<br><button type="button" class="btn g" data-v101go="exp" data-noi18n>${E(M(`期限切れのレート ${W.expRates}本を入れ直す（物流レート管理）`, `Renew ${W.expRates} expired rates`))}</button></li>`);
     if (A.port && W.ports.length) items.push(`<li>${E(M(`依頼と違う仕出港のレートで組んだ見積が ${A.port}件あります（依頼の仕出港：${W.ports.slice(0, 4).map((p) => `${p.pol} ${p.n}件`).join("・")}）。依頼の仕出港発のレートを登録すると、その港発の見積になります。`, `${A.port} quotes use a rate from another origin port (${W.ports.slice(0, 4).map((p) => p.pol + " " + p.n).join(", ")}). Register rates from those ports.`))}<br><button type="button" class="btn g" data-v101go="pol" data-pol="${E(W.ports[0].pol)}" data-noi18n>${E(M(`${W.ports[0].pol}発のレートを登録する（手入力の欄へ）`, `Register a rate from ${W.ports[0].pol}`))}</button></li>`);
-    if (A.others + A.open) items.push(`<li>${E(M(`貴社のレートが無い区間の依頼が ${A.others + A.open}件あります（他社だけが答えた ${A.others}件・どの会社も答えられなかった ${A.open}件。区間：${W.lanes.slice(0, 3).map((x) => x.lane).join("／")}${W.lanes.length > 3 ? " ほか" : ""}）。`, `${A.others + A.open} requests are on lanes without your rate (${A.others} quoted only by others, ${A.open} by nobody).`))}<br><button type="button" class="btn g" data-v101go="others" data-noi18n>${E(M(`貴社が未回答の依頼を見る（${A.others}件）`, `See requests you have not answered (${A.others})`))}</button></li>`);
+    if (A.others + A.open) items.push(`<li>${E(M(`貴社のレートが無い区間の依頼が ${A.others + A.open}件あります（どの会社のレートも無い ${A.open}件＝上のタイル「要確認」${A.open}件・他社だけが答えた ${A.others}件${A.othersStale ? `〔うち ${A.othersStale}件は他社の見積も期限切れなどで、荷主の画面では取り下げ〕` : ""}。区間：${W.lanes.slice(0, 3).map((x) => x.lane).join("／")}${W.lanes.length > 3 ? " ほか" : ""}）。`, `${A.others + A.open} requests are on lanes without your rate (${A.others} quoted only by others, ${A.open} by nobody).`))}<br><button type="button" class="btn g" data-v101go="others" data-noi18n>${E(M(`貴社が未回答の依頼を見る（${A.others}件）`, `See requests you have not answered (${A.others})`))}</button></li>`);
     const html = `<section class="v101fnext" data-noi18n role="region" aria-label="${E(M("自動回答が少ない理由と次の一手", "Why few auto-answers and what to do"))}"><h3>${E(M(`AI自動回答率 ${A.rate}%（そのまま出せる ${A.clean} / ${A.recv}件）が低い理由と、次にできること`, `AI auto-answer rate ${A.rate}% (${A.clean}/${A.recv}): why, and what to do next`))}</h3><ol>${items.join("")}</ol><p>${E(M(`数え方：受信 ${A.recv}件のうち、貴社のレートで AI が見積を出した ${A.auto}件から、期限切れ・仕出港違いのレートを含む ${A.warn}件を除いた ${A.clean}件が「そのまま出せる」です（他社だけが答えた依頼は、貴社の回答に数えません）。${W.trial ? `体験用の依頼を除くと そのまま出せる ${W.trial.cleanBase} / ${W.trial.base}件＝${W.trial.rateBase}%。` : ""}`, `Counted: of ${A.recv} requests, ${A.auto} quoted with your rates, minus ${A.warn} with expired/other-port rates = ${A.clean} ready as is.`))}</p></section>`;
     put(grid.parentElement, ":scope > .v101fnext", items.length ? html : "", "afterend", grid);
     fixAiCounts(w, A);
@@ -356,12 +543,17 @@
   }
   document.addEventListener("click", (ev) => {
     try {
+      if (V.expOnly && ev.target && ev.target.closest && ev.target.closest("[data-v89ftog]")) { V.expOnly = false; setTimeout(() => { const w2 = well(); if (w2) paintExpOnly(w2, false); }, 50); }
       const b = ev.target && ev.target.closest && ev.target.closest("[data-v101go]");
       if (!b || !fwdOn()) return;
       ev.preventDefault();
       const k = b.getAttribute("data-v101go");
       const go = (key) => { try { if (typeof closeDW === "function") closeDW(); } catch (e) { /* 無視 */ } try { RDX.goKey(key); } catch (e) { err("go", e); } };
-      if (k === "exp") { go("frates"); setTimeout(() => { try { if (window.v89fShowExpired) window.v89fShowExpired(true); } catch (e) { err("exp", e); } }, 300); }
+      if (k === "exp") {
+        /* 22.01.1（v3 N9）：行き先で期限切れの行が表の28行目以降に混ざって見えなかった → 期限切れの行だけを出し、最初の行へ（「すべての行に戻す」で戻る） */
+        go("frates");
+        setTimeout(() => { try { if (window.v89fShowExpired) window.v89fShowExpired(true); V.expOnly = true; const w2 = well(); if (w2) paintExpOnly(w2, true); } catch (e) { err("exp", e); } }, 300);
+      } else if (k === "expall") { V.expOnly = false; const w2 = well(); if (w2) paintExpOnly(w2, false); }
       else if (k === "pol") {
         go("frates");
         const pol = b.getAttribute("data-pol") || "";
@@ -379,7 +571,24 @@
     const h = [...w.querySelectorAll("h3")].find((x) => /^(レーン別の集計とAI物流マンの推奨|Lane summary & AI pick)/.test((x.textContent || "").trim()));
     return h ? (h.closest(".c") || h.parentElement) : null;
   }
+  /* 22.01.1（v3 N10）：タイル「参加物流会社 3社」（この画面のレート表の会社）と「相見積の比較（6社）」（その依頼に見積を出した会社）・荷主の窓の「物流会社 6社」が食い違って見えた
+     → タイルを「レート表の会社」と書き、受信した依頼に見積を出した会社の数（体験の世界の見本の会社を含む）を並べる */
+  function paintCos(w) {
+    const t = [...w.querySelectorAll(".g4 > .c")].find((c) => /^(参加物流会社|レート表の会社)$/.test(((c.querySelector("p.lbl") || {}).textContent || "").trim()));
+    if (!t) return;
+    const lb = t.querySelector("p.lbl"), kd = t.querySelector(".kd");
+    let rc = []; try { rc = typeof fwdCos === "function" ? fwdCos() : []; } catch (e) { rc = []; }
+    const all = new Set(); const per = [];
+    reqs().forEach((r) => { const s = new Set(); (r.legs || []).forEach((l) => (l && l.offers || []).forEach((o) => { if (o && o.co) { s.add(o.co); all.add(o.co); } })); if (s.size) per.push({ id: r.id, n: s.size }); });
+    setText(lb, M("レート表の会社", "Companies in this rate table", "本费率表中的公司", "Empresas en esta tabla"));
+    if (kd) setText(kd, M(`この画面のレート表に入っている会社（貴社＋見本 ${Math.max(0, rc.length - 1)}社）`, `Companies whose rates are in this screen (you + ${Math.max(0, rc.length - 1)} samples)`));
+    const mx = per.slice().sort((a, b) => b.n - a.n)[0];
+    put(t, ":scope > .v101fcos", all.size ? `<div class="v101fcos" data-noi18n>${E(M(`受信した依頼に見積を出した会社は ${all.size}社です（体験の世界の見本の物流会社を含む）。「相見積の比較（◯社）」は、その依頼に見積を出した会社の数です${mx ? `（いちばん多いのは ${mx.id} の ${mx.n}社）` : ""}。荷主の画面の「物流会社 ◯社」は、荷主の側から見た参加物流会社の数です。`, `${all.size} companies quoted the requests you received (including sample companies). “Comparison (N)” counts the companies that quoted that request.`))}</div>` : "");
+    const h = [...w.querySelectorAll(".c > h3")].find((x) => (x.textContent || "").trim() === "参加物流会社");
+    if (h) put(h.parentElement, ":scope > .v101fcosn", `<p class="v101fcosn" data-noi18n>${E(M(`この画面のレート表の会社（${rc.length}社）です。受信した依頼には、ほかにも体験の世界の見本の物流会社が見積を出しています（全部で ${all.size}社）。`, `Companies in this rate table (${rc.length}). Other sample companies also quoted (${all.size} in all).`))}</p>`, "afterend", h);
+  }
   function paintAgg(w) {
+    try { paintCos(w); } catch (e) { err("cos", e); }
     const card = aggCard(w); if (!card || typeof v101fLaneKey !== "function") return;
     const tb = card.querySelector("table tbody"); if (!tb) return;
     const G = v101fLaneGroups();
@@ -449,8 +658,23 @@
     cnt("agg");
   }
 
+  /* 22.01.1（v3 N9）：期限切れの行だけを出す（ホームの「期限切れのレート N本を入れ直す」から） */
+  function rateTbl(w) {
+    try { if (typeof v89fRateTable === "function") return v89fRateTable(w); } catch (e) { /* 下で */ }
+    return [...w.querySelectorAll("table")].find((t) => t.querySelector("[data-frdel]")) || null;
+  }
+  function paintExpOnly(w, scroll) {
+    const t = rateTbl(w); if (!t) return;
+    const on = !!V.expOnly;
+    if (t.classList.contains("v101fexponly") !== on) t.classList.toggle("v101fexponly", on);
+    const rows = [...t.querySelectorAll("tbody tr.v89fexp")];
+    const tw = t.closest(".tw") || t;
+    put(tw.parentElement, ":scope > .v101fexpbar", on && rows.length ? `<div class="v101fexpbar" data-noi18n role="status"><b>${E(M(`期限切れのレートだけを表示しています（${rows.length}本）`, `Showing expired rates only (${rows.length})`, `仅显示已过期的费率（${rows.length}条）`, `Solo tarifas vencidas (${rows.length})`))}</b><span>${E(M("行の「入れ直す」で新しい運賃・有効期限に置き換えるか、「削除」で外せます（見積・推奨には使われていません）。", "Renew or delete each row (they are not used in quotes)."))}</span><button type="button" class="btn g" data-v101go="expall" data-noi18n>${E(M("すべての行に戻す", "Show all rows", "显示全部", "Mostrar todas"))}</button></div>` : "", "beforebegin", tw);
+    if (on && scroll && rows[0]) { try { const bar = tw.parentElement.querySelector(":scope > .v101fexpbar"); (bar || rows[0]).scrollIntoView({ block: "start" }); } catch (e) { /* 無視 */ } }
+  }
   /* ═══ No.628 物流レート管理：手入力の欄の前に「区間のレート」で答えること ═══════════════ */
   function paintRates(w) {
+    try { paintExpOnly(w, false); } catch (e) { err("exponly", e); }
     const lb = [...w.querySelectorAll("p.lbl")].find((x) => /^手入力で1レーン追加|^Add one lane manually/.test((x.textContent || "").trim()));
     if (!lb) return;
     const box = lb.parentElement;
@@ -499,6 +723,102 @@
   }
   setInterval(paintVolUsedSrc, 1500);
 
+  /* ═══ 22.01.1（v3 N7）「レートを登録して回答」の窓：見出し・本文・区間の言葉を、窓にあるボタンと同じに ═══════════════ */
+  function fixAnsSheet(id) {
+    try {
+      const sh = document.getElementById("v33sheet");
+      const r = reqs().find((x) => x.id === id);
+      if (!sh || !r) return;
+      const cards = [...sh.querySelectorAll(".v90fansc")]; if (!cards.length) return;
+      let nEdit = 0, nReg = 0;
+      cards.forEach((cd) => {
+        const bt = cd.querySelector("[data-v90fans]"); if (!bt) return;
+        if (/この区間のレートを登録|Register this lane/.test(bt.textContent || "")) nReg++; else nEdit++;
+        /* 区間の言葉：「貴社のレートでの見積なし（レーン未登録）」の「レーン未登録」は、チップの「レーン未登録」（どの会社も無い）と別の意味だった */
+        const k = cd.querySelector(".v90fansk");
+        const cty = ((cd.querySelector(".v90fansh b") || {}).textContent || "").trim();
+        const l = (r.legs || []).find((x) => x && x.cty === cty);
+        if (k && /貴社のレートでの見積なし（レーン未登録）|No quote with your rate/.test(k.textContent || "")) {
+          const ST = l && l.ok && typeof v101fLegStale === "function" ? v101fLegStale(r, l) : null;
+          const t = l && l.ok ? M(`貴社のレートなし（この区間は他社の見積だけ${ST && ST.stale ? "・その見積も期限切れなどで荷主の画面では取り下げ" : ""}）`, "No rate of yours (only other forwarders quoted this lane)") : M("貴社のレートなし（どの会社のレートも無い区間）", "No rate of yours (no company has a rate for this lane)");
+          setText(k, t);
+        }
+      });
+      const way = /荷主が次に画面を開いたときに/.test(sh.textContent || "") ? M("荷主が次に画面を開いたときに、この依頼に貴社の見積が届きます。", "the shipper gets your quote next time they open the screen.") : M("関係する依頼だけを同じ決まりで計算し直します。", "only the related requests are recalculated.");
+      const H = [...sh.querySelectorAll("h3, h2, .v33sh-t, b")].find((x) => /回答の金額を直す（区間のレートを直します）|見積回答（金額を直す）|レートを登録して回答（|回答の金額を直す・レートを登録（/.test(x.textContent || ""));
+      let title = "", body = "";
+      if (!nEdit && nReg) {
+        title = M(`レートを登録して回答（区間のレートを登録します）：${id}`, `Register a rate to answer (lane rate): ${id}`);
+        body = M(`ここで登録するのは「区間のレート」（仕出港 → 仕向け・形態ごとの運賃）です。この依頼だけの金額（スポットの見積）は出せません。「この区間のレートを登録」を押すと、物流レート管理の手入力の欄に、この区間（仕出港・仕向け・形態）が入ります。運賃・日数・有効期限を入れて「追加」を押すと、${way}同じ区間のほかの依頼の見積にも使われます。「追加」を押すまで何も変わりません。`, `You register a lane rate here (no one-off price for one request). Press “Register this lane” to prefill the manual form; after you press Add, ${way}`);
+      } else if (nEdit && nReg) {
+        title = M(`回答の金額を直す・レートを登録（区間のレート）：${id}`, `Edit price / register rate (lane rate): ${id}`);
+        body = M(`ここで直す・登録するのは「区間のレート」です。この依頼だけの金額（スポットの見積）は出せません。貴社のレートがある区間は「この区間の金額を直す」で今の値が、無い区間は「この区間のレートを登録」でその区間が、物流レート管理の手入力の欄に入ります。「追加」を押すと、${way}同じ区間のほかの依頼にも使われます。「追加」を押すまで何も変わりません。`, `Edit or register lane rates. After you press Add, ${way}`);
+      }
+      if (title && H) {
+        const f = H.firstChild && H.firstChild.nodeType === 3 ? H.firstChild : null;
+        if (f) { if (f.nodeValue !== title) f.nodeValue = title; } else if (!H.children.length) setText(H, title);
+      }
+      const p = sh.querySelector("p.nn");
+      if (body && p) setText(p, body);
+      cnt("anssheet");
+    } catch (e) { err("anssheet", e); }
+  }
+  if (typeof v90fAnsOpen === "function" && !window.__v101fAns) {
+    window.__v101fAns = 1;
+    const __ao101 = v90fAnsOpen;
+    v90fAnsOpen = function (id) { const o = __ao101.apply(this, arguments); try { if (fwdOn()) { fixAnsSheet(id); setTimeout(() => fixAnsSheet(id), 60); } } catch (e) { err("ansopen", e); } return o; }; // eslint-disable-line no-global-assign
+  }
+
+  /* ═══ 22.01.1（v3 N3）荷主の「物流会社に見積を依頼（相見積）」の確かめの窓：送る中身（容積・箱数・総重量）と同じ値を出す ═══════════════
+     22.00 の窓（rd_v100flow.js の planOf）は opts.cbm が無いと「2m³（容積の目安）」と出していたが、送る中身は 21.56 の v56shipPack（商品の寸法・重量と数量から計算）。
+     ・この層は一番外で fwdRequest を包み、窓が出たら「何を：」の行を v101fShipPlan（同じ決め方）の値に書き換える（送る中身そのものは変えない）
+     ・21.60 の条件の欄（容積・重量など）から依頼したときは、確かめの窓で 2秒を過ぎると条件が読まれなくなっていた（21.60・21.802 は押してから2秒以内だけ読む）
+       → 呼ばれた時点で同じ読み方で opts に入れておく（窓に出す値と送る値が同じになる） */
+  function fixAskBox(plan, tries) {
+    try {
+      const box = document.getElementById("v100fAsk");
+      if (!box) { if (tries > 0) setTimeout(() => fixAskBox(plan, tries - 1), 60); return; }
+      const li = [...box.querySelectorAll(".v100f-askl li")].find((x) => /^(何を：|What: )/.test((x.textContent || "").trim()));
+      if (!li || li.dataset.v101) return;
+      const b = li.querySelector("b");
+      const tn = b ? b.nextSibling : null;
+      if (!tn || tn.nodeType !== 3) return;
+      let s = String(tn.data);
+      const vol = plan.src === "pack" ? M(`${CB(plan.cbm)} m³・${plan.cartons}カートン・総重量 ${(+plan.gw || 0).toLocaleString("ja-JP")} kg（商品の寸法・重量と数量から計算。この値で送ります）`, `${CB(plan.cbm)} m³, ${plan.cartons} cartons, ${plan.gw} kg (calculated from the product size/weight and quantity; sent as is)`)
+        : plan.src === "cond" ? M(`${CB(plan.cbm)} m³（入れた条件の値。この値で送ります）`, `${CB(plan.cbm)} m³ (from the conditions you entered)`)
+          : plan.src === "opts" ? M(`${CB(plan.cbm)} m³（この値で送ります）`, `${CB(plan.cbm)} m³`)
+            : M(`標準 ${CB(plan.cbm)} m³（商品の寸法・重量が足りないため。物流会社には標準 ${CB(plan.cbm)} m³ として届きます）`, `standard ${CB(plan.cbm)} m³ (size/weight missing)`);
+      const re = /[・,]\s*[\d.]+\s*m³\s*(（容積の目安）|\(est\. volume\))\s*$/;
+      if (re.test(s)) s = s.replace(re, M("・", ", ") + vol);
+      else s = s + M("・", ", ") + vol;
+      if (plan.pol) s = s.replace(/（([^（）]+)）(?=[・,]\s*(LCL|FCL|AIR|COURIER))/, (m, p) => (p === plan.pol ? m : `（${plan.pol}）`));
+      tn.data = s;
+      li.dataset.v101 = "1";
+      V.askFix = { at: Date.now(), plan, txt: li.textContent };
+      cnt("askfix");
+    } catch (e) { err("askfix", e); }
+  }
+  if (typeof fwdRequest === "function" && !window.__v101fReq) {
+    window.__v101fReq = 1;
+    const __rq101 = fwdRequest;
+    fwdRequest = function (opts) { // eslint-disable-line no-global-assign
+      let o2 = opts;
+      try {
+        if (!fwdOn() && typeof D !== "undefined" && D && D.ship) {
+          o2 = Object.assign({}, opts || {});
+          if (typeof V60 !== "undefined" && V60 && V60.go && Date.now() - V60.go < 2000 && typeof v60CondRead === "function") {
+            const c = v60CondRead() || {};
+            let n = 0; Object.keys(c).forEach((k) => { if (o2[k] == null || o2[k] === "") { o2[k] = c[k]; n++; } });
+            if (n && c.cbm) Object.defineProperty(o2, "__v101cond", { value: 1, enumerable: false });
+          }
+          const plan = typeof v101fShipPlan === "function" ? v101fShipPlan(o2) : null;
+          if (plan) { V.shipPlan = plan; setTimeout(() => fixAskBox(plan, 30), 0); }
+        }
+      } catch (e) { err("fwdreq", e); o2 = opts; }
+      return __rq101.call(this, o2);
+    };
+  }
+
   /* ═══ 描き直しのたびに ═══════════════════════════════════════════════ */
   let busy = false;
   function paint() {
@@ -508,6 +828,11 @@
       if (!fwdOn()) return;
       const w = well(); if (!w) return;
       const pg = page(), k = rdKey();
+      /* 22.01.1（v3 N1）：受信箱を離れたら、チップ「貴社は未回答」の押した状態を外す（戻ったときは「すべて」で始まる＝表とチップの印が同じ） */
+      /* RDX の画面のキーで見る（ホームなど刷新版の画面では、古い fwdCur が "finbox" のまま残ることがある） */
+      const at = (key) => (k ? k === key : pg === key);
+      if (!at("finbox") && CH.on) { CH.on = false; cnt("chipReset"); }
+      if (!at("frates") && V.expOnly) V.expOnly = false;
       if (k === "fhome") { try { paintHome(w); } catch (e) { err("home", e); } }
       else if (k === "finbox" || pg === "finbox") {
         try { paintInboxRows(w); } catch (e) { err("rows", e); }

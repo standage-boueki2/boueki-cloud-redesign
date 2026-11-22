@@ -101,7 +101,9 @@
         if (g >= 3) {
           unver++;
           const why = V.whyNot(L, run);
-          if (why) { const s = document.createElement("span"); s.className = "v101b-why"; s.setAttribute("data-v101-buyer-why", "1"); s.setAttribute("data-noi18n", "1"); s.textContent = "⚠ " + M("公式サイト未確認：", "Website not verified: ", "官网未确认：", "Sitio web no verificado: ") + why; nm.appendChild(s); }
+          // 22.01.1 v2-6：確かめている間は「⏳ 確かめています」（「未確認」「確かめられなかった」と言わない）
+          const busy = !!(V.busyRun && V.busyRun(run)) && !(L.v79u && L.v79u.st);
+          if (why) { const s = document.createElement("span"); s.className = "v101b-why" + (busy ? " busy" : ""); s.setAttribute("data-v101-buyer-why", busy ? "busy" : "1"); s.setAttribute("data-noi18n", "1"); s.textContent = busy ? "⏳ " + why : "⚠ " + M("公式サイト未確認：", "Website not verified: ", "官网未确认：", "Sitio web no verificado: ") + why; nm.appendChild(s); }
         }
         if (L.v101url && /^(cits|search)$/.test(L.v101url.src) && L.url) {
           const s = document.createElement("span"); s.className = "v101b-usrc"; s.setAttribute("data-v101-buyer-usrc", L.v101url.src); s.setAttribute("data-noi18n", "1");
@@ -198,25 +200,70 @@
       });
     } catch (e) { err("quietMailWarn", e); }
   }
+  /* ───── 22.01.1 v2-2：「不明」と答えた事柄を文面で断定しない（知らせ）───── */
+  const TOPN = { fit: ["適合（車種・機種・品番）", "fitment (models / part numbers)", "适配（车型・机型・品号）", "compatibilidad (modelos / referencias)"], asbestos: ["アスベスト不使用", "asbestos-free", "无石棉", "sin amianto"], origin: ["原産国", "country of origin", "原产国", "país de origen"], halal: ["ハラール", "halal", "清真", "halal"], organic: ["有機", "organic", "有机", "orgánico"], oem: ["OEM・PB", "OEM / private label", "OEM／贴牌", "OEM / marca blanca"], capacity: ["生産能力", "production capacity", "产能", "capacidad de producción"] };
+  function topN(k, lab) { const x = TOPN[k]; return x ? M(x[0], x[1], x[2], x[3]) : String(lab || k).replace(/^tok:/, ""); }
+  function msgOf(ta) { try { const o = leadOf(ta.dataset.lead); const m = o && o.l && o.l.ap && o.l.ap.seq ? o.l.ap.seq[+ta.dataset.i || 0] : null; return { m, L: o && o.l }; } catch (e) { return { m: null }; } }
+  function unkBox(ta, kind) {
+    if (!ta || !ta.parentNode || !V.unkScan) return null;
+    let box = ta.parentNode.querySelector(":scope > .v101b-unk");
+    const left = V.unkScan(ta.value);
+    const mm = kind === "ob" ? msgOf(ta).m : null;
+    const fixed = (mm && Array.isArray(mm.v101unk) ? mm.v101unk : (ta.__v101unk || [])).map((x) => x.k).filter((k, i, a) => a.indexOf(k) === i);
+    if (!left.length && !fixed.length) { if (box) box.remove(); return null; }
+    let t = "", role = "status";
+    if (left.length) {
+      role = "alert";
+      t = F(M("文面に、「不明」と答えた事柄の断定があります：{x}（「{m}」）。確かめるまで断定せず、「待確認／to be confirmed」と書いてください（答えが分かったら、商品情報の追加ヒアリングで入れると文面にも使えます）。", "The text states something you answered as “unknown”: {x} (“{m}”). Until it is confirmed, write “to be confirmed” instead (once you know, add it in the product's follow-up questions).", "邮件中有您回答为“不明”的事项的断定：{x}（“{m}”）。确认前请勿断定，请写“待确认”（确认后可在商品信息的追加询问中填写）。", "El texto afirma algo que respondió como «desconocido»: {x} («{m}»). Hasta confirmarlo, escriba «por confirmar»."), { x: left.map((x) => topN(x.k, x.lab)).join("・"), m: left[0].m });
+    } else {
+      t = F(M("「不明」と答えた事柄（{x}）は、文面で断定せず「待確認／to be confirmed」の形にしました（AI の案から外した言い回しがあります）。答えが分かったら、商品情報の追加ヒアリングで入れると文面にも使えます。", "Items you answered as “unknown” ({x}) are not stated as fact; they are written as “to be confirmed” (some wording from the AI draft was removed). Once you know, add them in the product's follow-up questions.", "您回答为“不明”的事项（{x}）在邮件中不作断定，写为“待确认”（已删除 AI 草稿中的相关措辞）。确认后可在商品信息的追加询问中填写。", "Lo que respondió como «desconocido» ({x}) no se afirma: se escribe «por confirmar» (se quitó parte del texto de la IA)."), { x: fixed.map((k) => topN(k)).join("・") });
+    }
+    if (!box) { box = document.createElement("div"); box.className = "v101b-unk"; box.setAttribute("data-noi18n", "1"); ta.parentNode.insertBefore(box, ta); }
+    box.setAttribute("role", role); box.setAttribute("data-v101-buyer-unk", left.length ? "left" : "fixed");
+    if (box.dataset.sig !== t) { box.dataset.sig = t; box.innerHTML = `<b>${E(left.length ? M("⚠ 断定に注意", "⚠ Unconfirmed claim", "⚠ 注意断定", "⚠ Afirmación sin confirmar") : M("ℹ 断定していません", "ℹ Not stated as fact", "ℹ 未作断定", "ℹ No se afirma"))}</b><span>${E(t)}</span>`; }
+    return box;
+  }
+  V.unkBox = unkBox;
   function sweepPh() {
     quietMailWarn();
     try {
       const a = $("#v71obBody");
-      if (a) { warnBox(a, V.phOf(a.value), "ob"); if (!a.dataset.v101b) { a.dataset.v101b = "1"; a.addEventListener("input", () => { warnBox(a, V.phOf(a.value), "ob"); const cb = $("[data-v101-buyer-copyok]"); if (cb) cb.remove(); }); } }
-      ["#dmB", "#dmR"].forEach((s) => { const t = $(s); if (t) { warnBox(t, V.phOf(t.value), s.slice(1)); if (!t.dataset.v101b) { t.dataset.v101b = "1"; t.addEventListener("input", () => warnBox(t, V.phOf(t.value), s.slice(1))); if (s === "#dmB") watchAi("#dmB"); } } });
+      if (a) {
+        warnBox(a, V.phOf(a.value), "ob"); unkBox(a, "ob");
+        if (!a.dataset.v101b) {
+          a.dataset.v101b = "1";
+          a.addEventListener("input", () => { warnBox(a, V.phOf(a.value), "ob"); unkBox(a, "ob"); const cb = $("[data-v101-buyer-copyok]"); if (cb) cb.remove(); });
+          // 利用者が手を入れた文面は、あとで勝手に書き換えない（知らせだけ）
+          a.addEventListener("keydown", () => { try { const x = msgOf(a).m; if (x) x.v101typed = 1; } catch (e) { /* 無視 */ } });
+        }
+      }
+      ["#dmB", "#dmR"].forEach((s) => { const t = $(s); if (t) { warnBox(t, V.phOf(t.value), s.slice(1)); unkBox(t, s.slice(1)); if (!t.dataset.v101b) { t.dataset.v101b = "1"; t.addEventListener("input", () => { warnBox(t, V.phOf(t.value), s.slice(1)); unkBox(t, s.slice(1)); }); if (s === "#dmB") watchAi("#dmB"); } } });
     } catch (e) { err("sweepPh", e); }
   }
   V.sweepPh = sweepPh;
   // AI が DM・返信の案を入れたら、仮の値を登録済みの値か【…】に（利用者が打っている間は触らない）
   const watch = {};
+  // AI の案を直す：仮の値（署名・連絡先）と、「不明」と答えた事柄の断定（22.01.1 v2-2）
+  function fixAi(t) {
+    const v0 = t.value;
+    let s1 = V.phOf(v0) ? V.scrub(v0) : v0;
+    let hits = [];
+    try { if (V.unkFix) { const r = V.unkFix(s1, ""); s1 = r.text; hits = r.hits || []; } } catch (e) { err("fixAiUnk", e); }
+    if (s1 === v0) return false;
+    t.value = s1;
+    if (hits.length) t.__v101unk = (t.__v101unk || []).concat(hits);
+    t.dispatchEvent(new Event("input", { bubbles: true }));
+    const what = [];
+    if (V.phOf(v0) && V.scrub(v0) !== v0) what.push(M("署名・連絡先を登録済みの情報に（無い項目は【】で残しています）", "the signature/contact details with your registered info (missing items left as 【】)"));
+    if (hits.length) what.push(M("「不明」と答えた事柄の断定を「待確認」の形に", "claims you answered as “unknown” to “to be confirmed”"));
+    toastS(F(M("AI の案を直しました：{x}", "Fixed the AI draft: {x}"), { x: what.join(M("・", "; ")) }));
+    return true;
+  }
   function watchAi(sel) {
     const t = $(sel); if (!t) return;
     // もう AI の案が入っていて、まだ利用者が手を入れていないときは、すぐ直す
     try {
-      if (!t.dataset.v101typed && V.phOf(t.value)) {
-        const s1 = V.scrub(t.value);
-        if (s1 !== t.value) { t.value = s1; t.dispatchEvent(new Event("input", { bubbles: true })); toastS(M("AI の案の署名・連絡先を、登録済みの情報に置き換えました（無い項目は【】で残しています）", "Replaced the signature and contact details in the AI draft with your registered info (missing items are left as 【】)")); }
-      }
+      if (!t.dataset.v101typed && (V.phOf(t.value) || (V.unkScan && V.unkScan(t.value).length))) fixAi(t);
     } catch (e) { err("watchAi0", e); }
     if (!t.dataset.v101tw) { t.dataset.v101tw = "1"; t.addEventListener("keydown", () => { t.dataset.v101typed = "1"; }); }
     const v0 = t.value, t0 = Date.now();
@@ -230,9 +277,8 @@
           setTimeout(() => {
             try {
               const y = $(sel); if (!y) return;
-              const s1 = V.scrub(y.value);
-              if (s1 !== y.value) { y.value = s1; y.dispatchEvent(new Event("input", { bubbles: true })); toastS(M("AI の案の署名・連絡先を、登録済みの情報に置き換えました（無い項目は【】で残しています）", "Replaced the signature and contact details in the AI draft with your registered info (missing items are left as 【】)")); }
-              warnBox(y, V.phOf(y.value), sel.slice(1));
+              fixAi(y);
+              warnBox(y, V.phOf(y.value), sel.slice(1)); unkBox(y, sel.slice(1));
             } catch (e) { err("watchAi2", e); }
           }, 400);
         }

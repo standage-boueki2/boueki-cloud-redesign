@@ -96,3 +96,24 @@ html.rd .k-jny-hd .v101d-grow:focus-visible { outline: 3px solid var(--rd-or, #f
 .v101d-regw { color: var(--crit, #c62828); font-weight: 700; flex-basis: 100%; }
 .v101d-regnote { font-size: 12px; }
 @media (max-width: 600px) { .v101d-regkv { flex-basis: 100%; } }
+/* 22.01.1 S2（v3）：選択中のバイヤー（PC 1440 で幅 約340px・スマホ 390）：ボタンと状態を折り返して全文を見せる
+   （前は刷新版の .rd-btn の nowrap でボタンがカードの外へはみ出し、.rd-kv dd の「…」で「送っていません」が切れた） */
+html.rd #rddbsel .v101d-btns .rd-btn { white-space: normal; text-align: left; justify-content: flex-start; max-width: 100%; height: auto; min-height: 44px; line-height: 1.45; padding: 9px 14px; box-sizing: border-box; overflow-wrap: anywhere; }
+html.rd #rddbsel .v101d-btns .rd-btn svg { flex: none; }
+html.rd #rddbsel .v101d-kv { grid-template-columns: minmax(56px, 84px) minmax(0, 1fr); }
+html.rd #rddbsel .v101d-kv dd { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.5; }
+html.rd #rddbsel .v101d-chip { white-space: normal; text-overflow: clip; overflow: visible; text-align: left; overflow-wrap: anywhere; }
+/* 22.01.1 S5：商流を決める窓 */
+.v101d-rlist { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.v101d-rl { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--line, #d7dde5); border-radius: 8px; background: var(--surface, #fff); }
+.v101d-rln { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.v101d-rln small { font-size: 12px; color: var(--ink-3, #6b7280); }
+.v101d-rr { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.v101d-rr label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; min-height: 32px; cursor: pointer; }
+/* 22.01.1 N12：コピーの前の知らせ・コピーの状態 */
+.v101d-qwarn { margin: 6px 0; padding: 8px 10px; border-left: 4px solid var(--warn, #9a6700); background: var(--warn-soft, #fff8e1); border-radius: 6px; font-size: 13px; line-height: 1.6; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.v101d-qwarn .v101d-btns { margin: 4px 0 0; }
+.v101d-cprow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.v101d-cpst { font-size: 13px; font-weight: 700; color: var(--ink-2, #4a5563); overflow-wrap: anywhere; min-width: 0; }
+.v101d-cpst.ok { color: var(--good, #1a7f37); }
+.v101d-cptmp { position: fixed; left: -9999px; top: 0; opacity: 0; }

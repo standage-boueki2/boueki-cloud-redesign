@@ -11,7 +11,12 @@
      ・案件（ホーム）：案件がまだ無いとき、商談の相手（送る前）と下書きの数を1行で（案件は連絡すると相手ごとにできる）。
    No.533 の副作用：カテゴリーを変えて STEP03 の項目の数が変わったら、バーの下に理由を1行（知らせも1回）。
    成長度：バーの見出しに「AI商社マンの成長度 N%（Lv.n 段階）」（押すと AI商社マンの画面）。ホームの札の名前も「成長度」に。
-   インラインの onclick・style は使わない（CSP）。外から来た文字はエスケープする。新しい文言は日・英・中・西（data-noi18n）。 */
+   インラインの onclick・style は使わない（CSP）。外から来た文字はエスケープする。新しい文言は日・英・中・西（data-noi18n）。
+   ── 22.01.1 ──
+   S1：キー "v101:dims"（logic の「次は 寸法・重量を入れる」の行き先）を RDX.goKey で受け、書類をつくるの寸法・重量の欄（hear の .v101dim）へ移して最初の欄に入れる所を置く
+   S2：選択中のバイヤーのボタン・状態を折り返して全文を見せる（css）
+   S5：「商流を決める」の窓（相手ごと・送らない）・「受注する」の窓（受注したら「商談を記録する」で「取引中」）
+   N12：見積の文面は欄で直せる。「文面をコピー」は【】・仮の値が残る間はその場で知らせ（role=alert）、押すと必ずその場に「コピーしました／できませんでした」（role=status） */
 (function () {
   "use strict";
   const RD = window.RDX;
@@ -190,7 +195,7 @@
     const D0 = V.qDefaults(t);
     const v = (k) => (Q && Q[k] != null && Q[k] !== "" ? Q[k] : (D0[k] || ""));
     const opt = (L, cur) => L.map((x) => `<option value="${E(x)}"${x === cur ? " selected" : ""}>${E(x)}</option>`).join("");
-    const route = (Q && Q.route) || "";
+    const route = V.routeOf ? V.routeOf(t, p.id) : ((Q && Q.route) || ""); // 22.01.1 S5：商流の窓で決めた値も
     const html = `<div class="v101d-win" data-v101-deal-win="quote" data-noi18n>
       <h3>${E(M("見積・条件の下書き（送りません）", "Quote draft (nothing is sent)", "报价・条件草稿（不发送）", "Borrador de cotización (no se envía)"))}</h3>
       <p class="nn">${E(M("相手ごとに、価格・数量・建値・有効期限を下書きします。保存しても相手には届きません。送るのは、下の英語の文面を確かめてから、貴社が行います（送ったら「商談の記録」で状況を「見積提示」にすると、STEP 06 の「相手に出す」が済みになります）。", "Draft price, quantity, Incoterms and validity per buyer. Saving sends nothing."))}</p>
@@ -247,18 +252,88 @@
     out.innerHTML = `<p class="v101d-ok"><b>${E(old ? F(M("保存してある下書き（{d}）・相手には送っていません", "Saved draft ({d}) — not sent"), { d: new Date(q.upd || q.at).toLocaleString("ja-JP") }) : F(M("✓ 下書きを保存しました（{t}）。相手には送っていません", "✓ Draft saved ({t}). Nothing was sent"), { t: hhmm() }))}</b></p>`
       + `<p class="v101d-sum" data-noi18n>${E(sumOf(q))}</p>`
       + `<p class="v101d-miss">${E(M("相手に出す前に埋める所：", "Fill in before sending: ") + miss.join("・"))}</p>`
-      + `<details class="v101d-txt" open><summary>${E(M("相手に出す文面（英語・コピー用。署名とお名前・連絡先は送る前に足してください）", "Text for the buyer (English, copy). Add your signature before sending."))}</summary><textarea readonly rows="12" data-v101-deal-qtxt="1" lang="en" aria-label="${E(M("相手に出す文面（英語）", "Quote text (English)"))}">${E(txt)}</textarea>`
-      + `<div class="rw"><button type="button" class="btn g" data-v101-deal-copy="1">${E(M("文面をコピー", "Copy text"))}</button></div></details>`
+      + `<details class="v101d-txt" open><summary>${E(M("相手に出す文面（英語・コピー用。【】の所は、送る前に入れてください）", "Text for the buyer (English, copy). Fill in the 【】 parts before sending."))}</summary><textarea rows="14" data-v101-deal-qtxt="1" lang="en" aria-label="${E(M("相手に出す文面（英語）", "Quote text (English)"))}">${E(txt)}</textarea>`
+      + `<p class="v101d-src">${E(M("この欄で直してからコピーできます（直した文は下書きには残りません。署名は AIバイヤー開拓の「✍ 署名」に入れると、次から文面に入ります）。", "You can edit here before copying (edits are not saved in the draft)."))}</p>`
+      + `<div class="rw v101d-cprow"><button type="button" class="btn g" data-v101-deal-copy="1">${E(M("文面をコピー", "Copy text"))}</button><span class="v101d-cpst" data-v101-deal-cpst="1" role="status" aria-live="polite"></span></div></details>`
       + `<div class="rw v101d-btns"><button type="button" class="btn g" data-v101-deal-rec="1">${E(M("送ったあとで：商談の記録に「見積提示」で残す", "After sending: record as “Quote sent”"))}</button><button type="button" class="btn g" data-v101-deal-topi="1">${E(M("正式な見積書（PI）は「書類をつくる」へ（STEP 07）", "Formal quotation (PI): go to Documents (STEP 07)"))}</button><button type="button" class="btn g" data-v101-deal-qdel="1">${E(M("この下書きを消す", "Delete this draft"))}</button></div>`
       + `<p class="nn v101d-src">${E(M("この下書きは見積書（PI）には入りません。PI は「書類をつくる」で、数量・単価・建値を案件として入れて作ります（送るのは貴社が「点検して相手に送る」を押したときだけ）。", "This draft is not copied into the PI. Make the PI in Documents."))}</p>`;
     const cp = $("[data-v101-deal-copy]", out);
-    if (cp) cp.addEventListener("click", async () => { const ta = $("[data-v101-deal-qtxt]", out); let ok = false; try { await navigator.clipboard.writeText(ta.value); ok = true; } catch (e) { try { ta.select(); ok = document.execCommand("copy"); } catch (x) { ok = false; } } toast(ok ? M("文面をコピーしました（まだ送っていません）", "Copied (not sent)") : M("コピーできませんでした。文面を選んでコピーしてください", "Could not copy; select the text and copy")); });
+    const ta0 = $("[data-v101-deal-qtxt]", out);
+    if (ta0) ta0.addEventListener("input", () => { const w0 = $("[data-v101-deal-qwarn]", out); if (w0) { const ph = V.phOf(ta0.value); if (!ph) w0.remove(); else qWarn(out, ta0, ph); } });
+    if (cp) cp.addEventListener("click", () => {
+      const ta = $("[data-v101-deal-qtxt]", out); if (!ta) return;
+      const ph = V.phOf(ta.value);
+      // 22.01.1 N12：【】・仮の値が残っている間は、コピーの前に知らせる（AI バイヤー開拓の文面のコピーと同じ）
+      if (ph) {
+        qWarn(out, ta, ph);
+        cpSt(out, M("まだコピーしていません（【】が残っています）", "Not copied yet (【】 parts remain)"));
+        toast(M("署名・本文に【】や仮の値が残っています。直してからコピーしてください（まだ送っていません）", "The signature or text still has 【】 or dummy values. Fix them before copying (nothing was sent)"));
+        return;
+      }
+      doCopy(out, ta, false);
+    });
     const rec = $("[data-v101-deal-rec]", out);
     if (rec) rec.addEventListener("click", () => recordWin(q));
     const pi = $("[data-v101-deal-topi]", out);
     if (pi) pi.addEventListener("click", () => { closeWin(); try { RD.goKey("ops:doc"); } catch (x) { /* 無視 */ } });
     const del = $("[data-v101-deal-qdel]", out);
     if (del) del.addEventListener("click", () => { if (V.qDel(ten(), q.pid)) { toast(M("下書きを消しました", "Draft deleted")); after(); quoteWin(q.pid); } });
+  }
+  // コピーの状態の1行（その場に・読み上げでも）とボタンの一時的な表示
+  function cpSt(out, txt, ok) {
+    const s0 = $("[data-v101-deal-cpst]", out); if (s0) { s0.textContent = txt; s0.classList.toggle("ok", !!ok); }
+    const b = $("[data-v101-deal-copy]", out);
+    if (b && ok) { if (!b.__lab) b.__lab = b.textContent; b.textContent = M("✓ コピーしました", "✓ Copied"); clearTimeout(b.__t); b.__t = setTimeout(() => { b.textContent = b.__lab; }, 2500); }
+  }
+  async function doCopy(out, ta, withBlanks) {
+    let ok = false;
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(ta.value); ok = true; } } catch (e) { ok = false; }
+    if (!ok) { try { const x = document.createElement("textarea"); x.value = ta.value; x.setAttribute("readonly", ""); x.className = "v101d-cptmp"; document.body.appendChild(x); x.select(); ok = document.execCommand("copy"); x.remove(); } catch (e) { ok = false; } }
+    if (ok) {
+      cpSt(out, F(withBlanks ? M("✓ コピーしました（{t}）。【】の所は、貼った先で直してから送ってください（まだ送っていません）", "✓ Copied ({t}). Fix the 【】 parts where you paste before sending (nothing was sent)") : M("✓ コピーしました（{t}）。まだ送っていません（貼った先で確かめて、貴社から送ってください）", "✓ Copied ({t}). Nothing was sent"), { t: hhmm() }), true);
+      toast(withBlanks ? M("コピーしました（【】の所は貼った先で直してください・まだ送っていません）", "Copied (fix the 【】 parts where you paste — not sent)") : M("文面をコピーしました（まだ送っていません）", "Copied (not sent)"));
+    } else {
+      try { ta.focus(); ta.select(); } catch (e) { /* 無視 */ }
+      cpSt(out, M("コピーできませんでした。文面を選んだので、Ctrl+C（Mac は ⌘+C）でコピーしてください", "Could not copy. The text is selected — press Ctrl+C (⌘+C on Mac)"));
+      toast(M("コピーできませんでした。文面を選んでコピーしてください", "Could not copy; select the text and copy"));
+    }
+    return ok;
+  }
+  // 【】・仮の値が残っているときの知らせ（文面の上・role=alert）。署名を入れる所へ・【】を残したままコピーする
+  function qWarn(out, ta, ph) {
+    let box = $("[data-v101-deal-qwarn]", out);
+    const left = V.leftOf(ta.value);
+    const t = left.length
+      ? F(M("署名・本文に、まだ入っていない所があります：{x}。【】が残ったままでは送れません（コピーするときも直してください）。署名は AIバイヤー開拓の「✍ 署名」に入れると、【】の所に入ります。", "Some parts are still empty: {x}. You cannot send while 【】 remains (fix them before copying too). Fill in your signature in “✍ Signature” of the AI buyer search."), { x: left.join("・") })
+      : F(M("本文に仮の情報（見本の値・穴埋め）が残っています：「{p}」。直してから送ってください（コピーするときも直してください）。", "The text still contains dummy information: “{p}”. Fix it before sending (and before copying)."), { p: ph });
+    if (!box) { box = document.createElement("div"); box.className = "v101d-qwarn"; box.setAttribute("data-v101-deal-qwarn", "1"); box.setAttribute("role", "alert"); box.setAttribute("data-noi18n", "1"); ta.parentNode.insertBefore(box, ta); }
+    if (box.__s !== t) {
+      box.__s = t;
+      box.innerHTML = `<b>⚠ ${E(M("送る前に直してください", "Fix before sending", "发送前请修改", "Corrija antes de enviar"))}</b><span>${E(t)}</span><span class="rw v101d-btns">`
+        + (left.length ? `<button type="button" class="btn g" data-v101-deal-sigopen="1">${E(M("署名を入れる →", "Add signature →", "填写签名 →", "Añadir firma →"))}</button>` : "")
+        + `<button type="button" class="btn g" data-v101-deal-copyok="1">${E(M("【】を残したままコピーする（貼った先で自分で直す）", "Copy anyway with 【】 (fix them where you paste)", "保留【】直接复制（粘贴后自行修改）", "Copiar igualmente con 【】 (corríjalos donde pegue)"))}</button></span>`;
+      const ok = $("[data-v101-deal-copyok]", box); if (ok) ok.addEventListener("click", () => doCopy(out, ta, true));
+      const so = $("[data-v101-deal-sigopen]", box); if (so) so.addEventListener("click", () => sigOpen());
+    }
+    try { box.scrollIntoView({ block: "nearest" }); } catch (e) { /* 無視 */ }
+    return box;
+  }
+  // 署名を入れる所（AIバイヤー開拓の「✍ 署名」）へ
+  function sigOpen() {
+    closeWin();
+    const fx = (n) => {
+      const d = document.getElementById("v79sig");
+      if (d) {
+        try { d.open = true; } catch (e) { /* 無視 */ }
+        try { d.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { d.scrollIntoView(); }
+        d.classList.add("v101d-hit"); setTimeout(() => d.classList.remove("v101d-hit"), 3000);
+        const i = document.getElementById("v79s_name"); if (i) { try { i.focus({ preventScroll: true }); } catch (e) { /* 無視 */ } }
+        return;
+      }
+      if (n < 8) setTimeout(() => fx(n + 1), 300);
+      else toast(M("AIバイヤー開拓の「✍ 署名」で、お名前（英字）・メール・住所を入れてください", "Fill in your name, e-mail and address in “✍ Signature” of the AI buyer search"));
+    };
+    try { if (curKey() !== "db") { RD.goKey("db"); setTimeout(() => fx(0), 800); } else fx(0); } catch (e) { err("sigOpen", e); }
   }
   function sumOf(q) {
     const u = q.unit || "";
@@ -286,7 +361,116 @@
   // 現在地バーの STEP06 の項目・次の一手から呼ばれる（rd_v94jny の goItem が act の名前で呼ぶ）
   W.v101dealPick = function () { try { pickWin(true); } catch (e) { err("pick", e); } };
   W.v101dealQuote = function (pid) { try { quoteWin(typeof pid === "string" ? pid : undefined); } catch (e) { err("quote", e); } };
+  W.v101dealRoute = function () { try { routeWin(); } catch (e) { err("route", e); } };
+  W.v101dealWon = function () { try { wonWin(); } catch (e) { err("won", e); } };
   V.pickWin = pickWin; V.quoteWin = quoteWin;
+
+  /* ══════ 22.01.1 S5：「商流を決める」の窓（相手ごと・送りません） ══════ */
+  const ROUTES = () => [["", M("まだ決めていない", "Not decided", "尚未决定", "Sin decidir")], ["direct", M("直接貿易", "Direct trade", "直接贸易", "Comercio directo")], ["indirect", M("間接貿易", "Indirect trade", "间接贸易", "Comercio indirecto")]];
+  const routeNm = (v) => (v === "direct" ? M("直接貿易", "direct") : v === "indirect" ? M("間接貿易", "indirect") : M("まだ", "not decided"));
+  function routeWin() {
+    const t = ten(); if (!t) return;
+    const P = V.partners(t);
+    if (!P.length) { toast(M("商流は相手ごとに決めます。先に、見積を出す相手を決めてください（送りません）", "The trade route is decided per buyer. Choose the buyer first (nothing is sent).")); pickWin(false); return; }
+    const rows = P.map((p, i) => {
+      const r = V.routeOf(t, p.id);
+      return `<li class="v101d-rl"><span class="v101d-rln"><b data-noi18n>${E(p.name)}</b><small data-noi18n>${E([p.cty, p.sent ? M("送信済み", "contacted") : M("送る前", "not sent")].filter(Boolean).join("・"))}</small></span>`
+        + `<span class="v101d-rr" role="radiogroup" aria-label="${E(p.name + M(" の商流", " — trade route"))}">${ROUTES().map(([v, lb]) => `<label><input type="radio" name="v101drR${i}" value="${v}" data-v101-deal-rp="${E(p.id)}"${r === v ? " checked" : ""}> ${E(lb)}</label>`).join("")}</span></li>`;
+    }).join("");
+    const html = `<div class="v101d-win" data-v101-deal-win="route" data-noi18n>
+      <h3>${E(M("商流（直接貿易／間接貿易）を決める（送りません）", "Decide the trade route (direct / indirect) — nothing is sent", "决定商流（直接贸易／间接贸易・不发送）", "Decidir la ruta comercial (no se envía)"))}</h3>
+      <p class="nn">${E(M("商流は、相手ごとに決めます。直接貿易＝貴社が輸出者になり、相手に直接売る（書類・代金のやりとりは相手と）。間接貿易＝国内の商社などを通して売る（書類・代金のやりとりは商社と）。まだ相手に送っていないので、決めた商流はここに控えます（相手には何も届きません）。見積・条件の下書きがある相手は、下書きの商流も同じにします。相手に連絡して案件ができたあとは、案件の画面の「商流」で決めます。",
+        "Decide the route per buyer. Direct: you export and sell to the buyer. Indirect: you sell through a domestic trading company. Nothing is sent; the choice is kept here (and in the quote draft, if any)."))}</p>
+      <ul class="v101d-rlist">${rows}</ul>
+      <div class="rw v101d-btns"><button type="button" class="btn" data-v101-deal-rsave="1">${E(M("商流を保存（送りません）", "Save the route (nothing is sent)"))}</button><button type="button" class="btn g" data-v101-deal-toq="1">${E(M("見積・条件の下書きへ", "Go to the quote draft"))}</button><button type="button" class="btn g" data-v101-deal-x="1">${E(M("閉じる", "Close"))}</button></div>
+      <div class="v101d-qout" data-v101-deal-rout="1" role="status" aria-live="polite"></div>
+    </div>`;
+    openWin(M("商流を決める", "Decide the trade route"), html, (pn) => {
+      const sv = $("[data-v101-deal-rsave]", pn);
+      if (sv) sv.addEventListener("click", () => {
+        const tt = ten(); const got = {};
+        $$("input[data-v101-deal-rp]", pn).forEach((x) => { if (x.checked) got[x.getAttribute("data-v101-deal-rp")] = x.value; });
+        Object.keys(got).forEach((pid) => V.rSet(tt, pid, got[pid], true));
+        V.save();
+        const P2 = V.partners(tt);
+        const sum = P2.map((p) => p.name + "：" + routeNm(V.routeOf(tt, p.id))).join("／");
+        const o = $("[data-v101-deal-rout]", pn);
+        if (o) o.innerHTML = `<p class="v101d-ok"><b>${E(F(M("✓ 商流を保存しました（{t}）。相手には送っていません", "✓ Route saved ({t}). Nothing was sent"), { t: hhmm() }))}</b></p><p class="v101d-sum" data-noi18n>${E(sum)}</p>`;
+        toast(M("✓ 商流を保存しました（相手には送っていません）", "✓ Route saved (nothing was sent)"));
+        after();
+      });
+      const toq = $("[data-v101-deal-toq]", pn); if (toq) toq.addEventListener("click", () => quoteWin());
+      $$("[data-v101-deal-x]", pn).forEach((b) => b.addEventListener("click", closeWin));
+    });
+  }
+  V.routeWin = routeWin;
+
+  /* ══════ 22.01.1 S5：「受注する」の窓（受注とは・いまの状態・受注したら「商談を記録する」で「取引中」に） ══════ */
+  function wonWin() {
+    const t = ten(); if (!t) return;
+    const s6 = V.step6(t);
+    const cases = (() => { try { return (RD.allCases ? RD.allCases() : RD.dbThreads ? RD.dbThreads() : []) || []; } catch (e) { return []; } })();
+    const now = F(M("いま：商談の相手 {p}社（送った {s}社）・見積の下書き {d}件・相手に出した見積：{q}。", "Now: {p} partner(s) ({s} contacted), {d} draft(s), quote sent: {q}."), { p: s6.nP, s: s6.nS, d: s6.nD, q: s6.quoteSent ? M("あり", "yes") : M("まだ送っていません", "not sent yet") });
+    const html = `<div class="v101d-win" data-v101-deal-win="won" data-noi18n>
+      <h3>${E(M("受注する（状況を「取引中」にする）", "Win the order (status “In business”)", "成交（状态改为“交易中”）", "Ganar el pedido (estado «En negocio»)"))}</h3>
+      <p class="v101d-have">${E(now)}</p>
+      <p class="nn">${E(M("受注は、見積・条件を相手に出して（送って）、相手が注文を決めたときです。受注したら「商談を記録する」で状況を「取引中」にすると、この項目が済みになります（記録だけで、相手には何も送りません）。", "You win the order when the buyer accepts a quote you sent. Then record the deal with status “In business” (this only records; nothing is sent)."))}${s6.nS ? "" : E(M("まだ相手に送っていないので、先に見積・条件の下書きを作り、文面を確かめて送ってください。", " You have not contacted anyone yet: draft the quote, check the text and send it first."))}</p>
+      <div class="rw v101d-btns"><button type="button" class="btn" data-v101-deal-wrec="1">${E(M("商談を記録する（受注したとき・状況「取引中」）", "Record the deal (when won — “In business”)"))}</button><button type="button" class="btn g" data-v101-deal-toq="1">${E(M("見積・条件の下書きへ", "Go to the quote draft"))}</button>${cases.length ? `<button type="button" class="btn g" data-v101-deal-wcase="1">${E(M("案件の一覧を開く", "Open the deal list"))}</button>` : ""}<button type="button" class="btn g" data-v101-deal-x="1">${E(M("閉じる", "Close"))}</button></div>
+    </div>`;
+    openWin(M("受注する", "Win the order"), html, (pn) => {
+      const rec = $("[data-v101-deal-wrec]", pn);
+      if (rec) rec.addEventListener("click", () => wonRecord());
+      const toq = $("[data-v101-deal-toq]", pn); if (toq) toq.addEventListener("click", () => quoteWin());
+      const wc = $("[data-v101-deal-wcase]", pn); if (wc) wc.addEventListener("click", () => { closeWin(); try { RD.goKey("dash:home"); } catch (x) { /* 無視 */ } });
+      $$("[data-v101-deal-x]", pn).forEach((b) => b.addEventListener("click", closeWin));
+    });
+  }
+  V.wonWin = wonWin;
+  // アプリの「商談を記録する」の窓を、状況「取引中」で開く（保存は利用者が押す。送信はしない）
+  function wonRecord() {
+    try {
+      if (typeof openDealForm !== "function") { toast(M("商談の記録の窓を開けません", "Cannot open the deal form")); return; } // eslint-disable-line no-undef
+      openDealForm(); // eslint-disable-line no-undef
+      setTimeout(() => {
+        const st = document.getElementById("dfSt"); if (st) { const o = Array.from(st.options).find((x) => (x.value || x.textContent) === "取引中"); if (o) { st.value = o.value; st.dispatchEvent(new Event("change", { bubbles: true })); } }
+        const P = V.partners(ten()); const b = document.getElementById("dfB"); if (b && P.length === 1 && !b.value) { b.value = String(P[0].name || "").replace(/（見本）$/, ""); b.dispatchEvent(new Event("input", { bubbles: true })); }
+        const pn = document.getElementById("pn");
+        if (pn && !$("[data-v101-deal-recnote]", pn)) { const p = document.createElement("p"); p.className = "nn v101d-recnote"; p.setAttribute("data-v101-deal-recnote", "1"); p.setAttribute("data-noi18n", "1"); p.textContent = M("受注したときの記録です（状況「取引中」を選んであります）。受注したら「保存」を押してください（この窓は記録だけで、相手には何も送りません）。", "This records a won order (status “In business” is selected). Save after the order is confirmed (nothing is sent)."); const h = $("h3", pn); if (h) h.after(p); }
+      }, 200);
+    } catch (e) { err("wonRecord", e); }
+  }
+
+  /* ══════ 22.01.1 S1：「次は 寸法・重量を入れる」の行き先＝書類をつくるの寸法・重量の欄（入れる所に移る） ══════ */
+  function goDims() {
+    try {
+      const fx = (tries) => {
+        const w = document.getElementById("well");
+        const f = w ? $$(".v101dim", w).find(vis) : null;
+        if (f) {
+          try { f.scrollIntoView({ block: "center" }); } catch (x) { f.scrollIntoView(); }
+          f.classList.add("v101d-hit"); setTimeout(() => f.classList.remove("v101d-hit"), 3000);
+          const i = $('input[data-f="cl"]', f) || $('input[data-f="ul"]', f) || $("input", f);
+          if (i) { try { i.focus({ preventScroll: true }); } catch (x) { i.focus(); } }
+          return;
+        }
+        if (tries < 10) { setTimeout(() => fx(tries + 1), 300); return; }
+        // 欄が画面に無い（寸法の要らない書類を先に作った・hear の層が無い）：寸法・重量を入れる窓か、土台の表
+        if (typeof W.v101hearDimDialog === "function" && W.v101hearDimDialog("")) return;
+        const b = $$("[data-v101dim-open], [data-onclick*=\"openTableEdit('dim')\"]").find(vis);
+        if (b) { try { b.scrollIntoView({ block: "center" }); } catch (x) { /* 無視 */ } b.classList.add("v101d-hit"); setTimeout(() => b.classList.remove("v101d-hit"), 3000); try { b.focus(); } catch (x) { /* 無視 */ } return; }
+        try { if (typeof openTableEdit === "function") openTableEdit("dim"); } catch (x) { /* 無視 */ } // eslint-disable-line no-undef
+      };
+      toast(M("寸法・重量は「書類をつくる」の画面の欄で入れます（数字だけ）。まだ分からないときは「まだ分からない」を押すと、先へ進めます", "Enter the dimensions/weight on the Documents screen. If not known yet, press “Not known yet” to move on.", "请在“制作单据”页面填写尺寸・重量。还不知道时按“还不知道”即可继续。", "Introduzca medidas y peso en Documentos. Si aún no lo sabe, pulse «Aún no lo sé»."));
+      if (curKey() !== "ops:doc") { RD.goKey("ops:doc"); setTimeout(() => fx(0), 700); } else fx(0);
+    } catch (e) { err("goDims", e); }
+  }
+  const gk0 = RD.goKey;
+  if (typeof gk0 === "function" && !gk0.__v101deal) {
+    RD.goKey = function (k) { if (k === "v101:dims") { goDims(); return; } return gk0.apply(this, arguments); };
+    RD.goKey.__v101deal = 1;
+  }
+  W.v101dealDims = function () { goDims(); };
+  V.goDims = goDims;
 
   /* ══════ バイヤーの画面（db）：選択中のバイヤー・リストの各行 ══════ */
   const SEL = { kind: "", id: "", at: 0 };

@@ -277,7 +277,12 @@ window.V101HEAR = V101HEAR;
         pre = rows.filter((r) => (kind === "dim" ? !rowHasNum(r, cols) : (isUnk(r.slice(cols.length > 1 ? 1 : 0)) || isUnk(r)))).length;
       }
     } catch (e) { /* 無視 */ }
-    const r = o.apply(this, arguments);
+    // 22.01.1（v1 N11）：「不明」などの行を外すときは、元の「寸法・重量を保存しました」を出さず、知らせを1つにまとめる
+    const held = [];
+    let oT = null;
+    if (pre > 0) { try { oT = W.toast; if (typeof oT === "function") W.toast = function (m) { held.push(arguments); return undefined; }; } catch (e) { oT = null; } }
+    let r;
+    try { r = o.apply(this, arguments); } finally { if (oT) { try { W.toast = oT; } catch (e) { /* 無視 */ } } }
     try {
       if (t && (kind === "dim" || kind === "price")) {
         const k = kind === "dim" ? "dimRows" : "priceRows";
@@ -286,12 +291,14 @@ window.V101HEAR = V101HEAR;
           save(); try { if (typeof syncTenant === "function") syncTenant(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
           try { if (typeof render === "function") render(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
           const after = Array.isArray(t[k]) ? t[k].length : 0;
-          toast(kind === "dim"
-            ? M(`寸法・重量は数字で入れてください。「不明」などの行（${before - after}行）は寸法として登録せず、「未確認」として控えました`, `Please enter dimensions/weight as figures. ${before - after} row(s) such as “unknown” were not registered and are kept as “not confirmed”.`, `请用数字填写尺寸・重量。“不明”等${before - after}行未登记为尺寸，已记为“未确认”。`, `Introduzca medidas y peso en cifras. ${before - after} fila(s) como «no sé» no se registraron y quedan «sin confirmar».`)
-            : M(`価格は数字で入れてください。「不明」などの行（${before - after}行）は価格として登録せず、「未確認」として控えました`, `Please enter prices as figures. ${before - after} row(s) such as “unknown” were not registered.`, `请用数字填写价格。“不明”等${before - after}行未登记。`, `Introduzca los precios en cifras. ${before - after} fila(s) como «no sé» no se registraron.`));
+          const dropped = Math.max(0, before - after);
+          const pre1 = after > 0 ? M(`${kind === "dim" ? "寸法・重量" : "価格表"}を保存しました（${after}行）。`, `Saved (${after} row(s)). `, `已保存（${after}行）。`, `Guardado (${after} fila(s)). `) : "";
+          toast(pre1 + (kind === "dim"
+            ? M(`寸法・重量は数字で入れてください。「不明」などの行（${dropped}行）は寸法として登録せず、「未確認」として控えました`, `Please enter dimensions/weight as figures. ${dropped} row(s) such as “unknown” were not registered and are kept as “not confirmed”.`, `请用数字填写尺寸・重量。“不明”等${dropped}行未登记为尺寸，已记为“未确认”。`, `Introduzca medidas y peso en cifras. ${dropped} fila(s) como «no sé» no se registraron y quedan «sin confirmar».`)
+            : M(`価格は数字で入れてください。「不明」などの行（${dropped}行）は価格として登録せず、「未確認」として控えました`, `Please enter prices as figures. ${dropped} row(s) such as “unknown” were not registered.`, `请用数字填写价格。“不明”等${dropped}行未登记。`, `Introduzca los precios en cifras. ${dropped} fila(s) como «no sé» no se registraron.`)));
           cnt("tblClean");
-        }
-      }
+        } else if (held.length) held.forEach((a) => { try { toast.apply(null, a); } catch (e) { /* 無視 */ } });
+      } else if (held.length) held.forEach((a) => { try { toast.apply(null, a); } catch (e) { /* 無視 */ } });
     } catch (e) { err("tblSave", e); }
     return r;
   });
@@ -583,7 +590,25 @@ window.V101HEAR = V101HEAR;
     const keep = [], notes = [];
     // 材質の後ろに続けて書かれた注記（「鋼板シールド（ZZ）　RoHS・REACH 対応は資料に記載なし」）は、材質と注記に分ける
     const REG_HARD = /RoHS|REACH|PFAS|SVHC|CPSIA|EN\s*71|ASTM|食品衛生法/i;
-    const rows0 = t.compRows.map((r) => {
+    // 22.01.1（v2-5）：「滅菌：なし／PFE・BFE・VFE 99%カット」＝項目名の無い区切り（／の後）が前の行の値にくっついた形。
+    //   「なし」「あり」のような1語で終わる答えの後ろに別の内容が続くときは、別の行（項目名「その他」）に分ける（消さない）
+    const CLOSED = /^(?:なし|無し|ナシ|あり|有り|不要|非該当|該当なし|対象外|未実施|していない|しない|none|no|yes|n\/a)$/i;
+    const split1 = [];
+    t.compRows.forEach((r) => {
+      if (!Array.isArray(r) || r.length < 2 || r[1] == null) { split1.push(r); return; }
+      const s = NF(r[1]).trim();
+      const m = s.match(/^([^／/]{1,8}?)\s*[／/]\s*(.+)$/);
+      if (m && CLOSED.test(m[1].trim()) && !CLOSED.test(m[2].trim()) && !/^[（(]/.test(m[2].trim())) {
+        const a = r.slice(); a[1] = m[1].trim();
+        split1.push(a);
+        const b = r.map(() => ""); b[0] = "その他"; b[1] = m[2].trim();
+        split1.push(b);
+        ch = true; cnt("compSplit");
+        return;
+      }
+      split1.push(r);
+    });
+    const rows0 = split1.map((r) => {
       if (!Array.isArray(r)) return r;
       let mod = false;
       const a = r.map((x, j) => {
@@ -646,7 +671,8 @@ window.V101HEAR = V101HEAR;
   // 否定の話題：本人の答え（ヒアリング・追加ヒアリング・登録の欄）から
   const NEGS = [
     { k: "md", say: /医療機器\s*(?:では|でも|じゃ)\s*(?:な[いくかし]|ありません)|医療機器\s*でな[いく]|非医療機器|医療機器以外|医療機器(?:に|には)?\s*(?:該当|当た|分類され)(?:しない|しません|らない|りません|ない|れない)|not\s+(?:a\s+)?medical\s+device/i,
-      q: /クラス\s*(?:分類|[IⅠⅡⅢ1-4]|\(|（)|class\s*(?:[I1-4]|\(|ification)|ISO\s*13485|医療機器(?:の|として)?(?:届出|認証|承認|登録|製造販売|区分|クラス)|一般医療機器|管理医療機器|510\s*\(?k|CE\s*マーク.{0,6}医療|MDR|薬機法.{0,8}(?:届出|承認|認証)|医療用.{0,6}(?:規格|クラス)|JIS\s*T\s*9001/i },
+      // 22.01.1（v2 518 の残り）：「医療用と一般衛生用のどちら」「日本国内での届出状況」も、医療機器かどうかを問う＝「医療機器ではない」の後は聞かない
+      q: /クラス\s*(?:分類|[IⅠⅡⅢ1-4]|\(|（)|class\s*(?:[I1-4]|\(|ification)|ISO\s*13485|医療機器(?:の|として)?(?:届出|認証|承認|登録|製造販売|区分|クラス)|一般医療機器|管理医療機器|510\s*\(?k|CE\s*マーク.{0,6}医療|MDR|薬機法.{0,8}(?:届出|承認|認証)|医療用.{0,6}(?:規格|クラス)|JIS\s*T\s*9001|医療用.{0,4}(?:と|か|・|／|or).{0,6}一般(?:衛生)?用|一般(?:衛生)?用.{0,4}(?:と|か|・|／).{0,6}医療用|医療用か(?:どうか)?|(?:日本)?国内(?:で)?の?(?:届出|承認|認証)(?:の)?(?:状況|有無)|医療機器(?:に)?(?:該当|あた|当た)(?:する|る)?か|medical\s+(?:or|vs\.?)\s+(?:general|hygiene)|medical[- ]grade\s+or/i },
     { k: "food", say: /食品(?:に|と)?(?:は)?(?:直接)?(?:触れ|接触し|ふれ)(?:ない|ません|る部材(?:は)?(?:なし|ない|ありません))|食品(?:に|と)?(?:は)?接触(?:なし|無し)|食品接触(?:なし|無し)|非食品接触|no food contact/i,
       q: /食品(?:に|と)?(?:直接)?(?:触れる|接触する)|食品接触|溶出試験|食品衛生法.{0,10}(?:試験|規格|適合)|food[- ]contact/i },
     { k: "batt", say: /電池(?:は)?(?:なし|無し|を?使(?:用し|っ)?て(?:い)?(?:ない|ません)|は?入って(?:い)?(?:ない|ません)|不使用|含ま(?:ない|ず|れ(?:てい)?ない))|バッテリー(?:は)?(?:なし|無し|不使用)|no batter/i,
@@ -668,6 +694,8 @@ window.V101HEAR = V101HEAR;
       // 医療機器：21.98 の 1か所の判定（V98REG.md）を正とする
       try { if (typeof V98REG !== "undefined" && V98REG && typeof V98REG.md === "function") { const md = V98REG.md(t); if (md && md.v === "no" && md.why !== "pharma" && !/医薬品/.test(String(t.cat || ""))) out.md = "V98REG"; } } catch (e) { /* 下へ */ } // eslint-disable-line no-undef
       if (t.v98md && t.v98md.v === "no") out.md = out.md || "hear";
+      // 22.01.1：📎の資料に本人（会社）が書いた否定（「医療機器ではありません」など）も、本人の答えと同じに扱う
+      try { if (t.v101docNeg && typeof t.v101docNeg === "object") Object.keys(t.v101docNeg).forEach((k) => { if (!out[k]) out[k] = "doc"; }); } catch (e) { /* 無視 */ }
       const txts = [];
       ["compRows", "dimRows"].forEach((k) => { (Array.isArray(t[k]) ? t[k] : []).forEach((r) => { if (Array.isArray(r)) txts.push(r.join(" ")); }); });
       ["shelf", "cert", "store", "catRaw"].forEach((k) => { if (typeof t[k] === "string") txts.push(t[k]); });
@@ -676,7 +704,7 @@ window.V101HEAR = V101HEAR;
       try { const F = fillO(); (F && Array.isArray(F.log) ? F.log : []).forEach((x) => { if (x && x.who === "u") txts.push(String(x.html || "").replace(/<[^>]+>/g, "")); }); } catch (e) { /* 無視 */ }
       const all = NF(txts.join("\n"));
       NEGS.forEach((n) => { if (!out[n.k] && n.say.test(all)) out[n.k] = "said"; });
-      if (out.md === "said" && t.v98md && t.v98md.v === "yes") delete out.md;
+      if ((out.md === "said" || out.md === "doc") && t.v98md && t.v98md.v === "yes") delete out.md;
     } catch (e) { err("negSaid", e); }
     return out;
   }
@@ -788,9 +816,19 @@ window.V101HEAR = V101HEAR;
   const HARDLIQ = /日本酒|清酒|純米酒|純米吟醸|純米大吟醸|吟醸酒|大吟醸|焼酎|泡盛|ウイスキー|ウィスキー|ワイン|ビール|発泡酒|リキュール|梅酒|ブランデー|ウォッカ|本みりん|本味醂|アルコール分|アルコール度数|度数\s*\d|酒税|whisk(?:e)?y|\bwine\b|\bbeer\b|liquor|spirits|shochu|\bsake\b(?!\s*lees)/i;
   const fermFood = (s) => { const x = NF(s); return FERM.test(x) && !HARDLIQ.test(x); };
   V.fermFood = fermFood;
+  /* 22.01.1（v2-1・高）犬用おやつが「食品（人の食品）」になる：📎の仕様書（原材料・賞味期限）を土台の detectCat が「食品」と数え、
+     区分の問い（AI の判定「ペット用品」）が答えられる前に区分が埋まった。→ 犬用・猫用・ペット・dog・cat・pet・treat などはペット用品に。 */
+  const PET_STRONG = /犬用|猫用|ペット用|ペットフード|ペット用品|ドッグフード|キャットフード|愛犬|愛猫|犬のおやつ|猫のおやつ|犬・猫用|犬猫用|小型犬|子犬用|子猫用|for\s+(?:dogs?|cats?|pets?)\b|\b(?:dog|cat|pet|puppy|kitten)s?\s*(?:food|treats?|snacks?|chews?|jerky|biscuits?|supplies)\b/i;
+  const PET_NAME = /ペット|犬用|猫用|愛犬|愛猫|ドッグフード|キャットフード|ドッグ(?:おやつ|ジャーキー|ガム|トリーツ|フード)|キャット(?:フード|おやつ|タワー)|\b(?:dogs?|cats?|pets?|puppy|puppies|kittens?|canine|feline)\b/i;
+  const petName = (s) => { const x = NF(s); if (PET_NAME.test(x)) return true; return /\btreats?\b/i.test(x) && !/(?:heat|surface|thermal|water|chemical|anti)[\s-]*treat/i.test(x); };
+  V.petName = petName;
+  const PET_CAT = "ペット用品";
+  const ckOfCat = (c) => { try { return fn("catKeyOf") ? String(W.catKeyOf(c) || "") : "other"; } catch (e) { return "other"; } };
   wrap("detectCat", (o) => function (all) {
     const r = o.apply(this, arguments);
     try { if (r === "liquor" && fermFood(all)) { cnt("catFerm"); return "food"; } } catch (e) { err("detectCat", e); }
+    // 資料の文に「犬用」「ペットフード」「dog treats」などがあれば、人の食品・日用品ではなくペット用品（読み取りの結果に区分の名前を付けるのは下の buildTenant／tenantFromTextGrids の包み）
+    try { if (PET_STRONG.test(NF(all))) { cnt("catPet"); return "pet"; } } catch (e) { err("detectPet", e); }
     return r;
   });
   wrap("applyAnswer", (o) => function (t, k) {
@@ -812,6 +850,12 @@ window.V101HEAR = V101HEAR;
           t.cat = "食品"; t.catKey = "food"; delete t.catRaw;
           t.v101catFix = { from: "酒類", why: "品名が醸造食品（味噌・醤油など）で、酒の言葉が無い", at: Date.now() };
           cnt("catFix");
+        } else if (!by && t.cat && t.cat !== c0.cat && t.cat !== PET_CAT && (petName(String(t.item || "") + " " + String(t.itemEn || "")) || (x && x.catKey === "pet"))) {
+          // 22.01.1（v2-1）：品名が犬用・猫用など（ヒアリングの AI の判定もペット用品）なのに、資料・AI の読み取りが「食品」などにした → ペット用品
+          const from = String(t.cat);
+          t.cat = PET_CAT; t.catKey = ckOfCat(PET_CAT);
+          t.v101catFix = { from, why: "品名が犬用・猫用などのペット用（人の食品ではない）", at: Date.now() };
+          cnt("catPetFix");
         }
       }
     } catch (e) { err("mergeCat", e); }
@@ -820,6 +864,14 @@ window.V101HEAR = V101HEAR;
   // 今までに登録した商品：本人が区分を答えていない（資料の読み取りで決まった）酒類で、品名が醸造食品なら食品に
   function catSweep(t) {
     try {
+      // 22.01.1（v2-1）：今までに資料の読み取りで「食品」になった犬用おやつ（本人が区分を答えていない）→ ペット用品
+      if (t && userT(t) && !(t.v101catBy && t.v101catBy.cat) && !t.v101petFixed && t.cat !== PET_CAT && (t.catKey === "food" || /^食品/.test(String(t.cat || ""))) && petName(String(t.item || "") + " " + String(t.itemEn || ""))) {
+        const from = String(t.cat || "");
+        t.cat = PET_CAT; t.catKey = ckOfCat(PET_CAT); delete t.catRaw; t.v101petFixed = 1;
+        t.v101catFix = { from, why: "品名が犬用・猫用などのペット用（人の食品ではない）", at: Date.now() };
+        cnt("catPetSweep");
+        return true;
+      }
       if (!t || !userT(t) || t.catKey !== "liquor" || (t.v101catBy && t.v101catBy.cat) || t.v101catFixed) return false;
       if (!fermFood(String(t.item || "") + " " + String(t.itemEn || ""))) return false;
       if (/酒/.test(String(t.catRaw || "")) && HARDLIQ.test(String(t.catRaw || ""))) return false;
@@ -831,6 +883,380 @@ window.V101HEAR = V101HEAR;
   }
   V.catSweep = catSweep;
   wrap("tenantToD", (o) => function (t) { try { catSweep(t); } catch (e) { /* 無視 */ } return o.apply(this, arguments); });
+
+  /* ══════════════════════════════════════════════════════════════════════════════════════════════
+     22.01.1（2026-11-22 公開後の検証 v1・v2・v3 の直し）
+     ① v2-1  資料の読み取りの結果に、ペット用品の区分の名前を付ける（detectCat が "pet" を返したとき）
+     ② v1 N3 資料・答えの「項目：値」（内径・外径・幅・シールなど）が読み取りで落ちたら、材質・仕様の表に残す
+     ③ v2 518 の残り  📎の資料に書かれた否定（「医療機器ではありません」など）を、本人の答えと同じに扱う（AI の前提の問いを外す）
+     ④ v1 N8・612 の残り  取り込みの知らせの項目を「」で1つずつ（数と並びをそろえる）
+     ⑤ v2-9  「AIはこう理解しました」の寸法の文を、v101dims（外装の寸法・重さ・入数）で言う
+     ⑥ v2-8  任意の項目：③の表・本人の答えに入っている項目（滅菌の有無・医療用／一般用の別・対象年齢）を未登録と数えない
+     ⑦ v3 S4  寸法・重量を「不明（資料に記載なし）」と答えたら、最後にもう一度は聞かない
+     ⑧ v1 N9  トライアルで「STANDAGEの担当が確認します」と言わない（担当への依頼は出ていない）
+     ══════════════════════════════════════════════════════════════════════════════════════════════ */
+  const trial = () => { try { return !!(typeof SES !== "undefined" && SES && SES.t === "trial"); } catch (e) { return false; } }; // eslint-disable-line no-undef
+  V.trial = trial;
+  const fileLines = (grids) => (Array.isArray(grids) ? grids : []).map((g) => (Array.isArray(g) ? g : []).map((r) => (Array.isArray(r) ? r : [r]).map((x) => String(x == null ? "" : x).trim()).filter(Boolean).join("：")).join("\n")).join("\n");
+  function decorate(t2, txt, nm) {
+    try {
+      if (!t2 || typeof t2 !== "object") return;
+      Object.defineProperty(t2, "__v101txt", { value: String(txt || "").slice(0, 40000), enumerable: false, configurable: true, writable: true });
+      Object.defineProperty(t2, "__v101file", { value: String(nm || t2.file || ""), enumerable: false, configurable: true, writable: true });
+      // 区分のキーは、ヒアリング・選び直しで「ペット用品」を選んだときと同じ（catKeyOf）にそろえる
+      if (t2.catKey === "pet" && !String(t2.cat || "").trim()) { t2.cat = PET_CAT; t2.catKey = ckOfCat(PET_CAT); cnt("t2pet"); }
+    } catch (e) { err("decorate", e); }
+  }
+  wrap("tenantFromTextGrids", (o) => function (text, grids, filename) {
+    const t2 = o.apply(this, arguments);
+    try { if (t2 && typeof t2 === "object" && typeof t2.then !== "function") decorate(t2, String(text || "") + "\n" + fileLines(grids), filename); } catch (e) { err("tg", e); }
+    return t2;
+  });
+  wrap("buildTenant", (o) => async function (file) {
+    const t2 = await o.apply(this, arguments);
+    try {
+      if (t2 && file) {
+        const nm = String(file.name || "");
+        let txt = "";
+        if (/\.(txt|csv)$/i.test(nm)) txt = typeof zipTextDec === "function" ? zipTextDec(new Uint8Array(await file.arrayBuffer())) : await file.text(); // eslint-disable-line no-undef
+        else if (/\.(xlsx|xlsm)$/i.test(nm) && typeof readWorkbook === "function") { const sh = await readWorkbook(file); txt = fileLines((sh || []).map((s) => s && s.grid)); } // eslint-disable-line no-undef
+        decorate(t2, txt, nm);
+      }
+    } catch (e) { err("bt", e); }
+    return t2;
+  });
+
+  /* ② 資料・答えの「項目：値」で、どこにも登録されなかったもの（仕様の言葉だけ。原材料・品名などは別の欄があるので対象外） */
+  const KEEP_LAB = /^(?:内径|外径|幅|厚さ|厚み|高さ|長さ|奥行き?|直径|呼び径|ピッチ|外形寸法|本体寸法|寸法|サイズ|シール(?:形式)?|シールド|保持器|潤滑(?:剤)?|グリース|硬度|硬さ|公差|精度(?:等級)?|等級|表面処理|めっき|メッキ|塗装|材質|素材|構成|定格(?:電圧|電流|出力|荷重)?|電圧|消費電力|回転数|許容回転数|荷重|基本定格荷重|色|カラー|対象年齢|耐熱温度|使用温度(?:範囲)?|適合(?:車種|機種)|摩擦材|裏板|本体|耳ひも|ノーズワイヤー|容器|トリガー|キャップ|塗料|仕上げ)$/;
+  function pairsOf(raw) {
+    const out = [];
+    // 値は資料・答えに書いてあるとおり（全角の括弧などを変えない）。項目名だけ NFKC で比べる
+    String(raw == null ? "" : raw).replace(/\r/g, "").split(/\n/).forEach((line) => {
+      line.split(/[／]/).forEach((seg) => {
+        const m = seg.match(/^\s*[・•\-*]?\s*([^：:\s][^：:]{0,13}?)\s*[：:]\s*(.+?)\s*$/);
+        if (!m) return;
+        const lab = NF(m[1]).trim(), val = m[2].trim();
+        if (!lab || !val || isUnk(val) || val.length > 80) return;
+        out.push({ lab, val });
+      });
+    });
+    return out;
+  }
+  function hayOf(t) {
+    const a = [];
+    ["compRows", "dimRows", "priceRows"].forEach((k) => (Array.isArray(t[k]) ? t[k] : []).forEach((r) => a.push(Array.isArray(r) ? r.join(" ") : String(r))));
+    (Array.isArray(t.strengths) ? t.strengths : []).forEach((s) => a.push(Array.isArray(s) ? s.join(" ") : String(s)));
+    ["item", "itemEn", "sku", "cert", "shelf", "store", "origin", "catRaw", "dimNote", "ctn", "moq"].forEach((k) => { if (typeof t[k] === "string") a.push(t[k]); });
+    try { const A = t.v68attrs || {}; Object.keys(A).forEach((k) => { if (typeof A[k] === "string") a.push(A[k]); }); } catch (e) { /* 無視 */ }
+    return NF(a.join(" ")).replace(/\s+/g, "");
+  }
+  function keepPairs(t, raw, by, file) {
+    const kept = [];
+    try {
+      if (!t || !raw) return kept;
+      // 資料の読み取りでは、材質・仕様の表がもう登録されているとき（読み取りが一部を落とした形）だけ足す。
+      // 表がまだ空なら足さない（ヒアリングで「材質・仕様の表」を聞くので、本人の答えを先にする＝勝手に表を埋めて問いを飛ばさない）
+      if (by === "doc" && !(Array.isArray(t.compRows) && t.compRows.some((r) => Array.isArray(r) && r.some((x) => String(x == null ? "" : x).trim())))) return kept;
+      const P = pairsOf(raw).filter((x) => KEEP_LAB.test(x.lab));
+      if (!P.length) return kept;
+      const hay = hayOf(t);
+      const labs = (Array.isArray(t.compRows) ? t.compRows : []).filter((r) => Array.isArray(r) && String(r[1] == null ? "" : r[1]).trim()).map((r) => NF(r[0] || "").trim());
+      P.forEach((x) => {
+        const nv = NF(x.val).replace(/\s+/g, "");
+        if (hay.indexOf(nv) >= 0) return;
+        if (labs.indexOf(x.lab) >= 0) return; // 同じ項目名の行がある（値の書き方が違うだけ）
+        if (kept.some((y) => y.lab === x.lab)) return;
+        kept.push(x);
+      });
+      if (!kept.length) return kept;
+      if (!Array.isArray(t.compRows)) t.compRows = [];
+      if (!Array.isArray(t.compCols) || t.compCols.length < 2) t.compCols = ["項目", "内容", "備考"];
+      if (!String(t.compTitle || "").trim()) t.compTitle = String(t.catKey || "") === "parts" ? "材質・素材表" : "成分表・材質表";
+      const w = Math.max(2, t.compCols.length);
+      kept.forEach((x) => { const r = new Array(w).fill(""); r[0] = x.lab; r[1] = x.val; t.compRows.push(r); });
+      const old = Array.isArray(t.v101keep) ? t.v101keep : [];
+      t.v101keep = old.concat(kept.map((x) => ({ lab: x.lab, val: x.val, by: by || "", file: file || "", at: Date.now() }))).slice(-16);
+      cnt("keep", kept.length); lg({ k: "keep", by, kept });
+    } catch (e) { err("keep", e); }
+    return kept;
+  }
+  V.keepPairs = keepPairs; V.pairsOf = pairsOf;
+  /* ③ 資料に書かれた否定 */
+  function docNeg(t, raw, file) {
+    try {
+      if (!t || !raw) return;
+      const s = NF(raw);
+      NEGS.forEach((n) => {
+        const m = String(raw).match(n.say) || s.match(n.say); // 知らせには資料に書いてあるとおりの文字を出す
+        if (!m) return;
+        if (!t.v101docNeg || typeof t.v101docNeg !== "object") t.v101docNeg = {};
+        if (!t.v101docNeg[n.k]) {
+          t.v101docNeg[n.k] = { file: String(file || ""), txt: m[0].slice(0, 40), at: Date.now() }; cnt("docNeg:" + n.k);
+          // 次の取り込みの知らせで伝える（同じ資料で2つ以上見つかっても、全部伝える）
+          (V.docNegQ = V.docNegQ || []).push({ k: n.k, file: String(file || ""), txt: m[0].slice(0, 40), at: Date.now() });
+        }
+        // 医療機器かどうかの1か所の判定（21.98 の TEN.v98md）にも「資料の記載」として控える（追加ヒアリングで聞かなくなるので、規制・書類の判定が「未確認」に戻らないように）。
+        // 本人がボタン・答えで決めた値（btn・hear）は上書きしない
+        if (n.k === "md" && !(t.v98md && (t.v98md.v === "no" || t.v98md.v === "yes"))) {
+          t.v98md = { v: "no", from: "doc", k: "", txt: m[0].slice(0, 40), file: String(file || ""), at: Date.now() };
+          cnt("docMd");
+        }
+      });
+    } catch (e) { err("docNeg", e); }
+  }
+  V.docNeg = docNeg;
+  V.chNames = new Set(["会社名", "英文社名", "商品名", "英文商品名", "品番", "HSコード", "HSコード（4桁・要確定）", "産地", "認証", "賞味期限", "取引条件", "支払条件", "仕出港", "リードタイム", "MOQ", "入数", "商材カテゴリ", "希望小売価格", "保存方法", "進出希望国", "商品の強み", "価格表", "寸法・重量", "成分・材質表"]);
+  wrap("mergeTen", (o) => function (t, x) {
+    const r = o.apply(this, arguments);
+    try {
+      if (t && x && typeof x === "object" && t === ten()) {
+        const raw = String(x.__v101txt || "");
+        if (raw) {
+          docNeg(t, raw, x.__v101file || x.file || "");
+          const kept = keepPairs(t, raw, "doc", x.__v101file || x.file || "");
+          if (kept.length) { V.lastKeep = { at: Date.now(), kept, file: x.__v101file || x.file || "" }; try { compFix(t); } catch (e) { /* 無視 */ } }
+        }
+        if (Array.isArray(r)) r.forEach((n) => { if (n) V.chNames.add(String(n)); });
+      }
+    } catch (e) { err("merge1011", e); }
+    return r;
+  });
+  // ヒアリングで打った材質表の答え（「材質：…／内径：20mm／外径：47mm／幅：14mm」）も、仕様の項目が落ちたら残す（21.99.1 の AI の振り分けの直しと同じ考え）
+  wrap("applyAnswer", (o) => function (t, k, raw) {
+    const r = o.apply(this, arguments);
+    try { if (r && t && k === "compRows" && raw) { const kept = keepPairs(t, String(raw), "hear", ""); if (kept.length) { V.lastKeepHear = { at: Date.now(), kept }; compFix(t); } } } catch (e) { err("aa-keep", e); }
+    return r;
+  });
+
+  /* ④ 取り込みの知らせ：項目名の「・」と区切りの「・」が同じで、数より多く見える → 項目を「」で1つずつ */
+  function splitNames(list, n) {
+    const tk = String(list).split("・");
+    const known = V.chNames;
+    const out = [];
+    for (let i = 0; i < tk.length;) {
+      let hit = -1;
+      for (let j = Math.min(tk.length, i + 4); j > i; j--) { const c = tk.slice(i, j).join("・").trim(); if (known.has(c)) { out.push(c); hit = j; break; } }
+      if (hit < 0) { out.push(tk[i].trim()); i++; } else i = hit;
+    }
+    return out.filter(Boolean).length === n ? out.filter(Boolean) : null;
+  }
+  V.splitNames = splitNames;
+  function fixImport(h) {
+    const m = h.match(/(から\s*<b>)(\d+)(項目<\/b>\s*を取り込みました：)([^<]*?)(\s*<br>|$)/);
+    if (!m || /「/.test(m[4])) return h;
+    const n = +m[2];
+    const names = splitNames(m[4].trim(), n);
+    if (!names) return h;
+    let add = "";
+    try {
+      const t = ten();
+      if (t && names.indexOf("寸法・重量") >= 0) {
+        const d = W.v101dims(t);
+        if (!d.ok) add += M("<br>※「寸法・重量」は単品の分だけです（外装〔カートン〕の寸法・重さ・入数はまだ）。運賃の見積・梱包明細の前に入れてください。", "<br>* “Dimensions/weight” covers the single unit only (carton size, weight and units per carton are not yet registered).");
+      }
+      const GQ = (V.docNegQ || []).filter((g) => !g.said && Date.now() - g.at < 120000);
+      GQ.forEach((G) => {
+        G.said = 1;
+        const nm = NEG_NM[G.k] ? M(NEG_NM[G.k][0], NEG_NM[G.k][1]) : G.k;
+        add += M(`<br>資料${G.file ? "（" + E(G.file) + "）" : ""}に「${E(G.txt)}」とあるので、「${E(nm)}」と控えました（それを前提にした問いは聞きません。違うときは「規制を調べる」で直せます）。`, `<br>The file${G.file ? " (" + E(G.file) + ")" : ""} says “${E(G.txt)}”, so we noted “${E(nm)}” (we won't ask questions that assume otherwise; you can change it in Check regulations).`);
+      });
+      if (V.docNegQ && V.docNegQ.length > 20) V.docNegQ = V.docNegQ.filter((g) => !g.said);
+      const K = V.lastKeep;
+      if (K && Date.now() - K.at < 15000 && K.kept.length) add +=M(`<br>資料の${K.kept.map((x) => "「" + E(x.lab) + "：" + E(x.val) + "」").join("")}は、読み取りで落ちないように材質・仕様の表に入れました。`, `<br>${K.kept.map((x) => "“" + E(x.lab) + ": " + E(x.val) + "”").join(" ")} from the file were added to the materials/specifications table so they are not lost.`);
+    } catch (e) { /* 無視 */ }
+    cnt("importList");
+    return h.replace(m[0], m[1] + m[2] + m[3] + names.map((x) => "「" + x + "」").join("") + add + m[5]);
+  }
+  V.fixImport = fixImport;
+
+  /* ⑦ 寸法・重量を「不明（資料に記載なし）」と答えたら、最後にもう一度は聞かない */
+  const NOREASK = /記載(?:が|は)?(?:な|無)|資料に(?:な|無)|載って(?:い)?(?:ない|ません)|未記載/;
+  wrap("fillAnswer", (o) => function (v) {
+    try {
+      const F = fillO();
+      const k = F && F.cur && !F.cur.x ? String(F.cur.k || "") : "";
+      if (k && isUnk(v) && (k === "dimRows" || NOREASK.test(NF(v)))) {
+        if (!Array.isArray(F.v101noReask)) F.v101noReask = [];
+        if (F.v101noReask.indexOf(k) < 0) F.v101noReask.push(k);
+        F.v101noReaskAns = Object.assign({}, F.v101noReaskAns || {}, { [k]: String(v).slice(0, 40) });
+        V.lastNoReask = { k, at: Date.now() };
+      }
+    } catch (e) { err("fa-noreask", e); }
+    return o.apply(this, arguments);
+  });
+  wrap("v54hearAsk", (o) => function (nx) {
+    try {
+      const F = fillO();
+      if (F && F.v54hearR2 && nx && Array.isArray(F.v101noReask) && F.v101noReask.indexOf(nx.k) >= 0) {
+        F.skip = (F.skip || []).concat(nx.k);
+        cnt("noReask");
+        return W.fillNext();
+      }
+    } catch (e) { err("ask-noreask", e); }
+    return o.apply(this, arguments);
+  });
+  function noReaskNames() {
+    const F = fillO();
+    const ks = F && Array.isArray(F.v101noReask) ? F.v101noReask : [];
+    return ks.map((k) => ({ k, n: needName(k) || k, a: (F.v101noReaskAns || {})[k] || "" })).filter((x) => x.n);
+  }
+
+  /* ⑧ トライアルで「STANDAGEの担当が確認します」と言わない */
+  const STAFF_FIN = [
+    ["「不明」と答えた点は、STANDAGEの担当があらためて確認します。AI商社マンは推測で断定しません。", "「不明」と答えた点は「未確認」のままです（トライアルでは STANDAGE の担当への確認の依頼は出ていません）。AI商社マンは推測で断定しません。分かったら商品情報の「AIの気づき」で「解決済みにする」を押してください。"],
+    ["Points answered “unknown” will be checked by STANDAGE staff. The AI will not state guesses as fact.", "Points answered “unknown” stay “not confirmed” (in the trial, no check request is sent to STANDAGE staff). The AI will not state guesses as fact. Once you know, mark them as resolved under “AI notes” on the product page."],
+    ["回答“不明”的点由 STANDAGE 负责人再次确认。AI 不会做出推测性的断定。", "回答“不明”的点仍为“未确认”（试用期间不会向 STANDAGE 负责人发出确认请求）。AI 不会做出推测性的断定。弄清楚后请在商品信息的“AI的发现”中标记为已解决。"],
+    ["STANDAGE confirmará los puntos respondidos «no sé». La IA no dará suposiciones como hechos.", "Los puntos respondidos «no sé» quedan «sin confirmar» (en la prueba no se envía ninguna solicitud al equipo de STANDAGE). La IA no dará suposiciones como hechos. Cuando lo sepa, márquelos como resueltos en las notas de la IA de la ficha."],
+  ];
+  const STAFF_NOTE = [
+    ["追加ヒアリングで「不明」と答えた点です。STANDAGEの担当があらためて確認します。AI商社マンは、この点を推測で断定しません。分かったら「解決済みにする」を押してください。", "追加ヒアリングで「不明」と答えた点です（未確認。トライアルでは STANDAGE の担当への確認の依頼は出ていません）。AI商社マンは、この点を推測で断定しません。分かったら「解決済みにする」を押してください。"],
+    ["You answered “unknown” to this in the follow-up questions. STANDAGE staff will check it with you. The AI will not state guesses about it as fact. Once you know, press “Mark as resolved”.", "You answered “unknown” to this in the follow-up questions (not confirmed; in the trial, no check request is sent to STANDAGE staff). The AI will not state guesses about it as fact. Once you know, press “Mark as resolved”."],
+    ["在追加询问中回答了“不明”。STANDAGE 的负责人会再次确认。AI 不会对此做出推测性的断定。弄清楚后请点击“标记为已解决”。", "在追加询问中回答了“不明”（未确认；试用期间不会向 STANDAGE 负责人发出确认请求）。AI 不会对此做出推测性的断定。弄清楚后请点击“标记为已解决”。"],
+    ["Respondió «no sé» en las preguntas de seguimiento. El equipo de STANDAGE lo confirmará. La IA no dará suposiciones como hechos. Cuando lo sepa, pulse «Marcar como resuelto».", "Respondió «no sé» en las preguntas de seguimiento (sin confirmar; en la prueba no se envía ninguna solicitud al equipo de STANDAGE). La IA no dará suposiciones como hechos. Cuando lo sepa, pulse «Marcar como resuelto»."],
+  ];
+  const STAFF_QA = [["STANDAGEの担当が確認します", "未確認"], ["STANDAGE staff will check", "not confirmed"], ["STANDAGE 负责人将确认", "未确认"], ["STANDAGE lo confirmará", "sin confirmar"]];
+  const swapAll = (h, L) => { let s = String(h); L.forEach(([a, b]) => { if (s.indexOf(a) >= 0) s = s.split(a).join(b); const ea = E(a); if (ea !== a && s.indexOf(ea) >= 0) s = s.split(ea).join(E(b)); }); return s; };
+  wrap("v68pQaHtml", (o) => function () { const h = o.apply(this, arguments); try { if (trial() && typeof h === "string" && /STANDAGE/.test(h)) { cnt("n9qa"); return swapAll(h, STAFF_QA); } } catch (e) { err("n9qa", e); } return h; });
+  wrap("v68pNoteHtml", (o) => function () { const h = o.apply(this, arguments); try { if (trial() && typeof h === "string" && /STANDAGE/.test(h)) { cnt("n9note"); return swapAll(h, STAFF_NOTE); } } catch (e) { err("n9note", e); } return h; });
+  wrap("v68pNotesCtxFix", (o) => function () { const h = o.apply(this, arguments); try { if (trial() && typeof h === "string" && /STANDAGEの担当が確認する/.test(h)) return h.split("STANDAGEの担当が確認する").join("トライアルのため担当への確認の依頼は出ていない。利用者が分かったら入れる"); } catch (e) { err("n9ctx", e); } return h; });
+
+  // 知らせの文（ヒアリングのログの最後の文）を、ほかの層が直した後に直す：④ 取り込み・⑦ 聞き直さない・⑧ 担当の確認
+  wrap("fillSay", (o) => function (who) {
+    const F0 = fillO(); const n0 = F0 && Array.isArray(F0.log) ? F0.log.length : -1;
+    const r = o.apply(this, arguments);
+    try {
+      const F = fillO();
+      if (who === "ai" && F && Array.isArray(F.log) && n0 >= 0 && F.log.length > n0) {
+        const it = F.log[F.log.length - 1];
+        if (it && typeof it.html === "string") {
+          let h = it.html;
+          if (/を取り込みました：/.test(h)) h = fixImport(h);
+          const NR = noReaskNames();
+          if (NR.length) {
+            // 1回目：「後回しにして、ほかの質問が終わってから、もう一度伺います」→ 聞き直さない
+            const ck = F.cur && !F.cur.x ? String(F.cur.k || "") : "";
+            const mm = h.match(/承知しました。\s*<b>([^<]+)<\/b>\s*は後回しにして、ほかの質問が終わってから、もう一度伺います。/);
+            if (mm && ck) {
+              const x = NR.find((y) => y.k === ck);
+              if (x) {
+                h = M(`承知しました。<b>${mm[1]}</b>は「${E(x.a)}」と伺ったので、「未確認」として控えました（このヒアリングでは聞き直しません。「不明」は値として登録しません）。分かったら「商品情報」や「書類をつくる」の画面から入れられます。`,
+                  `Noted. As you answered “${E(x.a)}”, <b>${mm[1]}</b> is kept as “not confirmed” (we won't ask again in this interview). You can enter it later on the product page or the documents page.`);
+                cnt("noReaskSay");
+              }
+            }
+            // 最後の聞き直し：「あとで」にした N項目（「a」「b」）→ 聞き直さない項目を外して数え直す
+            const lm = h.match(/(「あとで」にした<b>)(\d+)(項目<\/b>（)([\s\S]*?)(）を、もう一度だけ伺います。)/);
+            if (lm) {
+              const names = (lm[4].match(/「[^」]+」/g) || []).map((s) => s.slice(1, -1));
+              const drop = NR.filter((x) => names.indexOf(x.n) >= 0);
+              if (drop.length) {
+                const rest = names.filter((n) => !drop.some((x) => x.n === n));
+                const why = M(`${drop.map((x) => "「" + E(x.n) + "」").join("")}は「${E(drop[0].a)}」と伺ったので、聞き直しません（「未確認」として控えています）。`, `${drop.map((x) => "“" + E(x.n) + "”").join(" ")}: not asked again, as you answered “${E(drop[0].a)}” (kept as “not confirmed”).`);
+                if (rest.length) h = h.replace(lm[0], lm[1] + rest.length + lm[3] + rest.map((n) => "「" + n + "」").join("") + lm[5]) + "<br>" + why;
+                else h = h.replace(/「あとで」にした<b>\d+項目<\/b>（[\s\S]*?）を、もう一度だけ伺います。(?:<br>)?\s*分からなければ、もう一度「わからない（あとで）」で飛ばしてください。/, why);
+                cnt("noReaskList");
+              }
+            }
+          }
+          if (trial() && /STANDAGE/.test(h)) h = swapAll(h, STAFF_FIN.concat(STAFF_NOTE));
+          if (h !== it.html) it.html = h;
+        }
+      }
+    } catch (e) { err("fs1011", e); }
+    return r;
+  });
+
+  /* ⑤「AIはこう理解しました」の寸法の文（v101dims で言う。データは日本語の1つの文にして、英・中・西は辞書で訳す） */
+  const SUM_DIM = {
+    unit: ["寸法・重量は単品の分だけです。外装（カートン）の寸法・重さ・入数がまだないので、運賃の見積依頼と梱包明細は「要確認」です（「書類をつくる」の画面で入れられます）。",
+      "Dimensions/weight cover the single unit only. The carton size, weight and units per carton are not registered yet, so freight quote requests and the packing list are “to confirm” (you can enter them on the documents page).",
+      "尺寸・重量只有单品的数据。外箱（纸箱）的尺寸・重量・入数尚未登记，因此运费报价请求和装箱单为“待确认”（可在“制作单据”页面填写）。",
+      "Las medidas y el peso son solo de la unidad. Aún faltan las medidas, el peso y las unidades por caja, así que las solicitudes de flete y la lista de empaque quedan «por confirmar» (puede introducirlos en la pantalla de documentos)."],
+    part: ["寸法・重量は、外装（カートン）の寸法・重さ・入数がまだそろっていません。そろうまで、運賃の見積依頼と梱包明細は「要確認」です（「書類をつくる」の画面で入れられます）。",
+      "Dimensions/weight: the carton size, weight and units per carton are not complete yet. Until they are, freight quote requests and the packing list are “to confirm” (you can enter them on the documents page).",
+      "尺寸・重量：外箱（纸箱）的尺寸・重量・入数尚未齐全。齐全之前，运费报价请求和装箱单为“待确认”（可在“制作单据”页面填写）。",
+      "Medidas y peso: aún no están completos las medidas, el peso y las unidades por caja. Hasta entonces, las solicitudes de flete y la lista de empaque quedan «por confirmar» (puede introducirlos en la pantalla de documentos)."],
+  };
+  try {
+    if (typeof I18N !== "undefined" && I18N && I18N.dict) { // eslint-disable-line no-undef
+      ["en", "zh", "es"].forEach((l, i) => { const d = I18N.dict[l] = I18N.dict[l] || {}; Object.keys(SUM_DIM).forEach((k) => { if (!d[SUM_DIM[k][0]]) d[SUM_DIM[k][0]] = SUM_DIM[k][i + 1]; }); }); // eslint-disable-line no-undef
+    }
+  } catch (e) { err("i18n-sum", e); }
+  wrap("buildSummary", (o) => function (t) {
+    let h = o.apply(this, arguments);
+    try {
+      if (typeof h === "string" && t && /運賃の見積依頼と梱包明細の自動作成/.test(h)) {
+        const d = W.v101dims(t);
+        if (!d.ok) {
+          const k = (d.carton && [d.carton.l, d.carton.wd, d.carton.h, d.carton.w].some((x) => x != null)) || d.perCtn != null ? "part" : "unit";
+          h = h.replace(/寸法・重量は<b>\d+行<\/b>。\s*これで<b>運賃の見積依頼と梱包明細の自動作成<\/b>ができます。/, SUM_DIM[k][0]);
+          cnt("sumDim");
+        }
+      }
+    } catch (e) { err("sum", e); }
+    return h;
+  });
+
+  /* ⑥ 任意の項目：③の表・本人の答えに入っている項目は「入っている」に数える（④の表示も同じ値を出す） */
+  function fieldOf(fk) { try { if (typeof V68P_G === "undefined" || !V68P_G) return null; for (const g of Object.keys(V68P_G)) { const f = (V68P_G[g].f || []).find((x) => x && x.k === fk); if (f) return f; } } catch (e) { /* 無視 */ } return null; } // eslint-disable-line no-undef
+  function labelWords(f) {
+    let ja = "";
+    try { if (typeof V68P_FL !== "undefined" && V68P_FL && V68P_FL[f.k]) ja = String(V68P_FL[f.k][0] || ""); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+    if (!ja) ja = String(f.ja || "");
+    return NF(ja).replace(/[（(][^）)]*[）)]/g, "").split(/[・／\/、]/).map((x) => x.trim()).filter((x) => x.length >= 3 || /^(?:年齢|材質|素材|色)$/.test(x));
+  }
+  function optDerived(t, fk) {
+    try {
+      if (!t || !fk) return null;
+      try { const O = W.V100OUT; if (O && typeof O.n8Val === "function" && /^(mdSterile|mdUse)$/.test(fk)) { const x = O.n8Val(t, fk); if (x && x.v && !isUnk(x.v)) return x; } } catch (e) { /* 下へ */ }
+      const f = fieldOf(fk);
+      if (!f) return null;
+      const words = labelWords(f);
+      const rows = Array.isArray(t.compRows) ? t.compRows : [];
+      const hit = rows.find((r) => {
+        if (!Array.isArray(r)) return false;
+        const lab = NF(r[0] == null ? "" : r[0]).trim(), v = String(r[1] == null ? "" : r[1]).trim();
+        if (!lab || !v || isUnk(v)) return false;
+        if (f.re && f.re.test(lab)) return true;
+        return words.some((w) => lab === w || (w.length >= 3 && lab.indexOf(w) === 0));
+      });
+      if (hit) return { v: String(hit[1]).trim(), src: M("③ の表から", "From table ③", "来自③表", "De la tabla ③") };
+    } catch (e) { err("optDer", e); }
+    return null;
+  }
+  V.optDerived = optDerived;
+  wrap("v92prodOpt", (o) => function (t) {
+    const L = o.apply(this, arguments);
+    try {
+      const tt = t === undefined ? ten() : t;
+      if (Array.isArray(L) && tt) L.forEach((x) => { if (x && !x.ok && /^v68:/.test(String(x.k || "")) && optDerived(tt, String(x.k).slice(4))) { x.ok = true; x.v101der = 1; cnt("optOk"); } });
+    } catch (e) { err("opt", e); }
+    return L;
+  });
+  wrap("v90ctyOptMiss", (o) => function (t) {
+    const L = o.apply(this, arguments);
+    try {
+      const tt = t === undefined ? ten() : t;
+      if (Array.isArray(L) && tt) return L.filter((x) => !(x && /^v68:/.test(String(x.k || "")) && optDerived(tt, String(x.k).slice(4))));
+    } catch (e) { err("optMiss", e); }
+    return L;
+  });
+  wrap("v68pFieldRow", (o) => function (t, f) {
+    const r = o.apply(this, arguments);
+    try {
+      // 「医療用／一般用の別」：資料の記載から控えたとき（TEN.v98md.from＝doc）は「登録の答え」ではなく「資料の記載」と出す
+      if (f && f.k === "mdUse" && typeof r === "string" && /data-v100n8/.test(r) && t && t.v98md && t.v98md.from === "doc") {
+        return r.replace("医療機器ではありません（登録の答え）", "医療機器ではありません（資料の記載）").replace("登録の答えから", "資料から" + (t.v98md.file ? "（" + E(t.v98md.file) + "）" : ""))
+          .replace("Not a medical device (your answer)", "Not a medical device (stated in your file)").replace("From your answer", "From your file");
+      }
+      if (!f || typeof r !== "string" || r.indexOf('class="mute"') < 0 || /data-v100n8/.test(r)) return r;
+      const x = optDerived(t, f.k);
+      if (!x) return r;
+      cnt("optRow");
+      const nm = typeof W.v68pFL === "function" ? W.v68pFL(f.k) : f.k;
+      return `<tr data-v68f="${E(f.k)}" data-v101opt="1"><td class="k">${E(nm)}</td><td>${E(x.v)}</td><td class="v68psrc">${E(x.src)}</td></tr>`;
+    } catch (e) { err("fr", e); return r; }
+  });
 
   // 起動時と画面の描き直しの前に、今までに登録した商品も掃除する（保存はしない。次の保存で残る）
   wrap("render", (o) => function () { try { const t = ten(); if (t && userT(t)) { clean(t, "render"); strDedupe(t); compFix(t); } } catch (e) { err("render", e); } return o.apply(this, arguments); });

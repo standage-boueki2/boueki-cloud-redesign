@@ -10,8 +10,18 @@ tr[data-v101-buyer-grp="3"] { background: #FFFBF3; }
 .v101b-phwarn .btn { flex: 0 0 auto; }
 .v101b-signote { margin: 6px 0; font-size: 12.5px; line-height: 1.6; overflow-wrap: anywhere; }
 .v101b-noreg { display: block; margin: 3px 0; color: #9A3B00; font-weight: 600; overflow-wrap: anywhere; }
+/* 22.01.1：確かめている間・失敗の理由（v2-6）・「不明」と答えた事柄の知らせ（v2-2） */
+.v101b-why.busy { color: #44556B; font-weight: 600; }
+.v101b-chkbusy { color: #1F3B63; background: #EEF4FB; border: 1px solid #BFD3EA; border-radius: 8px; padding: 6px 10px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.v101b-chkwhy { display: block; flex-basis: 100%; margin: 0 0 4px; color: #9A3B00; font-weight: 700; line-height: 1.6; overflow-wrap: anywhere; }
+.v101b-unk { margin: 6px 0 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid #BFD3EA; background: #EEF4FB; color: #1F3B63; font-size: 13px; line-height: 1.6; display: flex; flex-wrap: wrap; gap: 4px 10px; overflow-wrap: anywhere; }
+.v101b-unk[data-v101-buyer-unk="left"] { border-color: #E9A23B; background: #FFF4E0; color: #6B3A00; }
+.v101b-unk b { flex: 0 0 auto; }
+.v101b-unk span { flex: 1 1 260px; min-width: 0; }
 @media (max-width: 600px) {
   .v101b-cnt { font-size: 12.5px; }
   .v101b-phwarn { font-size: 12.5px; }
   .v101b-phwarn span { flex-basis: 100%; }
+  .v101b-unk { font-size: 12.5px; }
+  .v101b-unk span { flex-basis: 100%; }
 }

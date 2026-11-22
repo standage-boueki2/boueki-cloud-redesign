@@ -333,6 +333,27 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
         return true;
       });
       (M.products || []).forEach((p) => { if (p && Array.isArray(p.feats)) { const n0 = p.feats.length; p.feats = prune(p.feats, "feat"); if (p.feats.length !== n0) cnt("dupFeat", n0 - p.feats.length); } });
+      /* 22.01.1（543 の残り・v1 N2 の一部）「売れる理由」（Why It Sells）にも「Clear allergen identification / Soybeans are identified as the allergen.」が出て、
+         成分・仕様の表と2か所になった。アレルゲンは表にあれば、売れる理由のページからも外す（控えの文章は変えず、この資料の写しだけ）。
+         残りが1項目になるとページが作られない（土台）ため、黙って消さず最終チェックに理由を出す（V.lastWhy） */
+      try {
+        const W0 = M.v85 && M.v85.plan;
+        V.lastWhy = null;
+        if (W0 && Array.isArray(W0.items) && has("allergen")) {
+          const n0 = W0.items.length;
+          const keep = W0.items.filter((it) => {
+            const head = NF((it && it.t) || ""), d0 = NF((it && it.d) || "");
+            const k = factOf(head) === "allergen" || (factOf(d0) === "allergen" && /allerg|alérg|过敏|アレルゲン/i.test(head + " " + d0) && head.length < 60) ? "allergen" : "";
+            if (k) { out.push({ where: "why", k, t: txt(it) }); return false; }
+            return true;
+          });
+          if (keep.length !== n0) {
+            M.v85.plan = Object.assign({}, W0, { items: keep }); // M.v85 は deck.v85 と同じもの（控えの文章 plan.why は変えない）
+            cnt("dupWhy", n0 - keep.length);
+            if (keep.length < 2 && n0 >= 2) V.lastWhy = { at: Date.now(), left: keep.map((x) => NF(x && x.t)).filter(Boolean) };
+          }
+        }
+      } catch (e) { err("dupWhy", e); }
       // 梱包・物流のページの「Warranty: …」は、仕様の表に保証の行があれば外す（物流の事実ではなく、表と重なる）
       try {
         const specW = [].concat(M.specsList || [], M.specsP1 ? [M.specsP1] : []).some((sp) => (sp && sp.rows || []).some((r) => factOf(r && r[0]) === "warranty"));
@@ -353,9 +374,37 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
         if (q1.length !== n0) cnt("dupQuality", n0 - q1.length);
         if (!q1.length) M.quality = null;
       }
+      ingrTitle(M);
     } catch (e) { err("dedupe", e); }
     return out;
   }
+  /* 22.01.1（v1 N14）成分のページの見出しが「Ingredients and allergen」なのに、ページにアレルゲンが無い（表に1か所）。
+     成分のページにアレルゲンが無いときは、見出し・小見出しから「and allergen」などを外す（中身に合わせる） */
+  const ALW = /allerg|alérg|allergè|过敏|過敏|アレルゲン|アレルギー/i;
+  function ingrTitle(M) {
+    try {
+      const ig = M && M.ingr; if (!ig) return 0;
+      const inPage = (ig.groups || []).some((g) => ALW.test(NF(g && g.name)) || (g && g.items || []).some((x) => ALW.test(txt(x)))) || (ig.hero && ALW.test(NF(ig.hero.name))) || ALW.test(NF(ig.note));
+      if (inPage) return 0;
+      let n = 0;
+      ["title", "sub"].forEach((k) => {
+        const s0 = String(ig[k] || ""); if (!s0 || !ALW.test(s0)) return;
+        let s = s0
+          .replace(/\s*(?:,|&|\+|\/|\band\b|\bwith\b)\s*(?:key\s+)?allerg(?:en|ens|y|ies)(?:\s+(?:info(?:rmation)?|declarations?|labell?ing|notes?))?\b/gi, "")
+          .replace(/\ballerg(?:en|ens|y|ies)(?:\s+(?:info(?:rmation)?|declarations?))?\s*(?:,|&|\+|\/|\band\b)\s*/gi, "")
+          .replace(/\s*(?:,|&|\/|\by\b|\be\b)\s*al[ée]rgenos?\b/gi, "").replace(/\bal[ée]rgenos?\s*(?:,|&|\/|\by\b)\s*/gi, "")
+          .replace(/\s*(?:,|&|\/|\bet\b)\s*allerg[èe]nes?\b/gi, "")
+          .replace(/[与和及、・\/]\s*过敏原(?:信息)?/g, "").replace(/过敏原(?:信息)?\s*[与和及、・\/]/g, "")
+          .replace(/[・と、／\/]\s*アレルゲン(?:情報)?/g, "").replace(/アレルゲン(?:情報)?\s*[・と、／\/]/g, "")
+          .replace(/\s{2,}/g, " ").trim();
+        if (ALW.test(s) && s.replace(/[^A-Za-z぀-鿿]/g, "").length <= 12) s = ""; // 見出しがアレルゲンだけ＝土台の見出しに戻す
+        if (s !== s0) { ig[k] = s; n++; V.lastIngrTitle = { at: Date.now(), was: s0, now: s }; }
+      });
+      if (n) cnt("ingrTitle", n);
+      return n;
+    } catch (e) { err("ingrTitle", e); return 0; }
+  }
+  V.ingrTitle = ingrTitle;
   V.dedupe = dedupe;
   V.lastDup = null;
 
@@ -380,17 +429,35 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
     } catch (e) { return false; }
   }
   V.nonFood = nonFood;
+  /* 22.01.1（v2-5 の見出し）E 不織布マスク（区分は医療・衛生）の材質表の小見出しが「Ingredients & Composition」。医療・衛生の区分は
+     22.01 では「食品・化粧品と同じく成分の表」とみなして直していなかった。医療・衛生でも、医薬品でなく、表に成分の行（原材料・成分・有効成分・
+     全成分・INCI）が無ければ、部位・材質の表として同じ直しをする（医薬品・成分の行がある表は今まで通り） */
+  function medParts(T) {
+    try {
+      const ck = String((T && T.catKey) || ""), c = String((T && T.cat) || "") + " " + String((T && T.item) || "");
+      if (/医薬品|サプリ|健康食品|化粧|美容液|コスメ|食品|飲料|ペットフード/.test(c)) return false;
+      return ck === "medical" || /医療|衛生|マスク|手袋|ガーゼ|包帯|絆創膏/.test(c);
+    } catch (e) { return false; }
+  }
+  const ING_ROW = /^(?:ingredients?|active ingredients?|inactive ingredients?|composition|full ingredients?|inci(?: name)?|成分|全成分|原材料名?|有効成分|配料|ingredientes?)$/i;
   function matFix(M, data, lang, T) {
     let n = 0; const what = [];
     try {
-      if (!M || !T || !nonFood(T)) return 0;
+      if (!M || !T) return 0;
+      const nf = nonFood(T), med = !nf && medParts(T);
+      if (!nf && !med) return 0;
       const L2 = String(lang || "en").slice(0, 2);
       [].concat(M.specsList || [], M.specsP1 ? [M.specsP1] : []).forEach((sp) => {
         if (!sp) return;
-        const ingRows = (sp.rows || []).some((r) => /^(?:ingredients?|active ingredients?|composition|成分|原材料名?|有効成分|配料|ingredientes?)$/i.test(NF(r && r[0]).trim()));
+        const ingRows = (sp.rows || []).some((r) => ING_ROW.test(NF(r && r[0]).trim()));
+        if (med && ingRows) return; // 医療・衛生で成分の行がある表（医薬部外品の有効成分など）は今まで通り
         if (!ingRows && Array.isArray(sp.hdr) && INGH.test(NF(sp.hdr[0]).trim())) { what.push("見出し「" + sp.hdr[0] + "」→「" + (PARTH[L2] || PARTH.en) + "」"); sp.hdr[0] = PARTH[L2] || PARTH.en; n++; }
         if (!ingRows && sp.eb && /ingredient|成分|原材料|配料|ingrediente/i.test(sp.eb)) { const e0 = sp.eb; sp.eb = String(sp.eb).replace(/\bIngredients?\b/g, "Materials").replace(/\bINGREDIENTS?\b/g, "MATERIALS").replace(/成分表|原材料/g, "材质表").replace(/\bIngredientes\b/g, "Materiales"); if (sp.eb !== e0) { what.push("小見出し「" + e0 + "」→「" + sp.eb + "」"); n++; } }
-        if (!ingRows && sp.title && /ingredient/i.test(sp.title)) { const t0 = sp.title; sp.title = String(sp.title).replace(/\bIngredients?\b/g, "Materials"); if (sp.title !== t0) n++; }
+        try { // 土台の見出し（食品なら「Ingredients & Composition」・それ以外は材質の見出し）を、その言語の材質の見出しに
+          if (!ingRows && sp.title && typeof W.dk3Lb === "function" && sp.title === W.dk3Lb(lang, "ingr") && W.dk3Lb(lang, "mat") && W.dk3Lb(lang, "mat") !== sp.title) { const t0 = sp.title; sp.title = W.dk3Lb(lang, "mat"); what.push("見出し「" + t0 + "」→「" + sp.title + "」"); n++; }
+        } catch (e) { /* 次へ */ }
+        if (!ingRows && sp.title && /ingredient/i.test(sp.title)) { const t0 = sp.title; sp.title = String(sp.title).replace(/\bIngredients?\b/g, "Materials").replace(/\bINGREDIENTS?\b/g, "MATERIALS"); if (sp.title !== t0) { what.push("見出し「" + t0 + "」→「" + sp.title + "」"); n++; } }
+        if (!ingRows && sp.sub && /ingredient|成分|配料|ingrediente/i.test(sp.sub)) { const t0 = sp.sub; sp.sub = String(sp.sub).replace(/\bIngredients?\b/g, "Materials").replace(/\bINGREDIENTS?\b/g, "MATERIALS").replace(/成分表/g, "材质表").replace(/\bIngredientes\b/g, "Materiales"); if (sp.sub !== t0) { what.push("小見出し「" + t0 + "」→「" + sp.sub + "」"); n++; } }
         if (Array.isArray(sp.rows)) {
           let fc = 0, sw = 0;
           const keep = sp.rows.filter((r) => {
@@ -460,6 +527,124 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
     return n;
   }
   V.packFix = packFix;
+  /* ════ 22.01.1（v2-4・v1 N4）梱包・物流のページの食い違い：登録の表（訳す前）で決める ════
+     E：「Quantity per case(1 case)｜50 pieces」（登録は「入数（1ケース）＝50枚入」・MOQ は 500箱＝1箱 50枚入の中身）・「Product number｜To be confirmed」（品番 KM-M50 は登録済み）。
+     C：「Master carton: 100 pieces」（登録の外装「外装 100個入」）と「Quantity per Case｜To be confirmed」が同じページ・「Part Number｜To be confirmed」（6204ZZ は登録済み）。
+     原因：22.01 の packFix は訳した後の文字（「50 pieces」）で決めていたため 1箱の中身と分からず、空の欄は全部「To be confirmed」にしていた。
+     直し：PL（No.617）と同じ決まりを、訳す前の登録の表（dk3Model の src）で当てる。
+           ・入数の欄の値が、売る単位（MOQ・価格表の単位）と数え方が違う（50枚入・売る単位は箱）＝1箱の中身 → 項目名を「Quantity per box」（売る単位）に
+           ・入数の欄が空で、外装（外装・カートン・ケース）と書かれた所に「N個入」がある（パレットあたりでない）→ その数を入れ、同じページの「Master carton: …」は外す（2回出さない）
+           ・品番の欄が空で、商品の品番（sku）が登録済み → 品番を出す（1商品の資料だけ。複数商品の表はどの行がどの商品か分からないので触らない） */
+  const UNITW = { "箱": ["box", "盒", "caja"], "袋": ["bag", "袋", "bolsa"], "缶": ["can", "罐", "lata"], "瓶": ["bottle", "瓶", "botella"], "パック": ["pack", "包", "paquete"], "セット": ["set", "套", "juego"], "個": ["piece", "个", "pieza"], "本": ["unit", "件", "unidad"], "枚": ["sheet", "张", "hoja"], "ケース": ["case", "箱", "caja"] };
+  const perLab = (u, L2) => { const x = UNITW[u] || ["sales unit", "销售单位", "unidad de venta"]; return L2 === "zh" ? "每" + x[1] + "数量" : L2 === "es" ? "Cantidad por " + x[2] : L2 === "fr" ? "Quantité par " + x[0] : L2 === "de" ? "Menge pro " + x[0] : "Quantity per " + x[0]; };
+  const EN_U = { "個": "pcs", "本": "pcs", "枚": "pcs", "袋": "bags", "箱": "boxes", "セット": "sets", "缶": "cans", "瓶": "bottles", "パック": "packs" };
+  const SKUH = /品番|型番|品目コード|商品コード|製品番号|部品番号|^sku$|item\s*(?:no|code)|product\s*(?:no|number|code)|part\s*(?:no|number)/i;
+  const PERH = /入数|入り数|ケース入|カートン入|per\s*(?:case|carton)/i;
+  function packSrc(M, src, data, lang, T) {
+    let n = 0; const what = [];
+    try {
+      if (!M || !T || !Array.isArray(M.packs) || (M.products || []).length !== 1) return 0;
+      const L2 = String(lang || "en").slice(0, 2);
+      const i0 = (M.products[0] && M.products[0].idx) || 0;
+      const prods = (typeof W.dk3Prods === "function" ? W.dk3Prods(T) : null) || [T];
+      const T0 = prods[i0] || T;
+      const sd = (((src && src.prods) || [])[i0] || {}).dim;
+      const td = ((((data && data.prods) || [])[i0]) || {});
+      if (!sd || !Array.isArray(sd.cols) || !Array.isArray(sd.rows)) return 0;
+      const sku = NF(T0.sku || "").trim();
+      const moqU = (V.badPerText && (NF(T0.moq || "").match(/\d[\d,]*(?:\.\d+)?\s*([^\s\d（(,.]{1,4})/) || [])[1]) || "";
+      const ctnS = NF(T0.ctn || "");
+      const ctnM = ctnS.match(/(\d[\d,]*)\s*(個|本|枚|袋|箱|セット|缶|瓶|パック|pcs?|units?|pieces?)\s*入/i);
+      const ctnOk = !!(ctnM && /外装|外箱|カートン|ケース|段ボール|carton|case|ctn/i.test(ctnS) && !PALLET2.test(ctnS) && !(V.badPerText && V.badPerText(ctnS, T0, +ctnM[1].replace(/,/g, ""))));
+      const ctnVal = () => { const tc = NF(td.ctn || ""); const m = tc.match(/(\d[\d,]*)\s*([A-Za-z一-鿿]+)/); if (m && m[1].replace(/,/g, "") === ctnM[1].replace(/,/g, "")) return m[1] + " " + m[2]; return ctnM[1] + " " + (EN_U[ctnM[2]] || ctnM[2]); };
+      const fix = (sh, sv, getL, setL, getV, setV) => {
+        const s = NF(sh), v = NF(sv).trim(), tv = NF(getV() || "").trim();
+        const emptyT = !tv || /^[—\-–]$/.test(tv) || /^(to be confirmed|待确认|por confirmar)$/i.test(tv);
+        if (SKUH.test(s) && (!v || NOVAL2.test(v)) && sku && emptyT) { setV(sku); what.push("品番＝" + sku); n++; return; }
+        if (!PERH.test(s)) return;
+        const num = (v.match(/\d[\d,]*/) || [])[0];
+        if (v && num && V.badPerText && V.badPerText(v, T0, +num.replace(/,/g, ""))) { const nl = perLab(moqU, L2); if (getL() !== nl) { setL(nl); what.push("入数「" + v + "」は1" + (moqU || "単位") + "の中身"); n++; } return; }
+        if ((!v || NOVAL2.test(v)) && ctnOk && emptyT) { setV(ctnVal()); V._dropCtnFact = 1; what.push("入数＝外装の「" + ctnM[0] + "」"); n++; }
+      };
+      M.packs.forEach((pk) => {
+        if (!pk || pk.cmp || !Array.isArray(pk.rows)) return;
+        V._dropCtnFact = 0;
+        const cols = Array.isArray(pk.cols) ? pk.cols : [];
+        if (cols.length > 2 && cols.length === sd.cols.length && pk.rows.length === 1 && sd.rows.length === 1) {
+          const row = pk.rows[0], srow = sd.rows[0] || [];
+          if (!Array.isArray(row)) return;
+          sd.cols.forEach((sc, ci) => fix(sc, srow[ci], () => cols[ci], (x) => { cols[ci] = x; }, () => row[ci], (x) => { row[ci] = x; }));
+        } else if (cols.length <= 2 && pk.rows.length === sd.rows.length) {
+          pk.rows.forEach((r, ri) => { const sr = sd.rows[ri] || []; if (Array.isArray(r)) fix(sr[0], (sr.slice(1) || []).join(" "), () => r[0], (x) => { r[0] = x; }, () => r[1], (x) => { r[1] = x; }); });
+        }
+        if (V._dropCtnFact && Array.isArray(pk.facts)) { const f0 = pk.facts.length; pk.facts = pk.facts.filter((f) => !(f && f.ic === "boxes")); if (pk.facts.length !== f0) what.push("同じページの「" + (td.ctn || T0.ctn) + "」の行は表と重なるため外しました"); }
+      });
+      V._dropCtnFact = 0;
+    } catch (e) { err("packSrc", e); }
+    if (n) { cnt("packSrc", n); V.lastPack = { at: Date.now(), n, msg: "梱包・物流のページの表を登録の表に合わせました：" + what.join("・") }; }
+    return n;
+  }
+  const PALLET2 = /パレット|pallet|plt\b/i;
+  const NOVAL2 = /不明|わからない|分からない|未定|未確認|未登録|未入力|記載なし|要確認|unknown|tbd|to be confirmed/i;
+  V.packSrc = packSrc;
+  /* ════ 22.01.1（v1 N12 の資料側）価格の桁がそろわない：「US$11」「US$9.75」が同じ表に並ぶ（B）・「US$12」「US$10.50」（D）。
+     同じ価格の表の中で、同じ通貨の値の小数の桁を、登録の値のうち小数のある値の桁（2桁）にそろえる（値は変えない：11 → 11.00）。円は小数を付けない ════ */
+  const MONEY = /(US\$|USD\s?|HK\$|S\$|NT\$|A\$|C\$|€|EUR\s?|£|GBP\s?|(?<![A-Za-z])\$)\s?(\d{1,3}(?:,\d{3})+|\d+)(?:([.,])(\d{1,2}))?(?![\d.,]*\d)/g;
+  function priceDec(M) {
+    let n = 0;
+    try {
+      const P = (M && M.pricing) || {};
+      const tabs = [];
+      (P.groups || []).forEach((g) => { if (g && g.table && tabs.indexOf(g.table) < 0) tabs.push(g.table); });
+      (P.tables || []).forEach((t) => { if (t && tabs.indexOf(t) < 0) tabs.push(t); });
+      tabs.forEach((t) => {
+        const rows = (t.rows || []).filter(Array.isArray);
+        const mx = {};
+        const key = (cu) => cu.trim().replace(/^USD$/, "US$").replace(/^EUR$/, "€").replace(/^GBP$/, "£");
+        rows.forEach((r) => r.forEach((c) => { if (typeof c === "string") { c.replace(MONEY, (m, cu, ip, sep, dp) => { if (dp) { const k = key(cu); if (!mx[k] || mx[k].d < dp.length) mx[k] = { d: dp.length, sep }; } return m; }); } }));
+        if (!Object.keys(mx).length) return;
+        rows.forEach((r) => r.forEach((c, ci) => {
+          if (typeof c !== "string") return;
+          const nc = c.replace(MONEY, (m, cu, ip, sep, dp) => { const X = mx[key(cu)]; if (!X) return m; if (!dp) { n++; return m + X.sep + "0".repeat(X.d); } if (dp.length < X.d) { n++; return m + "0".repeat(X.d - dp.length); } return m; });
+          if (nc !== c) r[ci] = nc;
+        }));
+      });
+    } catch (e) { err("priceDec", e); }
+    if (n) { cnt("priceDec", n); V.lastPrice = { at: Date.now(), n }; }
+    return n;
+  }
+  V.priceDec = priceDec;
+  /* ════ 22.01.1（v1 N13）B・D の表紙で社名が2回続く（ロゴの無い「根拠重視」の表紙は、上に小さく社名・その下に大きく「ブランド名か社名」を出す。
+     ブランド名が無いと同じ社名が2回）。表紙で同じ文字の要素が2つあるときは、小さい方を外す ════ */
+  const elTx = (e) => (e && Array.isArray(e.ps) ? e.ps.map((p) => (p.r || []).map((r) => (r && r.r ? r.r.map((x) => x.t || "").join("") : String((r && r.t) || ""))).join("")).join(" ") : "");
+  const elSz = (e) => { let s = 0; try { (e.ps || []).forEach((p) => (p.r || []).forEach((r) => { s = Math.max(s, +(r && r.sz) || 0); (r && r.r || []).forEach((x) => { s = Math.max(s, +(x && x.sz) || 0); }); })); } catch (x) { /* 0 */ } return s; };
+  function coverDup(S) {
+    try {
+      if (!S || !Array.isArray(S.els)) return 0;
+      const T = S.els.filter((e) => e && e.k === "text" && !/^(deco|draft|v54draft|pno|foot)$/.test(e.name || ""));
+      const norm = (s) => NF(s).replace(/\s+/g, " ").trim().toLowerCase();
+      const drop = new Set();
+      for (let a = 0; a < T.length; a++) for (let b = a + 1; b < T.length; b++) {
+        const ta = norm(elTx(T[a])), tb = norm(elTx(T[b]));
+        if (!ta || ta.length < 4 || ta !== tb) continue;
+        drop.add(elSz(T[a]) <= elSz(T[b]) ? T[a] : T[b]);
+      }
+      if (!drop.size) return 0;
+      S.els = S.els.filter((e) => !drop.has(e));
+      V.lastCover = { at: Date.now(), n: drop.size, t: [...drop].map(elTx).join(" ／ ").slice(0, 80) };
+      cnt("coverDup", drop.size);
+      return drop.size;
+    } catch (e) { err("coverDup", e); return 0; }
+  }
+  V.coverDup = coverDup;
+  try {
+    if (typeof DK3_SL !== "undefined" && DK3_SL && typeof DK3_SL.cover === "function" && !DK3_SL.cover.v101out) { // eslint-disable-line no-undef
+      const __cv101 = DK3_SL.cover; // eslint-disable-line no-undef
+      const f = function () { const S = __cv101.apply(this, arguments); try { coverDup(S); } catch (e) { err("cover", e); } return S; };
+      f.v101out = 1;
+      DK3_SL.cover = f; // eslint-disable-line no-undef
+    }
+  } catch (e) { err("coverWrap", e); }
   if (typeof W.dk3Model === "function" && !W.dk3Model.v101out) {
     const __dm101 = W.dk3Model;
     const f = function (lang0, plan, data, ph, deck, src, T) {
@@ -467,8 +652,11 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
       try {
         if (M && lang0 && !/^ja/.test(String(lang0))) {
           const tt = T || V.ten();
+          V.lastPack = null; V.lastPrice = null; V.lastIngrTitle = null; V.lastCover = null; V.lastMat = null; // この資料の分だけを最終チェックに書く
           if (typeof V.matFix === "function") V.matFix(M, data, lang0, tt);
+          if (typeof V.packSrc === "function") V.packSrc(M, src, data, lang0, tt);
           if (typeof V.packFix === "function") V.packFix(M, lang0);
+          if (typeof V.priceDec === "function") V.priceDec(M);
           const d = dedupe(M, tt, lang0);
           V.lastDup = { at: Date.now(), uid: V.pkey(tt), lang: lang0, list: d };
           V.lastM = M;
@@ -487,11 +675,17 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
       try {
         const L = V.lastDup;
         if (r && L && L.list && L.list.length && Date.now() - L.at < 15 * 60000 && deck && deck.lang === L.lang && Array.isArray(r.ok) && !r.ok.some((x) => /^同じ情報が2枚に重ならないよう/.test(String(x)))) {
-          const W2 = { ingr: "成分のページ", feat: "商品の特長", quality: "品質のページ", pack: "梱包・物流のページ" };
+          const W2 = { ingr: "成分のページ", feat: "商品の特長", quality: "品質のページ", pack: "梱包・物流のページ", why: "売れる理由のページ" };
           const s = L.list.slice(0, 6).map((x) => (W2[x.where] || x.where) + "「" + String(x.t).replace(/\s+/g, " ").slice(0, 40) + "」").join("・");
           r.ok.push("同じ情報が2枚に重ならないよう、表のページ（成分・仕様の表・要約・取引条件）にある事実を、ほかのページから外しました（" + L.list.length + "件）：" + s);
         }
         if (r && V.lastMat && V.lastMat.n && Date.now() - V.lastMat.at < 15 * 60000 && Array.isArray(r.ok) && !r.ok.some((x) => /^材質・仕様の表の列を/.test(String(x)))) r.ok.push(V.lastMat.msg);
+        const fresh = (x) => x && Date.now() - x.at < 15 * 60000 && L && deck && deck.lang === L.lang;
+        if (r && Array.isArray(r.ok) && fresh(V.lastPack) && !r.ok.some((x) => /^梱包・物流のページの表を登録の表に/.test(String(x)))) r.ok.push(V.lastPack.msg);
+        if (r && Array.isArray(r.ok) && fresh(V.lastPrice) && !r.ok.some((x) => /^価格の表の小数の桁を/.test(String(x)))) r.ok.push("価格の表の小数の桁を、同じ表の登録の値（小数2桁）にそろえました（" + V.lastPrice.n + "か所・値は変えていません）");
+        if (r && Array.isArray(r.ok) && fresh(V.lastIngrTitle) && !r.ok.some((x) => /^成分のページの見出しを/.test(String(x)))) r.ok.push("成分のページの見出しを中身に合わせました（アレルゲンは成分・仕様の表に載せています）：「" + V.lastIngrTitle.was + "」→「" + (V.lastIngrTitle.now || "（標準の見出し）") + "」");
+        if (r && Array.isArray(r.ok) && fresh(V.lastCover) && !r.ok.some((x) => /^表紙で同じ文字が2回/.test(String(x)))) r.ok.push("表紙で同じ文字が2回続いていたため、小さい方を外しました：「" + V.lastCover.t + "」");
+        if (r && Array.isArray(r.warn) && fresh(V.lastWhy) && !(deck.slides || []).some((s) => s && s.kind === "why") && !r.warn.some((w) => w && (w.k === "v101outWhy" || w.k === "v101why"))) r.warn.push({ k: "v101outWhy", t: "「売れる理由」のページは入れていません：アレルゲンの項目は成分・仕様の表に載せたため外し、残りが1項目（" + (V.lastWhy.left.join("・") || "なし") + "）だけになりました（2項目から作ります）。登録した商品の強みを、数字や試験の条件つきで1つずつ登録するか、追加ヒアリングで答えてから「↻ もう一度作る」を押すと載ります" });
       } catch (e) { err("check", e); }
       return r;
     };
@@ -530,7 +724,47 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
   const hhmm = (ms) => { try { const d = new Date(+ms); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); } catch (e) { return ""; } };
   V.hhmm = hhmm;
   const decOf = (o) => { try { return typeof W.v96dkDec === "function" ? (W.v96dkDec(o) || "") : ""; } catch (e) { return ""; } };
-  /* 資料（DK3G.deck）がいつ作られたか：作ったとき・開いた保存済みの資料の時刻 */
+  /* ── 22.01.1（v1 N1・No.552・高）写真を加工すると、存在しない「加工した写真で作り直す」ボタンを押すよう言われる ──
+     原因：22.01 は「加工した時刻 ＞ 資料の時刻」で「まだ入っていない」を決めていた。資料の時刻（deck.v101at）は dk3Generate の
+           約束（promise）が解けた時刻で付けていたが、その約束は資料を作り終えた後の保存（dk14Save→保存した資料の一覧の読み直し）まで待つ。
+           本番は保存と一覧の読み直しに数秒かかるため、その間に加工すると、資料の時刻が加工より後になって判定が消え、
+           知らせ（押してください）だけ出て箱とボタンが出なかった（v1 の APH2：加工の 2.6 秒後に v101at が付いた）。
+     直し：時刻に頼らない。資料を組むとき（dk3Media＝写真を資料に入れる所）に「資料に入れた写真の中身の指紋」を資料に控え（deck.v101ph）、
+           「いまの写真の指紋」と比べて決める。保存済みの資料（dk14 の写し）にも指紋が入る。指紋の無い古い資料は、資料の中の写真そのもの
+           （deck.media）と比べる。知らせ（toast）と資料の画面の箱は同じ判定（editState）を使い、ボタンが出ないのに押してと言わない。 */
+  const phIdent = (o) => (o && o.b64) ? phFp(o) + "|" + (o.hid || "") : "";
+  V.phIdent = phIdent;
+  const HI = V.hiFp = V.hiFp || {}; // 高解像度の控え（hid）→ その中身の指紋（古い資料と比べるときだけ・読み終えたら描き直す）
+  function kickHi(hid) {
+    try {
+      if (!hid || HI[hid] !== undefined || typeof W.dk3HiGet !== "function") return;
+      HI[hid] = null;
+      Promise.resolve().then(() => W.dk3HiGet(hid)).then((hi) => { HI[hid] = hi && hi.b64 ? phFp(hi) : ""; try { if (typeof cur !== "undefined" && cur === "deck" && typeof W.render === "function") W.render(); } catch (e) { /* 次へ */ } }, () => { HI[hid] = ""; }); // eslint-disable-line no-undef
+    } catch (e) { HI[hid] = ""; }
+  }
+  /* 資料（deck）の i 番目の写真が、いまの写真 o と同じ中身か："same"｜"diff"｜"absent"（資料の写真の候補に入らない写真）｜"unknown" */
+  function inDeckState(deck, i, o) {
+    try {
+      if (!deck || !o || !o.b64) return "unknown";
+      const R = deck.v101ph;
+      if (R && typeof R === "object") {
+        if (!Object.prototype.hasOwnProperty.call(R, String(i))) return "diff"; // 資料を作った後に足した写真
+        const r = R[i];
+        if (r === "-") return "absent";
+        return r === phIdent(o) ? "same" : "diff";
+      }
+      const md = deck.media || {};
+      const m = md["p0:" + i];
+      if (!m || !m.b64) return Object.keys(md).length ? "absent" : "unknown";
+      if (!o.hid) return (!m.hi && phFp(m) === phFp(o)) ? "same" : "diff";
+      const h = HI[o.hid];
+      if (h === undefined) { kickHi(o.hid); return "unknown"; }
+      if (!h) return "unknown";
+      return phFp(m) === h ? "same" : "diff";
+    } catch (e) { err("inDeck", e); return "unknown"; }
+  }
+  V.inDeckState = inDeckState;
+  /* 資料（DK3G.deck）がいつ作られたか（表示用）：組んだとき（dk3Media）・開いた保存済みの資料が組まれたとき */
   function deckAt(deck) {
     try {
       if (!deck) return 0;
@@ -541,35 +775,52 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
     return 0;
   }
   V.deckAt = deckAt;
-  /* 加工した写真のうち、いま開いている資料より新しいもの */
+  const edited = (o) => !!(o && o.b64 && o.v96edit); // 「加工の前に戻す」で v96edit は消える
+  const edAt = (o) => (o && o.v101edit && o.v101edit.fp === phFp(o) && +o.v101edit.at) || 0;
+  /* 加工した写真のうち、いま開いている資料に入っていないもの（中身の指紋で比べる） */
   function pendingEdits(T, deck) {
     const out = [];
     try {
-      const at = deckAt(deck); if (!at) return out;
+      if (!deck) return out;
       ((T && T.assets && T.assets.ph) || []).forEach((o, i) => {
-        if (!o || !o.b64 || !o.v101edit || decOf(o) === "no") return;
-        if (o.v101edit.fp !== phFp(o)) return; // 加工の後に差し替えた・戻した
-        if (+o.v101edit.at > at) out.push({ i, o, at: +o.v101edit.at });
+        if (!edited(o) || decOf(o) === "no") return;
+        const st = inDeckState(deck, i, o);
+        if (st === "diff" || (st === "unknown" && edAt(o) && edAt(o) > deckAt(deck))) out.push({ i, o, at: edAt(o), st });
       });
     } catch (e) { err("pend", e); }
     return out;
   }
   V.pendingEdits = pendingEdits;
-  /* 加工した写真のうち、いま開いている資料に入っているもの（作り直した後の知らせ） */
+  /* 加工した写真のうち、いま開いている資料に入っているもの（作り直した後の知らせ）。inDeck＝スライドに使われたか */
   function doneEdits(T, deck) {
     const out = [];
     try {
-      const at = deckAt(deck); if (!at) return out;
+      if (!deck) return out;
       const used = (W.V99PHOTO && typeof W.V99PHOTO.deckPhotos === "function") ? W.V99PHOTO.deckPhotos(deck) : null;
       ((T && T.assets && T.assets.ph) || []).forEach((o, i) => {
-        if (!o || !o.b64 || !o.v101edit || o.v101edit.fp !== phFp(o) || decOf(o) === "no") return;
-        if (+o.v101edit.at <= at && at - +o.v101edit.at < 6 * 3600000) out.push({ i, o, at: +o.v101edit.at, inDeck: used ? used.has(i) : null });
+        if (!edited(o) || decOf(o) === "no") return;
+        if (inDeckState(deck, i, o) === "same") out.push({ i, o, at: edAt(o), inDeck: used ? used.has(i) : null });
       });
     } catch (e) { err("done", e); }
     return out;
   }
   V.doneEdits = doneEdits;
-  /* 加工の保存：時刻と中身の指紋を控え、知らせを「作り直すと入る」に */
+  /* 知らせと資料の画面の箱が同じ判定を使う：いまの状態（"run"＝作っている途中／"pend"＝箱とボタンが出る／"in"＝もう入っている／"none"＝資料がない） */
+  function editState(T, i) {
+    try {
+      const g = V.G();
+      const same = !!(g && T && g.ten && V.pkey(g.ten) === V.pkey(T));
+      if (g && g.run && same) return "run";
+      if (g && g.deck && same) {
+        const P = pendingEdits(T, g.deck);
+        if (i == null ? P.length : P.some((x) => x.i === i)) return "pend";
+        return "in";
+      }
+    } catch (e) { err("state", e); }
+    return "none";
+  }
+  V.editState = editState;
+  /* 加工の保存：時刻と中身の指紋を控え、知らせを資料の画面と同じ判定で出す */
   function wrapSave(fn) {
     if (typeof fn !== "function" || fn.v101out) return fn;
     const f = async function (T, i, ops) {
@@ -580,12 +831,18 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
           if (o && o.b64) {
             o.v101edit = { at: Date.now(), fp: phFp(o), ops: (ops || []).map((x) => x && x.t).filter(Boolean) };
             try { if (typeof W.saveTen === "function") W.saveTen(); } catch (e) { /* 次の保存で */ }
-            const g = V.G(); const has = !!(g && g.deck && T && g.ten && V.pkey(g.ten) === V.pkey(T));
             const nm = M("商品写真" + (i + 1), "Product photo " + (i + 1), "商品照片" + (i + 1), "Foto " + (i + 1));
-            toast0(has ? M(nm + "を加工して保存しました。いま開いている資料・保存済みの資料には、まだ入っていません（作り直すと入ります）。営業資料の画面の「加工した写真で作り直す（文章はそのまま）」を押してください",
+            const st = editState(T, i);
+            V.lastEditState = { i, st, at: Date.now() };
+            toast0(st === "pend" ? M(nm + "を加工して保存しました。いま開いている資料・保存済みの資料には、まだ入っていません（作り直すと入ります）。営業資料の画面の「加工した写真で作り直す（文章はそのまま）」を押してください",
               nm + " was edited and saved. It is not in the open deck or the saved decks yet; press “Rebuild with the edited photo (same text)” on the sales deck page",
               nm + "已编辑并保存。当前打开的资料和已保存的资料中还没有放入（重新制作后放入）。请在营业资料页面点击“用编辑后的照片重新制作（文字不变）”",
               nm + " se editó y guardó. Aún no está en la presentación abierta ni en las guardadas; pulse «Rehacer con la foto editada (mismo texto)»")
+              : st === "run" ? M(nm + "を加工して保存しました。いまは資料を作っている途中です。できあがった資料に加工した写真が入っていないときは、営業資料の画面に「加工した写真で作り直す（文章はそのまま）」が出ます",
+                nm + " was edited and saved. A deck is being made now; if the finished deck does not have the edited photo, “Rebuild with the edited photo (same text)” appears on the sales deck page",
+                nm + "已编辑并保存。正在制作资料；如果完成的资料中没有编辑后的照片，营业资料页面会出现“用编辑后的照片重新制作（文字不变）”",
+                nm + " se editó y guardó. Se está creando una presentación; si no incluye la foto editada, aparecerá «Rehacer con la foto editada (mismo texto)»")
+              : st === "in" ? M(nm + "を加工して保存しました。いま開いている資料には、加工した写真がもう入っています", nm + " was edited and saved. The open deck already has the edited photo", nm + "已编辑并保存。当前打开的资料中已经有编辑后的照片", nm + " se editó y guardó; la presentación abierta ya la incluye")
               : M(nm + "を加工して保存しました。次に作る資料から入ります", nm + " was edited and saved. It goes into the next deck you make", nm + "已编辑并保存，下次制作的资料中会放入", nm + " se editó y guardó; entrará en la próxima presentación"));
             cnt("editSave");
             try { if (typeof W.render === "function") W.render(); } catch (e) { /* 次へ */ }
@@ -599,12 +856,41 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
   }
   try { if (W.V96DK && typeof W.V96DK.saveEdit === "function") W.V96DK.saveEdit = wrapSave(W.V96DK.saveEdit); } catch (e) { err("wrapSave", e); }
   try { if (typeof W.v96dkSaveEdit === "function") W.v96dkSaveEdit = wrapSave(W.v96dkSaveEdit); } catch (e) { err("wrapSave2", e); }
-  /* 作ったとき・保存済みの資料を開いたときの時刻 */
+  /* 資料を組むとき：資料に入れた写真の中身の指紋と、組んだ時刻を資料に控える（保存済みの資料の写しにも入る） */
+  if (typeof W.dk3Media === "function" && !W.dk3Media.v101out) {
+    const __md101 = W.dk3Media;
+    const f = async function (deck, T) {
+      const t0 = T || V.ten();
+      const snap = () => { try { return ((t0 && t0.assets && t0.assets.ph) || []).map(phIdent); } catch (e) { return []; } };
+      const s0 = snap();
+      const P = await __md101.apply(this, arguments);
+      try {
+        if (deck && t0) {
+          const s1 = snap(), md = deck.media || {}, rec = {};
+          s1.forEach((id, i) => {
+            if (!id) return;
+            const m = md["p0:" + i];
+            if (!m || !m.b64) { rec[i] = "-"; return; }
+            const o = t0.assets.ph[i];
+            if (!m.hi && !o.hid) rec[i] = phFp(m) + "|"; // 資料に入れた中身そのものの指紋（組む途中で写真が替わっても正しい）
+            else rec[i] = s0[i] === id ? id : "?"; // 高解像度の控えを使った写真：組む前と後で同じときだけ（途中で加工されたら「まだ入っていない」）
+          });
+          deck.v101ph = rec; deck.v101at = Date.now(); deck.v101uid = V.pkey(t0);
+          cnt("deckFp");
+        }
+      } catch (e) { err("mediaFp", e); }
+      return P;
+    };
+    f.v101out = 1;
+    W.dk3Media = f;
+  }
+  /* 作り始めた時刻（資料の時刻が無いときの控え。判定には使わない） */
   if (typeof W.dk3Generate === "function" && !W.dk3Generate.v101out) {
     const __gen101 = W.dk3Generate;
     const f = async function () {
+      const t0 = Date.now();
       const r = await __gen101.apply(this, arguments);
-      try { const g = V.G(); if (g && g.deck && !g.run && !g.deck.v101at) { g.deck.v101at = Date.now(); cnt("deckAt"); } } catch (e) { err("genAt", e); }
+      try { const g = V.G(); if (g && g.deck && !g.deck.v101at) { g.deck.v101at = t0; cnt("deckAt0"); } } catch (e) { err("genAt", e); }
       return r;
     };
     f.v101out = 1;
@@ -616,14 +902,15 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
       const r = await __op101.apply(this, arguments);
       try {
         const g = V.G(); const it = ((typeof DK14 !== "undefined" && DK14 && DK14.items) || []).find((x) => x && x.id === id); // eslint-disable-line no-undef
-        if (g && g.deck && it && it.at) g.deck.v101at = Date.parse(it.at) || g.deck.v101at;
+        if (g && g.deck && it && it.at && !g.deck.v101at) g.deck.v101at = Date.parse(it.at) || 0; // 組んだ時刻が控えてあればそのまま
       } catch (e) { err("openAt", e); }
       return r;
     };
     f.v101out = 1;
     W.dk14Open = f;
   }
-  /* 文章はそのまま、写真だけ入れ直して作り直す（前回の文章＝dk3Plan の控えを使う。force なし） */
+  /* 文章はそのまま、写真だけ入れ直して作り直す（前回の文章＝dk3Plan の控えを使う。force なし）。始まらなかったとき（写真を選ぶ窓が出た・
+     必要な項目が足りない）は、ボタンを元に戻す（押しても何も起きないボタンにしない。窓・知らせはその層が出す） */
   V.regenPhoto = function () {
     try {
       const g = V.G(); if (!g || g.run) return false;
@@ -631,6 +918,7 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
       V.regenAt = Date.now();
       W.dk3Generate(lg, false);
       cnt("regenPhoto");
+      setTimeout(() => { try { const g2 = V.G(); if (g2 && !g2.run && typeof W.render === "function" && typeof cur !== "undefined" && cur === "deck") W.render(); } catch (e) { /* 次へ */ } }, 900); // eslint-disable-line no-undef
       return true;
     } catch (e) { err("regen", e); return false; }
   };
@@ -661,7 +949,15 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
   V.editJaCheck = editJaCheck101;
   if (typeof W.dkImgAudit === "function" && !W.dkImgAudit.v101out) {
     const __au101 = W.dkImgAudit;
-    const f = async function () { const r = await __au101.apply(this, arguments); try { editJaCheck101(); } catch (e) { err("audit", e); } return r; };
+    const f = async function () {
+      /* 22.01.1：22.00.1（v100）の「切り取った後も、日本語の文字が残っている…」の知らせが、この層の「ぼかした範囲の外にも…」と続けて2つ出ていた
+         （手元の再現で確認）。v100 の知らせは同じ指紋の写真には出ない作りなので、加工した写真に先に指紋を控えて v100 の知らせだけを止める
+         （最終チェックの文は 22.01 で置き換え済み。日本語が無いと AI が言えば v100 が控えを消す＝今まで通り） */
+      try { const T = V.ten(); ((T && T.assets && T.assets.ph) || []).forEach((o) => { if (o && o.b64 && o.v96edit) { const fp = phFp(o); if (!o.v100editJa || o.v100editJa.fp !== fp) o.v100editJa = { fp, at: Date.now(), v101: 1 }; } }); } catch (e) { err("audit0", e); }
+      const r = await __au101.apply(this, arguments);
+      try { editJaCheck101(); } catch (e) { err("audit", e); }
+      return r;
+    };
     f.v101out = 1;
     W.dkImgAudit = f;
   }
@@ -689,6 +985,91 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
   }
 })();
 
+/* ═══ 22.01.1 out（v2-3・中〜高）英語資料のスペースの「直し」が正しい英単語を壊す ═══
+   症状：H「Portioning」→「Port ioning」・「portions」→「port ions」、E「nonwoven」→「non woven」。最終チェックに「スペースの抜けを直しました」。
+   原因：その ✓ は 21.86 の校正（v86dkPost → v86dkParaGlue → v86dkSplit）。8文字以上で語彙（画面の英訳から集めた語＋21.99.2 の 7,755語）に
+         無い語を「2つの語がくっついたもの」とみなし、前後とも語彙にあれば分ける。語彙の判定（v86dkIn）は語尾を外して調べるため、
+         「ioning」は「ion」＋ing、「ions」は「ion」＋s で語とみなされ、「port」と組んで分けていた。「non」も語彙に入っている（non-… から）。
+         21.98 の校正（v98dkProofPara）も同じ v86dkParaGlue を使い、21.99 の校正（v99dkSplit）も似た分け方をする。
+   直し：分ける前に、次のどれかに当たる分け方は「正しい1語」として分けない（v86dkSplit・v99dkSplit の両方）。
+         ① 前が語の頭にしか付かない接頭辞（non・anti・multi・semi・micro・poly・bio・eco・pre・pro・dis・ultra など）：nonwoven・antibacterial
+         ② 後ろが語尾だけ（ion・ions・ioning・ing・ings・ness・ment・ity・able・ation・ism・ist・ive・ous など）：port|ions・port|ioning
+         ③ 語全体が、語彙・資料の中の語の活用形（-ing・-s・-es・-ed・-er・-ly・-ment・-ness）：portioning（資料に portions がある）
+         あわせて、営業資料によく出るのに語彙に無い語（portion・nonwoven・polypropylene・antibacterial など）を語彙に足す。
+         くっついた語（organicsoy・forkitchens・woodpuzzle・therepair）は今まで通り分ける。分けなかった語は V101OUT.splitKept に控える。 */
+(function () {
+  "use strict";
+  const W = window, V = W.V101OUT;
+  if (!V || V._split) return;
+  V._split = 1;
+  const err = V.errf;
+  const cnt = (k, d) => { try { const x = d == null ? 1 : +d; if (x) V.n[k] = (V.n[k] || 0) + x; } catch (e) { /* 数えるだけ */ } };
+  const BOUNDP = new Set("non anti semi multi sub super inter intra micro nano poly mono bio eco pre pro dis mis tri hyper ultra mega mini auto trans extra counter neo pan para proto pseudo quasi retro tele thermo hydro photo macro meta omni uni vice infra ortho cyber geo aero agro electro hemi hypo iso mid un".split(" "));
+  const SUFB = /^(?:ions?|ion(?:ing|ings|ed|al|ally|ate|ates|ated|ic|ics)|ings?|ers?|ness(?:es)?|ments?|ive(?:ly|ness|s)?|ous(?:ly|ness)?|ity|ities|ably|ibly|able|ible|ance[sd]?|ence[sd]?|ancy|ency|isms?|ists?|i[sz]e[sdr]?|i[sz]ing|i[sz]ations?|ures?|ural|ured|ates?|ated|ating|ations?|ally|ical(?:ly)?|ics|ish|less(?:ly|ness)?|ful(?:ly|ness)?|ies|ier|iest|edly|ingly)$/;
+  const EXTRA = ("portion portions portioned portioning proportion proportions nonwoven nonwovens woven polypropylene polyethylene polyurethane polyester polymer polymers spunbond meltblown earloop earloops earband antibacterial antimicrobial antiviral antifungal antioxidant antioxidants antistatic hypoallergenic biodegradable compostable recyclable reusable resealable dishwasher microwave microwavable stainless nonstick nontoxic nonslip nonsterile semifinished multilayer multipurpose ultrasonic ultraviolet preservative preservatives premium prebiotic prebiotics probiotic probiotics protein proteins provenance packaging packaged unpackaged refrigerated refrigeration individually wrapped portionable lightweight waterproof dustproof shockproof breathable stretchable adjustable washable foldable stackable durable traceable traceability certified certification certifications inspection inspections lubricated lubricant tolerance tolerances deodorizing deodorant sanitizing sanitizer disinfecting disinfectant fermented fermentation unpasteurized pasteurized dehydrated freeze dried nonalcoholic jerky treats tenderloin tenderloins chewable chewy palatable palatability digestible digestibility formulated formulation formulations foodservice").split(" ");
+  /* 語彙に足す（21.99 と同じやり方。v86dkVocab の控えを捨てて作り直させる） */
+  if (typeof W.v86dkVocab === "function" && !W.v86dkVocab.v101out) {
+    const __voc101 = W.v86dkVocab;
+    const f = function () {
+      const Vv = __voc101.apply(this, arguments);
+      try { if (Vv && typeof Vv.add === "function" && !Vv.__v101out) { EXTRA.forEach((w) => Vv.add(w)); Vv.__v101out = 1; } } catch (e) { err("voc", e); }
+      return Vv;
+    };
+    f.v101out = 1;
+    W.v86dkVocab = f;
+    try { if (typeof V86DK !== "undefined" && V86DK) V86DK.voc = null; } catch (e) { /* 次に作るときに */ } // eslint-disable-line no-undef
+  }
+  const has = (x, Vv, Ww) => !!x && ((Vv && Vv.has && Vv.has(x)) || (Ww && Ww.has && Ww.has(x)));
+  const inV = (x, Vv, Ww) => { try { return has(x, Vv, Ww) || (typeof W.v86dkIn === "function" && Vv ? !!W.v86dkIn(x, Vv, Ww) : false); } catch (e) { return false; } };
+  /* 語全体が、語彙・資料の中の語の活用形か（portioning ← portion(s)） */
+  function inflected(lw, Vv, Ww) {
+    const SF = ["ings", "ing", "ers", "er", "ed", "es", "s", "ly", "ments", "ment", "ness"];
+    for (const sf of SF) {
+      if (lw.length - sf.length < 5 || !lw.endsWith(sf)) continue;
+      const st = lw.slice(0, -sf.length);
+      const cands = [st, st + "e", /(.)\1$/.test(st) ? st.slice(0, -1) : "", /i$/.test(st) ? st.slice(0, -1) + "y" : ""].filter((x) => x && x.length >= 5);
+      if (cands.some((c) => [c, c + "s", c + "es"].some((x) => x !== lw && has(x, Vv, Ww)))) return true; // 語そのもの（資料の中の語の一覧に入っている）は数えない
+    }
+    return false;
+  }
+  /* 分けてはいけない分け方か（理由を返す。分けてよければ ""） */
+  function keepWord(w, i, Vv, Ww) {
+    const lw = String(w || "").toLowerCase();
+    if (!(i > 0) || i >= lw.length) return "";
+    const a = lw.slice(0, i), b = lw.slice(i);
+    if (EXTRA.indexOf(lw) >= 0) return "known";
+    if (BOUNDP.has(a) && lw.length >= 6) return "prefix";
+    if (/^ion/.test(b) || SUFB.test(b)) return "suffix";
+    if (inflected(lw, Vv, Ww)) return "inflected";
+    return "";
+  }
+  V.keepWord = keepWord;
+  V.splitKept = V.splitKept || [];
+  const note = (w, i, why) => { try { V.splitKept.push({ w: String(w).slice(0, 40), a: String(w).slice(0, i), b: String(w).slice(i), why, at: Date.now() }); if (V.splitKept.length > 60) V.splitKept.shift(); cnt("splitKeep"); } catch (e) { /* 控えだけ */ } };
+  if (typeof W.v86dkSplit === "function" && !W.v86dkSplit.v101out) {
+    const __sp101 = W.v86dkSplit;
+    const f = function (w, Vv, Ww) {
+      const r = __sp101.apply(this, arguments);
+      try { if (r && r.i > 0) { const why = keepWord(w, r.i, Vv, Ww); if (why) { note(w, r.i, why); return null; } } } catch (e) { err("split86", e); }
+      return r;
+    };
+    f.v101out = 1;
+    W.v86dkSplit = f;
+    V.splitOrig = Object.assign(V.splitOrig || {}, { v86: __sp101 }); // 試験で直す前の分け方と比べる用
+  }
+  if (typeof W.v99dkSplit === "function" && !W.v99dkSplit.v101out) {
+    const __sp99 = W.v99dkSplit;
+    const f = function (tok, ctx) {
+      const r = __sp99.apply(this, arguments);
+      try { if (r && r.i > 0 && !r.fa) { const why = keepWord(tok, r.i, ctx && ctx.V, ctx && ctx.W); if (why) { note(tok, r.i, why); return null; } } } catch (e) { err("split99", e); }
+      return r;
+    };
+    f.v101out = 1;
+    W.v99dkSplit = f;
+    V.splitOrig = Object.assign(V.splitOrig || {}, { v99: __sp99 });
+  }
+})();
+
 /* ═══ v22.01 out：最終チェックの ✓ の文（英・中・西） ═══ */
 (function () {
   "use strict";
@@ -697,12 +1078,32 @@ var V101OUT = window.V101OUT = window.V101OUT || { v: "22.01", err: null, errs: 
   V._i18n = 1;
   try {
     if (typeof I18N !== "undefined" && I18N && Array.isArray(I18N.pat)) { // eslint-disable-line no-undef
-      const W = { en: [["成分のページ", "ingredients page"], ["商品の特長", "product features"], ["品質のページ", "quality page"], ["梱包・物流のページ", "packaging page"]], zh: [["成分のページ", "成分页"], ["商品の特長", "商品特点"], ["品質のページ", "品质页"], ["梱包・物流のページ", "包装・物流页"]], es: [["成分のページ", "página de ingredientes"], ["商品の特長", "características del producto"], ["品質のページ", "página de calidad"], ["梱包・物流のページ", "página de embalaje"]] };
+      const W = { en: [["成分のページ", "ingredients page"], ["商品の特長", "product features"], ["品質のページ", "quality page"], ["梱包・物流のページ", "packaging page"], ["売れる理由のページ", "Why It Sells page"]], zh: [["成分のページ", "成分页"], ["商品の特長", "商品特点"], ["品質のページ", "品质页"], ["梱包・物流のページ", "包装・物流页"], ["売れる理由のページ", "畅销理由页"]], es: [["成分のページ", "página de ingredientes"], ["商品の特長", "características del producto"], ["品質のページ", "página de calidad"], ["梱包・物流のページ", "página de embalaje"], ["売れる理由のページ", "página Por qué se vende"]] };
       const tw = (s, l) => { let x = String(s); (W[l] || []).forEach(([a, b]) => { x = x.split(a).join(b); }); return x.replace(/・/g, l === "zh" ? "、" : ", "); };
       I18N.pat.unshift({ re: /^同じ情報が2枚に重ならないよう、表のページ（成分・仕様の表・要約・取引条件）にある事実を、ほかのページから外しました（(\d+)件）：([\s\S]+)$/, // eslint-disable-line no-undef
         en: (m) => "To avoid showing the same facts on two slides, " + m[1] + " item(s) already on the table pages (specs table, at a glance, trade terms) were removed from other pages: " + tw(m[2], "en"),
         zh: (m) => "为避免同一信息出现在两页，已从其他页面删除表格页（成分・规格表、概要、交易条件）中已有的 " + m[1] + " 项：" + tw(m[2], "zh"),
         es: (m) => "Para no repetir los mismos datos en dos diapositivas, se quitaron " + m[1] + " elemento(s) que ya están en las páginas de tablas: " + tw(m[2], "es") });
+      I18N.pat.unshift({ re: /^梱包・物流のページの表を登録の表に合わせました：([\s\S]+)$/, // eslint-disable-line no-undef
+        en: (m) => "Aligned the packaging table with the registered table: " + String(m[1]).replace(/品番＝/g, "product no. = ").replace(/入数＝外装の/g, "quantity per case = outer carton ").replace(/・/g, ", "),
+        zh: (m) => "已按登记的表格调整包装・物流页的表格：" + m[1],
+        es: (m) => "Se ajustó la tabla de embalaje a la tabla registrada: " + String(m[1]).replace(/・/g, ", ") });
+      I18N.pat.unshift({ re: /^価格の表の小数の桁を、同じ表の登録の値（小数2桁）にそろえました（(\d+)か所・値は変えていません）$/, // eslint-disable-line no-undef
+        en: (m) => "Aligned decimal places in the price table with the registered values (2 decimals) (" + m[1] + " places; values unchanged)",
+        zh: (m) => "已将价格表的小数位与登记的值（2位小数）统一（" + m[1] + " 处・数值未变）",
+        es: (m) => "Se igualaron los decimales de la tabla de precios a los valores registrados (2 decimales) (" + m[1] + "; valores sin cambios)" });
+      I18N.pat.unshift({ re: /^成分のページの見出しを中身に合わせました（アレルゲンは成分・仕様の表に載せています）：([\s\S]+)$/, // eslint-disable-line no-undef
+        en: (m) => "Matched the ingredients page heading to its content (allergens are in the specifications table): " + m[1],
+        zh: (m) => "已使成分页的标题与内容一致（过敏原列在成分・规格表中）：" + m[1],
+        es: (m) => "Se ajustó el título de la página de ingredientes a su contenido (los alérgenos están en la tabla de especificaciones): " + m[1] });
+      I18N.pat.unshift({ re: /^表紙で同じ文字が2回続いていたため、小さい方を外しました：([\s\S]+)$/, // eslint-disable-line no-undef
+        en: (m) => "The same text appeared twice on the cover; the smaller one was removed: " + m[1],
+        zh: (m) => "封面上同样的文字出现了两次，已删除较小的一处：" + m[1],
+        es: (m) => "El mismo texto aparecía dos veces en la portada; se quitó el más pequeño: " + m[1] });
+      I18N.pat.unshift({ re: /^「売れる理由」のページは入れていません：([\s\S]+)$/, // eslint-disable-line no-undef
+        en: () => "The “Why It Sells” page is not included: the allergen item is already in the specifications table, which left only one item (the page needs two). Register the product strengths one by one with figures or test conditions (or answer the follow-up questions), then press “↻ Make it again”",
+        zh: () => "未放入“畅销理由”页：过敏原已列在成分・规格表中而被删除，只剩 1 项（需要 2 项）。请逐条登记带数字或试验条件的商品优势（或回答追加问题），再点“↻ 重新制作”",
+        es: () => "No se incluyó la página «Por qué se vende»: el alérgeno ya está en la tabla y quedó un solo punto (se necesitan dos). Registre los puntos fuertes con cifras o condiciones de prueba y pulse «↻ Crear de nuevo»" });
       I18N.pat.unshift({ re: /^材質・仕様の表の列を、食品でない商品の形に直しました：([\s\S]+)$/, // eslint-disable-line no-undef
         en: (m) => "Adjusted the materials/specifications table for a non-food product: " + String(m[1]).replace(/見出し/g, "header ").replace(/小見出し/g, "subtitle ").replace(/行/g, " row(s)").replace(/・/g, ", "),
         zh: (m) => "已将材质・规格表调整为非食品商品的形式：" + m[1],

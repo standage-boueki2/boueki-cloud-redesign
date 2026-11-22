@@ -210,6 +210,102 @@
       }
     } catch (e) { err("paintItem", e); }
   }
-  V.wrap("render", (o) => function () { const r = o.apply(this, arguments); try { setTimeout(paintItem, 0); } catch (e) { /* 無視 */ } return r; });
-  try { const mo = new MutationObserver(() => { if (!V.__pi) { V.__pi = 1; setTimeout(() => { V.__pi = 0; paintItem(); }, 120); } }); const st = () => { const w = document.getElementById("well"); if (w) mo.observe(w, { childList: true }); else setTimeout(st, 500); }; st(); } catch (e) { err("mo", e); }
+  /* ════════════ 22.01.1（612 の残り・v1 N8・v2-8）日本語の画面の並び：項目名の「・」と区切りの「・」が同じで、数より多く見える ════════════
+     データの文（英・中・西の訳の層が辞書で「・」つなぎを切り分けて訳す）は変えず、日本語の表示のときだけ、画面の上で区切りを「、」に。
+     並んだ項目の名前は、同じ数え方の関数（scoreOf・v90ctyOptMiss・v92prodFill）から取り、文と一致したときだけ直す（推し量りで切らない）。 */
+  function textNodes(el) { const a = []; const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); while (w.nextNode()) a.push(w.currentNode); return a; }
+  function rejoin(node, names, tail) {
+    // node の文の中の names.join("・") を names.join("、") に（tail は「 ほか」「 など」）
+    const v = String(node.nodeValue || "");
+    const a = names.join("・") + (tail || ""), b = names.join("、") + (tail || "");
+    if (names.length < 2 || v.indexOf(a) < 0 || a === b) return false;
+    node.nodeValue = v.replace(a, b);
+    return true;
+  }
+  // 英・中・西の画面：「Optional items not registered: N — a · b, c」（訳の層が「・」つなぎを辞書で切るときに、2つの項目を1つにまとめることがある）
+  //   → 同じ数え方の関数の項目名を1つずつ訳して並べ直す（訳の層が触らないよう data-noi18n の span に置き換える）
+  function trName(n) { try { const d = (typeof I18N !== "undefined" && I18N && I18N.dict && I18N.dict[I18N.lang]) || {}; const v = d[n]; return typeof v === "string" && v ? v : n; } catch (e) { return n; } } // eslint-disable-line no-undef
+  function fixListsOther() {
+    try {
+      const l = V.lang(); if (l === "ja") return 0;
+      const t = ten(); const well = document.getElementById("well");
+      if (!t || !well || !userT(t)) return 0;
+      let opt = [];
+      try { opt = (typeof W.v90ctyOptMiss === "function" ? W.v90ctyOptMiss(t) : []).map((x) => trName(String(x.n))); } catch (e) { opt = []; }
+      let n = 0;
+      textNodes(well).forEach((nd) => {
+        const v = String(nd.nodeValue || "");
+        const m = v.match(/^(\s*)(Optional items not registered: |Elementos opcionales sin registrar: )(\d+) — (.+?)( \((?:adding|al añadir)[\s\S]*)$/) || v.match(/^(\s*)(选填项目未登记 )(\d+) 项：(.+?)(（填写后[\s\S]*)$/);
+        if (!m || +m[3] !== opt.length || !opt.length) return;
+        const sep = l === "zh" ? "、" : ", ";
+        const lst = opt.join(sep);
+        if (m[4] === lst) return;
+        const sp = document.createElement("span"); sp.setAttribute("data-noi18n", "1"); sp.setAttribute("data-v101list", "1");
+        sp.textContent = m[1] + m[2] + m[3] + (l === "zh" ? " 项：" : " — ") + lst + m[5];
+        nd.parentNode.insertBefore(sp, nd); nd.parentNode.removeChild(nd);
+        n++;
+      });
+      if (n) V.n.listOther = (V.n.listOther || 0) + n;
+      return n;
+    } catch (e) { err("listOther", e); return 0; }
+  }
+  V.fixListsOther = fixListsOther;
+  function fixListsJa() {
+    try {
+      if (V.lang() !== "ja") return fixListsOther();
+      const t = ten();
+      const well = document.getElementById("well");
+      if (!t || !well || !userT(t)) return 0;
+      let n = 0;
+      // 「足りないのは N項目（a・b・c ほか）」
+      let miss = [];
+      try { miss = (typeof scoreOf === "function" ? scoreOf(t).missing : []).map((m) => String(m.n)); } catch (e) { miss = []; } // eslint-disable-line no-undef
+      well.querySelectorAll("b").forEach((b) => {
+        const m = String(b.textContent || "").trim().match(/^足りないのは(\d+)項目$/);
+        if (!m || b.childElementCount) return;
+        const N = +m[1];
+        const L = miss.slice(0, 4);
+        if (!L.length || N !== miss.length || L.length < 2) return;
+        // 用語の説明の印（span）で文字が分かれていることがあるので、<b> の後ろの文字をつないで区切りの位置を探す
+        const el = b.parentElement; if (!el) return;
+        const all = textNodes(el); const i0 = all.findIndex((x) => b.contains(x)); if (i0 < 0) return;
+        const after = all.slice(i0 + 1).filter((x) => !b.contains(x));
+        let txt = ""; const map = [];
+        for (const nd of after) { map.push([nd, txt.length]); txt += String(nd.nodeValue || ""); if (txt.indexOf("）") >= 0) break; }
+        const a = txt.indexOf("（"), z = txt.indexOf("）", a + 1);
+        if (a < 0 || z < 0) return;
+        const inner = txt.slice(a + 1, z), want = L.join("・") + (N > 4 ? " ほか" : "");
+        if (inner !== want) return;
+        let pos = a + 1;
+        L.slice(0, -1).forEach((nm) => {
+          pos += nm.length; // 区切りの「・」の位置
+          for (let j = map.length - 1; j >= 0; j--) { if (map[j][1] <= pos) { const nd = map[j][0], off = pos - map[j][1], v = String(nd.nodeValue || ""); if (v[off] === "・") nd.nodeValue = v.slice(0, off) + "、" + v.slice(off + 1); break; } }
+          pos += 1;
+        });
+        n++;
+      });
+      // 「任意の項目で未登録 N件：a・b（入れると…）」「任意 あとN件（a・b など）」
+      let opt = [];
+      try { opt = (typeof W.v90ctyOptMiss === "function" ? W.v90ctyOptMiss(t) : []).map((x) => String(x.n)); } catch (e) { opt = []; }
+      let optM = [], needM = [];
+      try {
+        const K = typeof W.v92prodFill === "function" ? W.v92prodFill(t) : null;
+        optM = K && Array.isArray(K.optMiss) ? K.optMiss.map((x) => String(x.n)) : [];
+        // 「商品情報を登録」の「残り N項目（a・b など）」「全体 c/d：あと a・b など」（同じ数え方 v92prodFill の missKeys と名前 v92prodNm）
+        needM = K && Array.isArray(K.missKeys) ? K.missKeys.map((k) => (k === "hs" && K.hsGuess ? "HSコード（推定・要確認）" : (typeof W.v92prodNm === "function" ? String(W.v92prodNm(k, t)) : k))) : [];
+      } catch (e) { optM = []; needM = []; }
+      textNodes(well).forEach((nd) => {
+        const v = String(nd.nodeValue || "");
+        if (/任意の項目で未登録 \d+件：/.test(v)) { if (rejoin(nd, opt, "")) n++; }
+        else if (/任意 あと\d+件（/.test(v)) { if (rejoin(nd, optM.slice(0, 2), optM.length > 2 ? " など" : "")) n++; }
+        else if (/残り \d+項目（/.test(v) || /全体 \d+\/\d+：あと /.test(v)) { if (rejoin(nd, needM.slice(0, 2), needM.length > 2 ? " など" : "")) n++; }
+      });
+      if (n) V.n.listJa = (V.n.listJa || 0) + n;
+      return n;
+    } catch (e) { err("listJa", e); return 0; }
+  }
+  V.fixListsJa = fixListsJa;
+
+  V.wrap("render", (o) => function () { const r = o.apply(this, arguments); try { setTimeout(paintItem, 0); setTimeout(fixListsJa, 0); setTimeout(fixListsJa, 400); } catch (e) { /* 無視 */ } return r; });
+  try { const mo = new MutationObserver(() => { if (!V.__pi) { V.__pi = 1; setTimeout(() => { V.__pi = 0; paintItem(); fixListsJa(); }, 120); } }); const st = () => { const w = document.getElementById("well"); if (w) mo.observe(w, { childList: true, subtree: true }); else setTimeout(st, 500); }; st(); } catch (e) { err("mo", e); }
 })();

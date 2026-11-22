@@ -13,3 +13,5 @@
 @media (max-width:600px){.v101out-gl li{display:block}.v101out-gl li .nn{display:block}.v101out-gl li .btn{margin-top:4px}.v101out-row .btn,.v101out-cgo{max-width:100%;white-space:normal}}
 .v101out-p{margin:4px 0 0;font-size:12.5px;line-height:1.7;color:var(--ink-2,#444);overflow-wrap:anywhere}
 .v101out-ed.ok .v101out-p{color:var(--good,#15803d);font-weight:700}
+/* 22.01.1：表紙の見本の注記（強みが登録の日本語のまま） */
+.k-cover .v101out-cvn{display:block;margin-top:4px;font-size:11px;line-height:1.5;color:var(--k-ink2,#555);font-weight:600;overflow-wrap:anywhere}
