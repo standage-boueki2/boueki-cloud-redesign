@@ -83,3 +83,16 @@ table.v101fexponly tbody tr:not(.v89fexp){display:none !important}
 }
 .rd-ts.v101fnlwhy{display:block;font-size:11.5px;color:var(--rd-ink2,#4a5560)}
 small.v101fnlwhy{display:block}
+/* 22.01.2（w3 の直し） */
+.k-tile.v101fnochk .k-tn{color:var(--rd-ink,#13233b) !important}
+.k-tile.v101fnochk .k-ti{color:var(--rd-ink-3,#6b7280) !important;background:var(--rd-bg-2,#f1f5f9) !important}
+.v101flegx{background:#fff3e0 !important;color:#9a4a00 !important}
+p.v101fwaystale{margin:6px 0 0;font-size:11px;line-height:1.55;color:#9a4a00}
+.v101fapoff{background:transparent !important;color:inherit !important;border-color:var(--rd-line,#d6dbe3) !important;box-shadow:none !important}
+.v101fexpact{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.v101fexpact .btn{padding:2px 10px;font-size:11px}
+.rd-td.v101ftodo .rd-cnt{white-space:nowrap}
+@media (prefers-color-scheme: dark){
+  .v101flegx{background:#2b2111 !important;color:#f6e7cf !important}
+  p.v101fwaystale{color:#f3c58a}
+}

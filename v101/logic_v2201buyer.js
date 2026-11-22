@@ -187,9 +187,14 @@
     const s = String(raw.s || ""), u = String(raw.u || ""), ok = String(raw.ok || "");
     const dest = String((Fc && Fc.dest) || "");
     if ((!s && !u) || !dest) return raw;
+    // 22.01.1・22.01.2 でこの層が足した行（v101b・v101p）は、国・商材ごとに当局の頁を開いて選んだ出どころなので絞らない
+    //   （「犬貓食品」「Animal Food」を人の食品の出どころと読んで外してしまうため）
+    if (/^v101[bp]\d/.test(String(raw.id || ""))) return raw;
     const prod = comOfHs(Fc.hs);
-    const key = s + "|" + u + "|" + ok + "|" + dest + "|" + [...prod].sort().join(",");
+    const key = (raw.id || "") + "|" + s + "|" + u + "|" + ok + "|" + dest + "|" + [...prod].sort().join(",");
     if (MEMO[key]) return MEMO[key];
+    // 22.01.2 L2：どの国にも当たる行の出どころを、国ごと（香港・台湾・シンガポール）に、当局の頁を開いて確かめたものに置き換える
+    try { const ov = V.l2Src ? V.l2Src(raw.id, dest, prod) : null; if (ov) { MEMO[key] = Object.assign({ v101: { l2: 1 } }, ov); V.n.srcDrop++; return MEMO[key]; } } catch (e) { err("l2", e); }
     const parts = s.split(SEP).map((x) => x.trim()).filter(Boolean);
     const keep = parts.map((p) => partOk(p, dest, prod));
     const idx = []; keep.forEach((k, i) => { if (k) idx.push(i); });
@@ -202,8 +207,16 @@
       const linkOk = !!u && keep[0] && (!uc || ccHit(new Set([uc]), dest));
       const same = idx.length === parts.length && (linkOk || !u);
       const s2 = idx.map((i) => parts[i]).join(SEP);
-      r = { s: same ? s : s2, u: linkOk ? u : "", ok: same ? ok : okFilt(ok, dest), v101: { all: parts.length, kept: idx.length, link: linkOk } };
-      if (!same) { trParts(s, idx, parts.length, s2); trOk(ok, r.ok); }
+      // 22.01.2（2回目）w2-15：残った出どころが「いくつもの国を並べた名前」で、リンクがほかの国の頁だった（相手国の頁ではない）ときは、
+      //   名前だけを残さず「要確認（未登録）」に（例：UAE に「JETRO UAE・サウジ・エジプト・ナイジェリア 輸出入手続」＝リンクはサウジの頁）
+      const multi = (x) => ccOf(x).size >= 2;
+      if (u && !linkOk && uc && !ccHit(new Set([uc]), dest) && idx.every((i) => multi(parts[i]))) {
+        r = { s: "", u: "", ok: NOREG, v101: { all: parts.length, kept: 0, multi: 1 } };
+        V.n.srcNoReg++;
+      } else {
+        r = { s: same ? s : s2, u: linkOk ? u : "", ok: same ? ok : okFilt(ok, dest), v101: { all: parts.length, kept: idx.length, link: linkOk } };
+        if (!same) { trParts(s, idx, parts.length, s2); trOk(ok, r.ok); }
+      }
     }
     if (r.s !== s || r.u !== u) V.n.srcDrop++;
     MEMO[key] = r;
@@ -322,7 +335,7 @@
     if (!R || typeof R !== "object") return false;
     if (Object.prototype.hasOwnProperty.call(R, "__v101raw")) return true;
     try {
-      const raw = { s: R.s, u: R.u, ok: R.ok, c: R.c };
+      const raw = { s: R.s, u: R.u, ok: R.ok, c: R.c, id: R.id };
       Object.defineProperty(R, "__v101raw", { value: raw, writable: true, enumerable: false, configurable: true });
       Object.defineProperty(R, "__v101F", { value: null, writable: true, enumerable: false, configurable: true });
       ["s", "u", "ok"].forEach((k) => Object.defineProperty(R, k, {
@@ -354,6 +367,8 @@
   function wrapRuleHit() {
     return wrap("v85docRuleHit", (o) => function (r, Fx) {
       const h = o.apply(this, arguments);
+      // 22.01.2 R4：ペットフードには、人の食品の手続き（台湾 TFDA の輸入査験・ベトナムの食品の自己公表など）の行を出さない
+      try { if (h && r && Fx && V.petHuman && V.petHuman(r, Fx)) { V.n.petCut = (V.n.petCut || 0) + 1; return null; } } catch (e) { err("petHit", e); }
       try { if (h && r && Fx && Fx.dest && inst(r)) { r.__v101F = { dest: String(Fx.dest), hs: String(Fx.hs || "") }; LIVE.add(r); clearSoon(); } } catch (e) { err("ruleHit", e); }
       return h;
     });
@@ -384,6 +399,9 @@
   function isFake(v) { const s = String(v || ""); if (!s.trim()) return false; FAKE_MAIL.lastIndex = 0; FAKE_ADDR.lastIndex = 0; FAKE_TEL.lastIndex = 0; return FAKE_MAIL.test(s) || FAKE_ADDR.test(s) || FAKE_TEL.test(s) || /\[[^\]\n]{1,30}\]/.test(s) || MK_RE.test(s); }
   function mailOf(s) { try { return typeof v71obMail === "function" ? v71obMail(s) : ((String(s || "").match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/) || [""])[0]); } catch (e) { return ""; } } // eslint-disable-line no-undef
   function clean(x) { const s = String(x == null ? "" : x).trim(); return s && !isFake(s) && !/[（(]案[)）]\s*$/.test(s) ? s : ""; }
+  // 22.01.2 S3：署名の名前は英字（ローマ字）だけ。ログインの名前が英字でない（例「大森（Claude検証）」）ときは入れず【差出人の名前（英字）を入れてください】に
+  //   （22.01 の L4「日本語の名前を入れて、ローマ字の氏名を入れてくださいと知らせる」を置き換える。英字の名前〔Taro Yamada など〕はそのまま）
+  function latinName(x) { const s = clean(x); if (!s) return ""; if (/[^ -ɏḀ-ỿ’]/.test(s)) return ""; return /[A-Za-zÀ-ɏ]{2,}/.test(s) ? s : ""; }
   // 登録済みの会社情報（英文の住所・電話・Web・メール・担当者）
   function regInfo() {
     const t = ten() || {};
@@ -422,7 +440,7 @@
   wrap("v79obSigText", (o) => function (s) {
     try {
       s = s || (fn("v79obSig") ? W.v79obSig() : {});
-      const name = clean(s.name) || MK.name, mail = mailOf(s.mail || "") && !isFake(s.mail) ? mailOf(s.mail) : MK.mail, addr = clean(s.addr) || MK.addr;
+      const name = latinName(s.name) || MK.name, mail = mailOf(s.mail || "") && !isFake(s.mail) ? mailOf(s.mail) : MK.mail, addr = clean(s.addr) || MK.addr;
       return [name, clean(s.title), clean(s.co), [mail, clean(s.tel), clean(s.web)].filter(Boolean).join(" | "), addr].filter(Boolean).join("\n");
     } catch (e) { err("sigText", e); return o.apply(this, arguments); }
   });
@@ -434,7 +452,7 @@
   // 本文の仮の値・穴埋めを、登録済みの値か【…】に置き換える
   function scrub(b, s) {
     s = s || (fn("v79obSig") ? W.v79obSig() : {});
-    const name = clean(s.name), mail = mailOf(s.mail || "") && !isFake(s.mail) ? mailOf(s.mail) : "", addr = clean(s.addr), tel = clean(s.tel), web = clean(s.web), title = clean(s.title), co = clean(s.co);
+    const name = latinName(s.name), mail = mailOf(s.mail || "") && !isFake(s.mail) ? mailOf(s.mail) : "", addr = clean(s.addr), tel = clean(s.tel), web = clean(s.web), title = clean(s.title), co = clean(s.co);
     let x = String(b || "");
     const x0 = x;
     const rep = (re, v) => { re.lastIndex = 0; x = x.replace(re, v); };
@@ -960,7 +978,8 @@
         else wholeDrop = true;
       }
     }
-    if (!wholeDrop) { out = tidy(out, lgS); if (!meaningful(out, lgS)) wholeDrop = true; }
+    // 22.01.2：節を外さず語だけ外した文（件名「Wooden puzzles from Japan」→「Wooden puzzles」など）は、2語でも残す（前は件名が空になった）
+    if (!wholeDrop) { out = tidy(out, lgS); if (segs.some((x) => x.drop) ? !meaningful(out, lgS) : !nonEmpty(out, lgS)) wholeDrop = true; }
     const adds = Object.keys(need).map((k) => { ctx.done[k] = 1; return tbcText(need[k], lgS, ctx.T); });
     const cap = (x) => (lgS === "en" || lgS === "es") ? x.charAt(0).toUpperCase() + x.slice(1) : x;
     if (wholeDrop) {
@@ -995,7 +1014,9 @@
     T = T || ten();
     let L = [];
     try { L = unkTopicsOf(T); } catch (e) { L = []; }
-    if (!s0.trim() || !L.length) return { text: s0, hits: [] };
+    // 22.01.2（2回目）w2-1：登録の名前（原材料・材質・品番）にそろえる直しは、「不明」の話題が無くても掛ける
+    if (!s0.trim()) return { text: s0, hits: [] };
+    if (!L.length) { try { if (V.termFix) return V.termFix(s0, hint, T); } catch (e) { err("termFix0", e); } return { text: s0, hits: [] }; }
     const hits = [];
     const ctx = { hint, T, L, done: {}, lineHedge: {}, naoQual: false, hit: (k, m, dropped) => { hits.push({ k, m: String(m || "").slice(0, 60), dropped: !!dropped }); } };
     // 同じ文面の中で、その話題を「確認」とすでに書いている（前に入れた「待確認」も）なら、もう足さない
@@ -1020,6 +1041,7 @@
     }
     let t = out.join("\n").replace(/\n{3,}/g, "\n\n");
     try { t = naoQualify(t, ctx); } catch (e) { err("nao", e); }
+    try { if (V.termFix) { const r2 = V.termFix(t, hint, T); t = r2.text; r2.hits.forEach((x) => hits.push(x)); } } catch (e) { err("termFix1", e); }
     if (t !== s0) { V.n.unkFix++; V.n.unkHit += hits.length; }
     return { text: t, hits };
   }
@@ -1028,6 +1050,7 @@
   function unkScan(text, hint, T) {
     T = T || ten();
     const L = unkTopicsOf(T), out = [];
+    try { if (V.termScan) V.termScan(text, hint, T).forEach((x) => out.push(x)); } catch (e) { err("termScan0", e); }
     if (!L.length) return out;
     String(text || "").split("\n").forEach((line) => sents2(line).forEach((x) => x.split(SUBSEP).forEach((sub, i, arr) => {
       if (i % 2 || !sub.trim() || HEDGE.test(sub)) return;
@@ -1072,6 +1095,7 @@
   wrap("v71obCtx", (o) => function () {
     let s = String(o.apply(this, arguments) || "");
     try { const a = unkPrompt(ten()); if (a && s.indexOf("【v101unk】") < 0) { s = s + "\n\n" + a; V.n.unkCtx++; } } catch (e) { err("ctx", e); }
+    try { const b = V.termPrompt ? V.termPrompt(ten()) : ""; if (b && s.indexOf("【v101reg】") < 0) s = s + "\n\n" + b; } catch (e) { err("ctxTerm", e); } // 22.01.2（2回目）w2-1
     return s;
   });
 
@@ -1255,7 +1279,7 @@
       const C_JA = "除菌・抗菌・殺菌をうたう商品を米国で売る時（物の表面・空間・布などに使い、菌・ウイルスを殺す・減らすとうたうもの）";
       const N_JA = "米国では、販売・流通する殺虫剤・殺菌剤などの「農薬（pesticide）」は、連邦の法律（FIFRA）で米国環境保護庁（USEPA）の登録が要る。物の表面などの菌・ウイルスを殺す・減らすとうたう消毒剤・除菌剤は「抗菌剤（antimicrobial pesticide）」に当たる。この商品が当たるか（うたい文句・使い方）と、登録の名義（米国の輸入者か、メーカーが米国の代理人を立てるか）を、輸入者と確かめる。手や肌に使うもの（手指の消毒など）は別の決まりになることがある（要確認）";
       const S_JA = "米国環境保護庁（USEPA）『About Pesticide Registration』（頁の更新 2026-10-15）／米国環境保護庁（USEPA）『What are Antimicrobial Pesticides?』・『Antimicrobial Pesticide Registration』（頁の更新 2026-01-29）";
-      const OK_JA = "要確認（登録が要るかは、商品のうたい文句・使い方ごとに USEPA の頁と輸入者に確かめる）";
+      const OK_JA = "要確認（頁を開いた日 2026-11-22・登録が要るかは、商品のうたい文句・使い方ごとに USEPA の頁と輸入者に確かめる）"; // 22.01.2：開いた日を持たせる
       if (!D85.rules.some((r) => r && r.id === "v101b01")) {
         D85.rules.push({ id: "v101b01", k: ["US_EPA_FIFRA"], w: { h: ["*"], d: ["US"], f: [FLAG] }, lv: "conditional", c: C_JA, is: "輸入者（米国）・メーカー（米国の代理人を通じて）", ld: 90, n: N_JA, s: S_JA, u: "https://www.epa.gov/pesticide-registration/about-pesticide-registration", ok: OK_JA });
       }
@@ -1264,7 +1288,7 @@
       dictAdd(C_JA, "When selling in the US a product that claims to sanitize, disinfect or kill germs (used on surfaces, air, fabrics, etc. and claimed to kill or reduce bacteria/viruses)", "在美国销售宣称除菌・抗菌・杀菌的商品时（用于物体表面・空间・布料等，宣称杀灭或减少细菌・病毒）", "Al vender en EE. UU. un producto que afirma desinfectar o eliminar gérmenes (en superficies, aire, tejidos, etc.)");
       dictAdd(N_JA, "In the US, pesticides sold or distributed must be registered by EPA under federal law (FIFRA). Disinfectants and sanitizers claimed to kill or reduce bacteria/viruses on surfaces are antimicrobial pesticides. Check with the importer whether this product is covered (claims and use) and who will hold the registration (the US importer, or the maker through a US agent). Products used on hands or skin may fall under different rules (to be confirmed).", "在美国，销售・流通的农药（pesticide）须依联邦法律（FIFRA）在 EPA 注册。宣称杀灭或减少物体表面细菌・病毒的消毒剂・除菌剂属于“抗菌剂（antimicrobial pesticide）”。请与进口商确认本商品是否适用（宣传用语・用途）以及注册名义人（美国进口商，或制造商通过美国代理人）。用于手部・皮肤的产品可能适用其他规定（需确认）。", "En EE. UU., los plaguicidas que se venden o distribuyen deben registrarse ante la EPA (ley FIFRA). Los desinfectantes que afirman eliminar o reducir bacterias/virus en superficies son plaguicidas antimicrobianos. Confirme con el importador si el producto está incluido y quién será el titular del registro. Los productos para manos o piel pueden tener otras normas (por confirmar).");
       dictAdd(S_JA, "US EPA “About Pesticide Registration” (page updated 2026-10-15) / US EPA “What are Antimicrobial Pesticides?” and “Antimicrobial Pesticide Registration” (pages updated 2026-01-29)");
-      dictAdd(OK_JA, "To be confirmed (whether registration is needed depends on the product's claims and use — check the EPA pages and with the importer)", "需确认（是否需要注册取决于商品的宣传用语和用途，请查看 EPA 页面并与进口商确认）", "Por confirmar (depende de las afirmaciones y el uso del producto — consulte la EPA y al importador)");
+      dictAdd(OK_JA, "To be confirmed (page opened 2026-11-22; whether registration is needed depends on the product's claims and use — check the EPA pages and with the importer)", "需确认（是否需要注册取决于商品的宣传用语和用途，请查看 EPA 页面并与进口商确认）", "Por confirmar (depende de las afirmaciones y el uso del producto — consulte la EPA y al importador)");
       dictAdd("輸入者（米国）・メーカー（米国の代理人を通じて）", "Importer (US) / maker (through a US agent)", "进口商（美国）・制造商（通过美国代理人）", "Importador (EE. UU.) / fabricante (mediante agente en EE. UU.)");
       V.epa = { flag: FLAG, rule: "v101b01", doc: "US_EPA_FIFRA" };
     } catch (e) { err("epaRule", e); }
@@ -1295,9 +1319,411 @@
     const g = function (d, hs) {
       const o = __fa.apply(this, arguments);
       try { if (o && !o.antimicrobial_claim) { const why = amcWhy(d || (ten() || {}), hs); if (why) { o.antimicrobial_claim = why; V.n.epaFlag++; } } } catch (e) { err("amcFlag", e); }
+      try { if (o && !o.pet_food) { const pw = petWhy(d || (ten() || {}), hs); if (pw) o.pet_food = pw; } } catch (e) { err("petFlag", e); } // 22.01.2 R4
       return o;
     };
     g.__v101buyer = 1;
     W.v85docFlagsAuto = g;
   }
+
+  /* ═════════════════════════════════════════════════════════════════════════════════════════════
+     22.01.2（大森さんの決め「22.01・22.01.1 は全部推奨で」のうち「次の版で」とした4つ）
+       S3 署名の名前は英字だけ（上の latinName・v79obSigText・scrub）／ L2 どの国にも当たる行の出どころを国ごとに／
+       T4 除菌・抗菌をうたう商品のほかの国の登録（EU・台湾）／ R4 ペットフードの行（香港・台湾・アメリカ・ベトナム）と人の食品の手続きを出さない
+     出どころはどれも、2026-11-22 に当局の頁を開いて、行に書いた中身だけを確かめた。断定せず「要確認（頁を開いた日 …）」で出す（信頼の決まり 1・6）
+     ═════════════════════════════════════════════════════════════════════════════════════════════ */
+  V.ver = "22.01.2";
+  V.latinName = latinName;
+  const OPENED = "2026-11-22";
+  const okOpen = (ja, en) => { const j = "要確認（頁を開いた日 " + OPENED + "・" + ja + "）"; dictAdd(j, "To be confirmed (page opened " + OPENED + "; " + en + ")", "需确认（打开页面日期 " + OPENED + "；" + en + "）", "Por confirmar (página abierta el " + OPENED + "; " + en + ")"); return j; };
+
+  /* ── L2：どの国にも当たる行（r008 輸出先の表示ラベル）の出どころを、国ごと・商材ごとの当局の頁に ──
+     22.01 は、サウジ・UAE の資料しか付いていない行を「要確認（この国・商材の公的な出どころは未登録）」にしていた。
+     香港・台湾・シンガポールで、当局の頁（法令の条文・当局の FAQ・指針）を開いて表示の決まりを確かめられたものだけを付ける。
+     確かめられなかった国・商材（香港の化粧品・化学品、シンガポールの玩具・化学品、医療機器・酒類など）は今までどおり「要確認（…未登録）」 */
+  const L2 = {
+    HK: {
+      food: { s: "香港 食物安全センター（CFS）『Food Labelling』FAQ（食品・薬品〔成分・表示〕規則 Cap.132W：包装済みの食品は英語か中国語か両方で表示）", u: "https://www.cfs.gov.hk/english/faq/faq_03.html",
+        en: "Hong Kong Centre for Food Safety “Food Labelling” FAQ (Cap. 132W: prepackaged food labelled in English or Chinese or both)" },
+      toy: { s: "香港 税関（C&ED）『Toys and Children's Products Safety』FAQ（Cap.424C：安全の注意書きは英語と中国語の両方・輸入者などの名前と住所）", u: "https://www.customs.gov.hk/en/faqs/consumer_protection/toy_safety/index.html",
+        en: "Hong Kong Customs and Excise Department “Toys and Children's Products Safety” FAQ (Cap. 424C: warnings in both English and Chinese; name and address of manufacturer, importer or supplier)" }
+    },
+    TW: {
+      food: { s: "台湾 全国法規資料庫『食品安全衛生管理法』第22条（容器・包装に中文と通用の記号で表示・最終改正 2019-06-12）", u: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=L0040001",
+        en: "Taiwan Laws & Regulations Database, Act Governing Food Safety and Sanitation, Art. 22 (labelling in Chinese; last amended 2019-06-12)" },
+      cosme: { s: "台湾 全国法規資料庫『化粧品衛生安全管理法』第7条（品名・全成分・輸入者・原産国などを中文で表示・最終改正 2018-05-02）", u: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=L0030013",
+        en: "Taiwan Laws & Regulations Database, Cosmetic Hygiene and Safety Act, Art. 7 (Chinese labelling incl. full ingredients, importer, origin; last amended 2018-05-02)" },
+      other: { s: "台湾 全国法規資料庫『商品標示法』第6条・第11条（輸入品は輸入者・国外の製造者を表示・文字は中文が主・最終改正 2022-05-18）", u: "https://law.moj.gov.tw/LawClass/LawAll.aspx?PCode=J0080011",
+        en: "Taiwan Laws & Regulations Database, Commodity Labeling Act, Arts. 6 and 11 (imported goods show the importer and foreign manufacturer; mainly in Chinese; last amended 2022-05-18)" }
+    },
+    SG: {
+      food: { s: "シンガポール 食品庁（SFA）『A Guide to Food Labelling and Advertisements』（包装済みの食品は英語で表示・2025-11 改訂）", u: "https://www.sfa.gov.sg/docs/default-source/food-manufacturing-and-storage/a-guide-to-food-labelling-and-advertisements.pdf",
+        en: "Singapore Food Agency “A Guide to Food Labelling and Advertisements” (prepacked food labelled in English; amended Nov 2025)" },
+      cosme: { s: "シンガポール 保健科学庁（HSA）『Regulatory overview of cosmetic products』（表示は英語・全成分・製造国・国内の責任者・頁の更新 2026-11-20）", u: "https://www.hsa.gov.sg/cosmetic-products/overview/",
+        en: "Singapore Health Sciences Authority “Regulatory overview of cosmetic products” (labels in English; full ingredients, country of manufacture, local responsible company; page updated 2026-11-20)" }
+    }
+  };
+  const L2OK = okOpen("表示の項目と当てはまるかは、商品ごとに輸入者と確かめる", "check the label items and whether they apply for each product with the importer");
+  Object.keys(L2).forEach((c) => Object.keys(L2[c]).forEach((k) => { const x = L2[c][k]; dictAdd(x.s, x.en, x.en, x.en); }));
+  const L2RULES = { r008: 1 };
+  V.L2 = L2;
+  V.l2Src = function (id, dest, prod) {
+    if (!id || !L2RULES[id]) return null;
+    const T = L2[dest];
+    if (!T || !prod || prod.has("liquor") || prod.has("med")) return null;
+    let x = null;
+    if (prod.has("food") && !prod.has("pet")) x = T.food || null;
+    else if (prod.has("cosme")) x = T.cosme || null;
+    else if (prod.has("toy")) x = T.toy || T.other || null;
+    else x = T.other || null; // 台湾は商品一般の表示の法律（商品標示法）
+    return x ? { s: x.s, u: x.u, ok: L2OK } : null;
+  };
+
+  /* ── T4：除菌・抗菌をうたう商品の、米国のほかの国の登録（条件つき・要確認）。当局の頁で確かめられた EU・台湾だけ ──
+     香港（除害劑條例 Cap.133）・シンガポール（NEA の公衆衛生用の農薬の登録）は、除菌剤が対象かを当局の頁で確かめられなかったので足していない */
+  const FLAG_AMC = "antimicrobial_claim";
+  const ADD_RULES = [], ADD_DOCS = {}, ADD_TR = [];
+  function addRule(r, doc, tr) { ADD_RULES.push(r); if (doc) ADD_DOCS[r.k[0]] = doc; (tr || []).forEach((x) => ADD_TR.push(x)); }
+  {
+    const c = "除菌・抗菌・殺菌をうたう商品を EU で売る時（殺生物性製品に当たるもの）";
+    const n = "EU の殺生物性製品規則（BPR・規則 (EU) 528/2012）の第17条は、殺生物性製品は認可を受けなければ市場に出せず、使えないと定めている。この商品が当たるか（うたい文句・使い方・有効成分）と、認可の名義（EU の会社）を輸入者と確かめる。手や肌に使うものは別の決まりになることがある（要確認）";
+    const s = "EUR-Lex 規則 (EU) No 528/2012（殺生物性製品規則 BPR）第17条（官報 OJ L 167・2012-06-27。統合版 2026-08-19 あり）";
+    addRule({ id: "v101b02", k: ["EU_BPR"], w: { h: ["*"], d: ["EU"], f: [FLAG_AMC] }, lv: "conditional", c, is: "輸入者（EU）", ld: 180, n, s, u: "https://eur-lex.europa.eu/eli/reg/2012/528/oj", ok: okOpen("当たるかは商品ごとに確かめる", "whether it applies depends on the product") },
+      ["EU の殺生物性製品の認可（除菌・抗菌をうたう製品・BPR）", "EU biocidal product authorisation (antimicrobial claims, BPR)", "importer", "external", 180],
+      [[c, "When selling in the EU a product that claims to sanitize, disinfect or kill germs (a biocidal product)"], [n, "Article 17 of the EU Biocidal Products Regulation (BPR, Regulation (EU) 528/2012) provides that biocidal products shall not be made available on the market or used unless authorised. Check with the importer whether this product is covered (claims, use, active substance) and who holds the authorisation (an EU company). Products used on hands or skin may fall under other rules (to be confirmed)."],
+        [s, "EUR-Lex Regulation (EU) No 528/2012 (Biocidal Products Regulation, BPR), Art. 17 (OJ L 167, 27.6.2012; consolidated version 2026-08-19)"], ["EU の殺生物性製品の認可（除菌・抗菌をうたう製品・BPR）", "EU biocidal product authorisation (antimicrobial claims, BPR)"], ["輸入者（EU）", "Importer (EU)"]]);
+  }
+  {
+    const c = "除菌・抗菌・殺菌をうたう商品を台湾で売る時（環境衛生用の殺菌剤などに当たるもの）";
+    const n = "台湾の環境用薬管理法は、環境衛生用の殺虫剤・殺鼠剤・殺菌剤などを「環境用薬」とし（第5条）、製造・加工・輸入には中央主管機関の許可証が要る（第9条。許可の無い輸入品は退運）。この商品が当たるか（物の表面・空間に使う殺菌剤か、化粧品・医薬品か）と、許可証の名義（台湾の輸入者）を確かめる（要確認）";
+    const s = "台湾 全国法規資料庫『環境用藥管理法』第5条・第9条（最終改正 2016-12-07）";
+    addRule({ id: "v101b03", k: ["TW_ENV_AGENT"], w: { h: ["*"], d: ["TW"], f: [FLAG_AMC] }, lv: "conditional", c, is: "輸入者（台湾）", ld: 180, n, s, u: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=O0060001", ok: okOpen("当たるかは商品ごとに確かめる", "whether it applies depends on the product") },
+      ["台湾 環境用薬の許可証（環境衛生用の殺菌剤など）", "Taiwan environmental agent permit (e.g. sanitation bactericides)", "importer", "external", 180],
+      [[c, "When selling in Taiwan a product that claims to sanitize, disinfect or kill germs (e.g. an environmental sanitation bactericide)"], [n, "Taiwan's Environmental Agents Control Act treats environmental sanitation insecticides, rodenticides, bactericides etc. as “environmental agents” (Art. 5); manufacturing, processing or importing requires a permit from the central authority (Art. 9; unpermitted imports must be returned). Check whether this product is covered (surface/space bactericide vs cosmetic or drug) and who holds the permit (the Taiwan importer) (to be confirmed)."],
+        [s, "Taiwan Laws & Regulations Database, Environmental Agents Control Act, Arts. 5 and 9 (last amended 2016-12-07)"], ["台湾 環境用薬の許可証（環境衛生用の殺菌剤など）", "Taiwan environmental agent permit (e.g. sanitation bactericides)"], ["輸入者（台湾）", "Importer (Taiwan)"]]);
+  }
+
+  /* ── R4：ペットフード（犬用おやつなど・HS 2309）の行。当局の頁で確かめた手続きだけ（条件つき・要確認）──
+     シンガポールは 21.95 の層（v95）の「AVS の輸入の手続き（積荷ごとの CCP）」の行が、同じ AVS の頁を出どころに既にある（今回の頁の更新 2026-11-17 も確かめた）ので足さない */
+  const FLAG_PET = "pet_food";
+  {
+    const c = "牛・豚・家きん由来の原料や乳を含むペットフードを香港へ送る時（香港は、犬・猫・ワシントン条約の対象の種に由来しなければ、輸入の許可は要らない）";
+    const n = "香港の漁農自然護理署（AFCD）は、ペットフードは犬・猫・ワシントン条約の対象の種に由来しなければ輸入の許可は要らないとし、牛・豚・家きん由来の原料や乳を含むものは、輸出国の獣医当局が出す（または裏書きした）証明書を付けることを勧めている（義務ではない）。日本の動物検疫所で出せるか・輸入者が求めるかを確かめる。表示の決まりは要確認";
+    const s = "香港 漁農自然護理署（AFCD）『Import and Export of Animals and Animal Products』FAQ（頁の表示 2026-06-16）";
+    addRule({ id: "v101p01", k: ["HK_PET_VC"], w: { h: ["*"], d: ["HK"], f: [FLAG_PET] }, lv: "conditional", c, is: "動物検疫所（日本）・輸入者", ld: 7, n, s, u: "https://www.afcd.gov.hk/english/quarantine/qua_ie/f_a_q.html", ok: okOpen("勧めか義務かと、日本で出せるかは輸入者と動物検疫所に確かめる", "check with the importer and Japan's Animal Quarantine Service whether it is needed and can be issued") },
+      ["香港向けペットフードの獣医の証明書（輸出国の公的な証明・AFCD が勧めるもの）", "Veterinary certificate for pet food to Hong Kong (recommended by AFCD)", "aqs", "external", 7],
+      [[c, "When sending pet food containing ruminant, porcine or poultry ingredients or milk to Hong Kong (no import permit is needed unless derived from cats, dogs or CITES-listed species)"], [n, "Hong Kong's AFCD says pet food needs no import permit unless derived from cats, dogs or CITES-listed species, and recommends (does not require) an official veterinary certificate issued or endorsed by the exporting country for products of ruminant, porcine or poultry origin or milk. Check whether Japan's Animal Quarantine Service can issue it and whether the importer wants it. Labelling rules to be confirmed."],
+        [s, "Hong Kong AFCD “Import and Export of Animals and Animal Products” FAQ (page shows 2026-06-16)"], ["香港向けペットフードの獣医の証明書（輸出国の公的な証明・AFCD が勧めるもの）", "Veterinary certificate for pet food to Hong Kong (recommended by AFCD)"], ["動物検疫所（日本）・輸入者", "Animal Quarantine Service (Japan) / importer"]]);
+  }
+  {
+    const c = "偶蹄類（牛・豚など）や鳥類（鶏など）由来の原料を含む犬猫用の食品（2309.10）・ペット用のかむおやつを台湾へ送る時";
+    const n = "台湾 農業部動植物防疫検疫署の「犬猫食品輸入検疫条件」（2022-03-29 公告）は、製造工場が輸出国の当局に犬猫用食品の工場として認められていること、新しく清潔な容器で詰めること、荷ごとに輸出国の動物検疫当局が出す証明書の原本（英語か中国語：輸入者・輸出者・工場・品名・数量・重さ・製造日・原料の動物の種類など）を付けることを定めている。疫病の発生国からは加熱の条件（中心 70℃・30分など）や当局の審査もある。日本がどの区分か・証明書が出せるかを動物検疫所と輸入者に確かめる（要確認）";
+    const s = "台湾 農業部動植物防疫検疫署『犬貓食品輸入檢疫條件』（英語版 Attachment 15-1・2022-03-29 公告・2022-04-29 から適用）";
+    addRule({ id: "v101p02", k: ["HC_PETFOOD"], w: { h: ["*"], d: ["TW"], f: [FLAG_PET] }, lv: "conditional", c, is: "動物検疫所（日本）", ld: 14, n, s, u: "https://www.aphia.gov.tw/ws.php?id=9624", ok: okOpen("当てはまるかは原料と日本の区分で確かめる", "whether it applies depends on the ingredients and Japan's status") },
+      null,
+      [[c, "When sending dog/cat food (2309.10) or pet chews containing Artiodactyla (cattle, pigs…) or Aves (chicken…) ingredients to Taiwan"], [n, "Taiwan APHIA's Quarantine Requirements for the Importation of Dog and Cat Food (promulgated 2022-03-29) require the plant to be approved by the exporting country's authority, clean new containers, and an original veterinary certificate from the exporting country's animal quarantine authority with each consignment (English or Chinese: importer, exporter, plant, product, quantity, weight, manufacturing date, animal species of ingredients, etc.). Products from countries not free of designated diseases also need heat treatment (e.g. core 70°C for 30 min) and authority review. Check Japan's status and certificate availability with the Animal Quarantine Service and the importer (to be confirmed)."],
+        [s, "Taiwan APHIA “Quarantine Requirements for the Importation of Dog and Cat Food” (English, Attachment 15-1; promulgated 2022-03-29, applicable from 2022-04-29)"], ["動物検疫所（日本）", "Animal Quarantine Service (Japan)"]]);
+  }
+  {
+    const s = "米国 FDA『Importing - Animal Food』（Content current as of 2025-02-14）";
+    const sEn = "US FDA “Importing - Animal Food” (content current as of 2025-02-14)";
+    const c1 = "米国にペットフード（おやつを含む）を売る時";
+    const n1 = "米国 FDA は、動物用の食品（ペットフード）も、施設の登録と荷ごとの事前通報（Prior Notice）の対象とし、正しく表示すること（連邦の動物用食品の表示の決まり 21 CFR Part 501）を求めている。州ごとの表示の決まりもある。表示の中身は輸入者と確かめる（要確認）";
+    addRule({ id: "v101p03", k: ["US_PET_LABEL"], w: { h: ["*"], d: ["US"], f: [FLAG_PET] }, lv: "conditional", c: c1, is: "自社・輸入者", ld: 14, n: n1, s, u: "https://www.fda.gov/animal-veterinary/import-exports/importing-animal-food", ok: okOpen("表示の中身は輸入者と確かめる", "confirm the label content with the importer") },
+      ["米国のペットフードの表示（21 CFR Part 501・州の決まり）", "US pet food labeling (21 CFR Part 501, state rules)", "self", "draft_template", 14],
+      [[c1, "When selling pet food (including treats) in the US"], [n1, "US FDA treats animal food (pet food) as subject to facility registration and prior notice for each shipment, and requires truthful labeling (federal animal food labeling regulations, 21 CFR Part 501). States may have their own labeling rules. Confirm the label content with the importer (to be confirmed)."],
+        [s, sEn], ["米国のペットフードの表示（21 CFR Part 501・州の決まり）", "US pet food labeling (21 CFR Part 501, state rules)"], ["自社・輸入者", "Your company / importer"]]);
+    const c2 = "肉・乳などの動物由来の原料を含むペットフードを、家畜の伝染病がある国から米国へ送る時";
+    const n2 = "FDA の頁は、家畜の伝染病（exotic livestock diseases）がある国からの動物由来の原料（乳製品・肉など）を含むものは、一般に USDA APHIS の獣医部門（VS）の輸入許可が要るとしている。日本の鶏肉などの原料が当たるかを輸入者と確かめる（要確認）";
+    addRule({ id: "v101p04", k: ["US_APHIS_VS"], w: { h: ["*"], d: ["US"], f: [FLAG_PET] }, lv: "conditional", c: c2, is: "輸入者（米国）", ld: 30, n: n2, s, u: "https://www.fda.gov/animal-veterinary/import-exports/importing-animal-food", ok: okOpen("当たるかは原料と日本の状況で輸入者と確かめる", "check with the importer whether it applies to the ingredients from Japan") },
+      ["米国 USDA APHIS の獣医部門の輸入許可（動物由来の原料を含む時）", "USDA APHIS Veterinary Services import permit (animal-origin ingredients)", "importer", "external", 30],
+      [[c2, "When sending pet food with animal-origin ingredients (meat, milk…) to the US from a country with exotic livestock diseases"], [n2, "The FDA page says products with animal-origin ingredients (dairy, meat, etc.) from countries with exotic livestock diseases generally need a USDA APHIS Veterinary Services (VS) import permit. Check with the importer whether ingredients from Japan (e.g. chicken) are covered (to be confirmed)."],
+        ["米国 USDA APHIS の獣医部門の輸入許可（動物由来の原料を含む時）", "USDA APHIS Veterinary Services import permit (animal-origin ingredients)"], ["輸入者（米国）", "Importer (US)"]]);
+  }
+  {
+    const c = "ベトナムにペットフードを輸出する時（輸入の登録・検疫などの手続きは、アプリで当局の頁を確かめられていない）";
+    const n = "ベトナムのペットフード（飼料）の輸入の手続きは、当局の頁で確かめられていない（要確認）。輸入者に聞くか、「AI で最新規制を詳細調査」で確かめる。人の食品の手続き（食品の自己公表など）はペットフードには当てはめていない";
+    const ok = "要確認（ペットフードの手続きは AI 詳細調査で確かめてください）";
+    addRule({ id: "v101p05", k: ["VN_PET_TBC"], w: { h: ["*"], d: ["VN"], f: [FLAG_PET] }, lv: "check", c, is: "輸入者（ベトナム）", ld: 0, n, s: "", u: "", ok },
+      ["ベトナム ペットフードの輸入の手続き（アプリで未確認）", "Vietnam pet food import procedures (not verified in the app)", "importer", "external", 0],
+      [[c, "When exporting pet food to Vietnam (the app has not verified the import registration/quarantine procedures on an official page)"], [n, "Vietnam's import procedures for pet food (animal feed) have not been verified on an official page (to be confirmed). Ask the importer or use “AI detailed research”. Human-food procedures (e.g. food self-declaration) are not applied to pet food."],
+        [ok, "To be confirmed (check the pet food procedures with the AI detailed research)", "需确认（宠物食品的手续请用 AI 详细调查确认）", "Por confirmar (verifique los trámites de alimentos para mascotas con la investigación detallada de IA)"], ["ベトナム ペットフードの輸入の手続き（アプリで未確認）", "Vietnam pet food import procedures (not verified in the app)"], ["輸入者（ベトナム）", "Importer (Vietnam)"]]);
+  }
+  try {
+    if (typeof V85DOC_D !== "undefined" && V85DOC_D && Array.isArray(V85DOC_D.rules)) { // eslint-disable-line no-undef
+      const D85 = V85DOC_D; // eslint-disable-line no-undef
+      D85.flags = D85.flags || {}; D85.docs = D85.docs || {};
+      if (!D85.flags[FLAG_PET]) D85.flags[FLAG_PET] = "ペットフード（犬・猫のおやつ・かむおやつを含む）";
+      dictAdd("ペットフード（犬・猫のおやつ・かむおやつを含む）", "Pet food (incl. dog/cat treats and chews)", "宠物食品（含犬猫零食・咬胶）", "Alimento para mascotas (incl. premios y masticables)");
+      Object.keys(ADD_DOCS).forEach((k) => { if (!D85.docs[k]) D85.docs[k] = ADD_DOCS[k]; });
+      ADD_RULES.forEach((r) => { if (!D85.rules.some((x) => x && x.id === r.id)) D85.rules.push(r); });
+      ADD_TR.forEach((x) => dictAdd(x[0], x[1], x[2] || x[1], x[3] || x[1]));
+    }
+  } catch (e) { err("addRules", e); }
+
+  /* ── R4：ペットフードに人の食品の手続きを出さない ──
+     原因：H（犬用おやつ）が区分「食品（人の食品）」で登録されると（v2 の N1・区分の直しは hear の担当）、ひな形の表（regsFor）が人の食品の手続き
+           （香港の食品表示・栄養表示・シンガポールの SFA 輸入ライセンスなど）を出し、書類の判断の表も人の食品の行（台湾 TFDA の輸入査験・
+           ベトナムの食品の自己公表・自由販売証明〔食品〕など）を当てていた。区分の直しに関係なく、商品がペットフードなら外す */
+  function petWhy(d, hs) {
+    const h = String(hs || (d && d.hs) || "").replace(/\D/g, "");
+    if (/^2309/.test(h)) return "HS 2309（ペットフード）";
+    const t = d || {};
+    const nm = [t.item, t.itemEn].join(" ");
+    if (/ペット用品/.test(String(t.cat || "")) || t.catKey === "pet") { if (/フード|おやつ|ジャーキー|ガム|飼料|treat|food|jerky|chew/i.test(nm)) return "区分・品名（ペット用のフード・おやつ）"; }
+    if (/犬用|猫用|ペット(?:フード|用(?:の)?(?:おやつ|フード))|\b(?:dog|cat|pet)\s+(?:food|treats?|chews?|jerky)\b/i.test(nm)) return "品名（犬用・猫用・ペット用のフード・おやつ）";
+    return "";
+  }
+  V.petWhy = petWhy;
+  function isPetNow() { try { const t = ten() || {}, d = dd() || {}; return !!(petWhy(t, t.hs || d.hs) || petWhy(d, d.hs || t.hs)); } catch (e) { return false; } }
+  V.isPetNow = isPetNow;
+  const PET_HUMAN_KEYS = new Set(["TW_TFDA", "VN_DECL", "FSC_FOOD", "TH_FDA", "KR_MFDS", "SG_SFA"]);
+  V.petHuman = function (r, Fx) {
+    if (!r || !Array.isArray(r.k) || !r.k.length || !r.k.every((k) => PET_HUMAN_KEYS.has(k))) return false;
+    const pet = !!(Fx && Fx.flags && Fx.flags[FLAG_PET]) || !!petWhy({}, Fx && Fx.hs) || isPetNow();
+    return pet;
+  };
+  const PET_HUMAN_DOC = /香港の食品表示|栄養成分表示|^栄養表示|Nutrition Facts|SFA ?輸入ライセンス|SFA import licen[cs]e|TFDA|食品の?輸入査験|輸入食品の査験|自己公表/i;
+  V.PET_HUMAN_DOC = PET_HUMAN_DOC;
+  function petDocsFix(r) {
+    if (!r || typeof r !== "object" || !Array.isArray(r.docs)) return 0;
+    const before = r.docs.length;
+    const keep = r.docs.filter((d) => !PET_HUMAN_DOC.test(String(d)));
+    if (keep.length !== before) { r.docs = keep; try { Object.defineProperty(r, "_v101pet", { value: before - keep.length, enumerable: false, configurable: true, writable: true }); } catch (e) { /* 印だけ */ } V.n.petDoc = (V.n.petDoc || 0) + (before - keep.length); }
+    return before - keep.length;
+  }
+  function petFixD() { try { if (!isPetNow()) return 0; const d = dd(); if (!d || !d.regs) return 0; let n = 0; Object.keys(d.regs).forEach((c) => { n += petDocsFix(d.regs[c]); }); return n; } catch (e) { err("petFixD", e); return 0; } }
+  V.petFixD = petFixD;
+  if (fn("regsFor") && !W.regsFor.__v101buyer) {
+    const __rf = W.regsFor;
+    const g = function () { const out = __rf.apply(this, arguments); try { if (out && isPetNow()) Object.keys(out).forEach((c) => petDocsFix(out[c])); } catch (e) { err("regsForPet", e); } return out; };
+    g.__v101buyer = 1;
+    W.regsFor = g;
+  }
+  if (fn("v54rExtras") && !W.v54rExtras.__v101buyer) {
+    const __ex = W.v54rExtras;
+    const g = function (c, cat, docs) { try { if (isPetNow()) return; } catch (e) { /* 下へ */ } return __ex.apply(this, arguments); };
+    g.__v101buyer = 1;
+    W.v54rExtras = g;
+  }
+  if (fn("v54rStatus") && !W.v54rStatus.__v101buyer) {
+    const __st = W.v54rStatus;
+    const g = function () { try { petFixD(); } catch (e) { /* 無視 */ } return __st.apply(this, arguments); };
+    g.__v101buyer = 1;
+    W.v54rStatus = g;
+  }
+
+  /* ═════════════════════════════════════════════════════════════════════════════════════════════
+     22.01.2（2回目・検証役 w1・w2 の報告から）
+       w2-1 文面の原材料・材質・品番の言い方を登録にそろえる（H「雞胸肉」→ 登録は「ささみ」）
+       w2-3 AI につながらずリストが作れないときの言い方（一時的な失敗は「少し待ってから」）・0社のときの形
+       w2-9 確かめの時間の目安と、終わった後の「まだ確かめていません」と各行の「つながりませんでした」の食い違い
+       （w2-5 本文の欄をその場で直せるように・w2-15 は rd_v101buyer.js と上の filt）
+     ═════════════════════════════════════════════════════════════════════════════════════════════ */
+  V.ver2 = "22.01.2-2";
+
+  /* ── w2-1：登録の名前にそろえる ──
+     原因：AI バイヤー開拓の文面は、資料の照合（fact の担当）を通らない。AI は登録の「ささみ」を「雞胸肉（鶏むね肉）」と訳し、件名・本文・フォローに残った。
+     直し：①AI への頼みに、登録の名前（原材料・材質・品番）と、その英・中（繁・簡）・西の言い方を渡す（【v101reg】）
+           ②できた文面（件名・本文・フォロー・DM・返信・見積の文面＝v101unkFix を通る文面）を登録と突き合わせ、同じ仲間の別の名前
+             （ささみ／むね肉／もも肉・ブナ／ヒノキ／スギ／オーク／パイン・PP／PE／PET・ステンレス／アルミ・綿／ポリエステル／ナイロン）を
+             登録の名前に置き換える。同じ文に登録の名前もあるとき（「ささみで、むね肉ではない」など）は触らない。
+             品番は、登録の品番と英字が同じで数字だけ違うもの（FP-210 など）を登録の品番に。 */
+  const cap1 = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const wre = (en) => new RegExp("\\b(?:" + en + "|" + cap1(en) + "(?=\\s*(?:wood|timber)))(?:\\s*wood)?\\b", "g"); // 英語の木の名前は小文字か「… wood」だけ（社名の「Cedar Toys」を拾わない）
+  const FAM = [
+    { k: "chicken", lab: "鶏肉の部位", items: [
+      { id: "tender", ja: /ささみ|笹身|ササミ/, tr: { en: "chicken tenderloin", zht: "雞里肌", zhs: "鸡里脊", es: "solomillo de pollo", ja: "ささみ" },
+        re: { en: /\bchicken\s+tenderloins?\b/gi, zh: /雞里肌|鸡里脊|雞柳|鸡柳/g, es: /\bsolomillos?\s+de\s+pollo\b/gi, ja: /ささみ|笹身|ササミ/g } },
+      { id: "breast", ja: /むね肉|胸肉|ムネ肉/, tr: { en: "chicken breast", zht: "雞胸肉", zhs: "鸡胸肉", es: "pechuga de pollo", ja: "むね肉" },
+        re: { en: /\bchicken\s+breasts?\b(?!\s+(?:tenderloin|fillet))/gi, zh: /雞胸肉|鸡胸肉|雞胸(?!里肌)|鸡胸(?!里脊)/g, es: /\bpechugas?\s+de\s+pollo\b/gi, ja: /鶏むね肉|鶏胸肉|むね肉|胸肉/g } },
+      { id: "thigh", ja: /もも肉|モモ肉|腿肉/, tr: { en: "chicken thigh", zht: "雞腿肉", zhs: "鸡腿肉", es: "muslo de pollo", ja: "もも肉" },
+        re: { en: /\bchicken\s+thighs?\b/gi, zh: /雞腿肉|鸡腿肉/g, es: /\bmuslos?\s+de\s+pollo\b/gi, ja: /鶏もも肉|もも肉/g } }] },
+    { k: "wood", lab: "木の種類", items: [
+      { id: "beech", ja: /ブナ|橅/, tr: { en: "beech", zht: "山毛櫸", zhs: "山毛榉", es: "haya", ja: "ブナ" }, re: { en: wre("beech"), zh: /山毛櫸|山毛榉|櫸木|榉木/g, es: /\bmadera\s+de\s+haya\b|\bhaya\b/g, ja: /ブナ材?|橅/g } },
+      { id: "hinoki", ja: /ヒノキ|檜|桧/, tr: { en: "hinoki cypress", zht: "檜木", zhs: "桧木", es: "ciprés hinoki", ja: "ヒノキ" }, re: { en: /\bhinoki(?:\s+cypress)?\b|\bcypress(?:\s*wood)?\b/g, zh: /檜木|桧木|扁柏/g, es: /\bciprés(?:\s+hinoki)?\b/g, ja: /ヒノキ材?|檜|桧/g } },
+      { id: "sugi", ja: /スギ材|杉材|杉の木/, tr: { en: "Japanese cedar (sugi)", zht: "杉木", zhs: "杉木", es: "cedro japonés", ja: "スギ" }, re: { en: wre("cedar"), zh: /杉木/g, es: /\bcedro(?:\s+japonés)?\b/g, ja: /スギ材|杉材/g } },
+      { id: "oak", ja: /オーク|ナラ材|楢/, tr: { en: "oak", zht: "橡木", zhs: "橡木", es: "roble", ja: "オーク" }, re: { en: wre("oak"), zh: /橡木/g, es: /\broble\b/g, ja: /オーク材?|ナラ材|楢/g } },
+      { id: "pine", ja: /パイン材|松材/, tr: { en: "pine", zht: "松木", zhs: "松木", es: "pino", ja: "パイン" }, re: { en: wre("pine"), zh: /松木/g, es: /\bpino\b/g, ja: /パイン材|松材/g } },
+      { id: "maple", ja: /メープル|カエデ材|楓/, tr: { en: "maple", zht: "楓木", zhs: "枫木", es: "arce", ja: "メープル" }, re: { en: wre("maple"), zh: /楓木|枫木/g, es: /\barce\b/g, ja: /メープル材?|カエデ材/g } }] },
+    { k: "resin", lab: "樹脂", skip: true, items: [
+      { id: "pp", ja: /ポリプロピレン|\bPP\b/, tr: { en: "polypropylene", zht: "聚丙烯", zhs: "聚丙烯", es: "polipropileno", ja: "ポリプロピレン" }, re: { en: /\bpolypropylene\b/gi, zh: /聚丙烯/g, es: /\bpolipropileno\b/gi, ja: /ポリプロピレン/g } },
+      { id: "pe", ja: /ポリエチレン(?!テレフタラート)|\bPE\b/, tr: { en: "polyethylene", zht: "聚乙烯", zhs: "聚乙烯", es: "polietileno", ja: "ポリエチレン" }, re: { en: /\bpolyethylene\b(?!\s+terephthalate)/gi, zh: /聚乙烯/g, es: /\bpolietileno\b(?!\s+tereftalato)/gi, ja: /ポリエチレン(?!テレフタラート)/g } },
+      { id: "pet", ja: /\bPET\b|ポリエチレンテレフタラート/, tr: { en: "PET", zht: "PET", zhs: "PET", es: "PET", ja: "PET" }, re: { en: /\bpolyethylene\s+terephthalate\b/gi, zh: /聚對苯二甲酸乙二酯|聚对苯二甲酸乙二酯/g, es: /\bpolietileno\s+tereftalato\b/gi, ja: /ポリエチレンテレフタラート/g } }] },
+    { k: "metal", lab: "金属", skip: true, items: [
+      { id: "sus", ja: /ステンレス|SUS\d/, tr: { en: "stainless steel", zht: "不鏽鋼", zhs: "不锈钢", es: "acero inoxidable", ja: "ステンレス" }, re: { en: /\bstainless\s+steel\b/gi, zh: /不鏽鋼|不锈钢/g, es: /\bacero\s+inoxidable\b/gi, ja: /ステンレス/g } },
+      { id: "al", ja: /アルミ/, tr: { en: "aluminium", zht: "鋁", zhs: "铝", es: "aluminio", ja: "アルミ" }, re: { en: /\balumin(?:i)?um\b/gi, zh: /鋁(?!箔)|铝(?!箔)/g, es: /\baluminio\b/gi, ja: /アルミ(?:ニウム)?(?!箔)/g } }] },
+    { k: "fiber", lab: "繊維", skip: true, items: [
+      { id: "cotton", ja: /綿|コットン/, tr: { en: "cotton", zht: "棉", zhs: "棉", es: "algodón", ja: "綿" }, re: { en: /\bcotton\b/gi, zh: /純棉|棉質|棉质|棉布/g, es: /\balgodón\b/gi, ja: /綿(?:100|素材)|コットン/g } },
+      { id: "poly", ja: /ポリエステル/, tr: { en: "polyester", zht: "聚酯纖維", zhs: "聚酯纤维", es: "poliéster", ja: "ポリエステル" }, re: { en: /\bpolyester\b/gi, zh: /聚酯纖維|聚酯纤维|滌綸|涤纶/g, es: /\bpoliéster\b/gi, ja: /ポリエステル/g } },
+      { id: "nylon", ja: /ナイロン/, tr: { en: "nylon", zht: "尼龍", zhs: "尼龙", es: "nailon", ja: "ナイロン" }, re: { en: /\bnylon\b/gi, zh: /尼龍|尼龙/g, es: /\bnail?on\b/gi, ja: /ナイロン/g } }] }
+  ];
+  V.FAM = FAM;
+  const PACK_CTX = /\b(?:bags?|pack(?:s|ed|ing|aging|age)?|pouch(?:es)?|wrap(?:ped|ping)?|labels?|cartons?|boxes|bottles?|caps?|containers?)\b|袋|包装|包裝|ラベル|標籤|标签|容器|瓶|ボトル|キャップ|\b(?:bolsas?|envases?|embalaje|etiquetas?)\b/i;
+  function regTextOf(T) {
+    const t = T || {};
+    const a = [t.item, t.itemEn, t.desc];
+    try { (Array.isArray(t.compRows) ? t.compRows : []).forEach((r) => a.push(Array.isArray(r) ? r.join(" ") : String(r || ""))); } catch (e) { /* 無視 */ }
+    try { (Array.isArray(t.strengths) ? t.strengths : []).forEach((s) => a.push(Array.isArray(s) ? s.join(" ") : String(s || ""))); } catch (e) { /* 無視 */ }
+    try { const A = t.v68attrs; if (A && typeof A === "object") Object.keys(A).forEach((k) => { if (typeof A[k] === "string") a.push(A[k]); }); } catch (e) { /* 無視 */ }
+    return a.filter(Boolean).join(" ／ ");
+  }
+  // 登録の名前（仲間ごとに1つだけ当たるとき＝あいまいでないとき）
+  function regTerms(T) {
+    const rt = regTextOf(T), out = [];
+    FAM.forEach((f) => { const hit = f.items.filter((it) => it.ja.test(rt) || (it.re.en && new RegExp(it.re.en.source, "i").test(rt))); if (hit.length === 1) out.push({ fam: f, reg: hit[0] }); });
+    return out;
+  }
+  V.regTerms = (T) => regTerms(T || ten()).map((x) => x.fam.k + ":" + x.reg.id);
+  function skuOf(T) { const s = String((T && T.sku) || "").trim(); return /^[A-Za-z]{1,6}-?\d{2,6}[A-Za-z]{0,4}$/.test(s) ? s : ""; }
+  function lgKey(lg) { return lg === "zht" || lg === "zhs" ? "zh" : lg; }
+  function termFix(text, hint, T) {
+    T = T || ten();
+    const s0 = String(text == null ? "" : text);
+    const hits = [];
+    if (!s0.trim() || !T) return { text: s0, hits };
+    const RT = regTerms(T), sku = skuOf(T);
+    if (!RT.length && !sku) return { text: s0, hits };
+    const lines = s0.split("\n").map((line) => {
+      if (!line.trim()) return line;
+      return sents2(line).map((sen) => {
+        let x = sen;
+        const lg = langOf(sen, hint), lk = lgKey(lg);
+        RT.forEach(({ fam, reg }) => {
+          if (fam.skip && PACK_CTX.test(x)) return; // 樹脂・金属・繊維は、包装・袋・ラベルの話の文では触らない（中身と包装は材質が違うことがある）
+          const regRe = reg.re[lk] ? new RegExp(reg.re[lk].source, reg.re[lk].flags) : null;
+          if (regRe && regRe.test(x)) return; // 同じ文に登録の名前もある（比べている文）は触らない
+          fam.items.forEach((it) => {
+            if (it === reg) return;
+            const re = it.re[lk]; if (!re) return;
+            const R = new RegExp(re.source, re.flags.indexOf("g") >= 0 ? re.flags : re.flags + "g");
+            const to = reg.tr[lg] || reg.tr[lk] || reg.tr.en;
+            x = x.replace(R, (m0) => { hits.push({ k: "term", m: m0 + "→" + to, dropped: false }); return (lk === "en" || lk === "es") && /^[A-Z]/.test(m0) ? cap1(to) : to; });
+          });
+        });
+        if (sku) {
+          const pre = sku.replace(/[-\d].*$/, "").toUpperCase(), norm = (y) => y.replace(/-/g, "").toUpperCase();
+          x = x.replace(/\b([A-Za-z]{1,6})-?(\d{2,6})([A-Za-z]{0,4})\b/g, (m0, a) => {
+            if (a.toUpperCase() !== pre || norm(m0) === norm(sku)) return m0;
+            hits.push({ k: "term", m: m0 + "→" + sku, dropped: false });
+            return sku;
+          });
+        }
+        return x;
+      }).join("");
+    });
+    const t = lines.join("\n");
+    if (t !== s0) V.n.termFix = (V.n.termFix || 0) + 1;
+    return { text: t, hits };
+  }
+  V.termFix = termFix;
+  function termScan(text, hint, T) {
+    const r = termFix(text, hint, T);
+    return r.hits.length ? [{ k: "term", lab: "登録と違う名前", m: r.hits[0].m.slice(0, 40) }] : [];
+  }
+  V.termScan = termScan;
+  function termPrompt(T) {
+    T = T || ten();
+    if (!T) return "";
+    const RT = regTerms(T), sku = skuOf(T);
+    const L = RT.map(({ fam, reg }) => {
+      const ng = fam.items.filter((it) => it !== reg).map((it) => [it.tr.en, it.tr.zht, it.tr.zhs].join("・")).join("・");
+      return "・" + fam.lab + "：「" + reg.tr.ja + "」（英 " + reg.tr.en + "／繁 " + reg.tr.zht + "／簡 " + reg.tr.zhs + "／西 " + reg.tr.es + "。" + ng + " と書かない）";
+    });
+    if (sku) L.push("・品番：" + sku + "（このとおりに書く）");
+    if (T.itemEn) L.push("・英語の品名：" + String(T.itemEn).slice(0, 80));
+    return L.length ? "■【v101reg】登録の名前（文面ではこの言い方を使う。訳すときもこの訳にそろえる）\n" + L.join("\n") : "";
+  }
+  V.termPrompt = termPrompt;
+
+  /* ── w2-3：AI につながらずリストが作れないとき（22.00 の層は理由に関係なく「0時（日本時間）以降に「AI で作り直す」」と出していた） ──
+     上限（cap）・取り置き（reserve）のときだけ「0時以降」。AI が応答しない・つながらない（error・off）は一時的なことが多いので「少し待ってから」 */
+  const OFF_JA = /0時（日本時間）以降に「AI で作り直す」で(?:新しいリストを)?作れます。?/g;
+  const OFF_EN = /Rebuild with AI after midnight JST\.?/g;
+  const OFF_TO_JA = "少し待ってから「AI で作り直す」を押すと作り直せます（通信の切れ目など、一時的に AI につながらなかったことがあります）。";
+  const OFF_TO_EN = "Wait a moment, then press “Rebuild with AI” (the AI may have been unreachable only briefly).";
+  dictAdd(OFF_TO_JA, OFF_TO_EN, "请稍等片刻后按“用 AI 重新生成”（可能只是暂时无法连接 AI）。", "Espere un momento y pulse «Rehacer con IA» (puede que la IA no estuviera disponible solo un momento).");
+  function offTemp(run) { return !!(run && run.v100 && !/^(cap|reserve)$/.test(String(run.v100.reason || ""))); }
+  V.offTemp = offTemp;
+  V.offFix = function (h, run) { if (!offTemp(run)) return h; return String(h).replace(OFF_JA, OFF_TO_JA).replace(OFF_EN, OFF_TO_EN); };
+  (function () {
+    const o = W.v71obBuild;
+    if (typeof o !== "function" || o.__v101b2) return;
+    const g = async function () {
+      let before = null; try { before = fn("v71obRun") ? W.v71obRun() : null; } catch (e) { before = null; }
+      const r = await o.apply(this, arguments);
+      try {
+        const run = fn("v71obRun") ? W.v71obRun() : null;
+        if (run && run !== before && offTemp(run)) {
+          if (typeof run.insight === "string") run.insight = V.offFix(run.insight, run);
+          if (fn("v71obSave")) W.v71obSave();
+          if (fn("v71obPaint")) W.v71obPaint();
+          const n = (run.leads || []).length;
+          try { if (typeof toast === "function") toast(n ? F(M("AI の新しいリストは作れませんでした。前のリストの {n}社を出しています。少し待ってから「AI で作り直す」を押してください", "No new AI list. Showing {n} companies from earlier lists. Wait a moment, then press “Rebuild with AI”"), { n }) : M("AI のリストは作れませんでした。少し待ってから「AI で作り直す」を押してください（一時的に AI につながらなかったことがあります）", "The AI list could not be made. Wait a moment, then press “Rebuild with AI”")); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+        }
+      } catch (e) { err("offBuild", e); }
+      return r;
+    };
+    g.__v101b2 = 1; g.__v101buyer = 1;
+    W.v71obBuild = g;
+  })();
+  // リストの中身（表の上の見出し・知らせ）：一時的な失敗の言い方と、0社のときの形
+  (function () {
+    const o = W.v71obInner;
+    if (typeof o !== "function" || o.__v101b2) return;
+    const g = function () {
+      let h = String(o.apply(this, arguments) || "");
+      try {
+        const run = fn("v71obRun") ? W.v71obRun() : null;
+        if (run && run.how !== "smp" && !run.v100smp) {
+          h = V.offFix(h, run);
+          if (!(run.leads || []).length) {
+            // 0社：「0社（11:09 作成）」→「0社（11:09 に作ろうとしましたが、作れていません）」。公式サイトの確かめの行は出さない（確かめる会社が無い）
+            h = h.replace(/：0社（([^）]+) 作成）/, (m0, d) => "：" + F(M("0社（{d} に作ろうとしましたが、作れていません）", "0 companies (tried at {d}; not made)"), { d }));
+            h = h.replace(/<div class="v79chk"[\s\S]*?<\/div>/, "");
+          }
+        }
+      } catch (e) { err("inner2", e); }
+      return h;
+    };
+    g.__v101b2 = 1; g.__v101buyer = 1;
+    W.v71obInner = g;
+  })();
+
+  /* ── w2-9：確かめの時間の目安・終わった後の言い方 ── */
+  V.chkEta = function (n) { return n > 5 ? M("2〜5分", "2–5 min", "约2〜5分钟", "2–5 min") : M("1〜3分", "1–3 min", "约1〜3分钟", "1–3 min"); };
+  (function () {
+    const o = W.v79obCheckHtml;
+    if (typeof o !== "function" || o.__v101b2) return;
+    const g = function (run) {
+      let h = String(o.apply(this, arguments) || "");
+      try {
+        if (!run || run.how === "smp" || run.v100smp) return h;
+        const L = (run.leads || []).filter((l) => l && !l.smp && !l.v79x);
+        if (!L.length) return ""; // 0社：確かめる会社が無い
+        if (busyRun(run)) {
+          // 時間の目安を実際に合わせ、経過の時間を出す（rd が毎秒書き換える）
+          h = h.replace(/（(\d+)社・1〜2分）/, (m0, n) => "（" + n + M("社・", " companies, ") + V.chkEta(+n) + "）").replace(/\((\d+) companies, 1–2 min\)/, (m0, n) => "(" + n + " companies, " + V.chkEta(+n) + ")");
+          const t0 = (V.chk && V.chk.at) || Date.now();
+          if (!/data-v101-buyer-elapsed/.test(h)) h = h.replace(/<\/div>\s*$/, `<span class="v101b-elapsed" data-v101-buyer-elapsed="${t0}" data-noi18n="1"></span></div>`);
+          return h;
+        }
+        // 終わった後：確かめようとして届かなかった会社を「まだ確かめていません」と言わない（各行の「つながりませんでした（2回試しました）」とそろえる）
+        if (run.v79chk && run.v79chk.st === "ok") {
+          const okSt = (l) => l.v79u && /^(ok|redir|dead)$/.test(l.v79u.st);
+          const rest = L.filter((l) => !okSt(l) && String(l.url || "").trim());
+          const att = rest.filter((l) => l.v79u && l.v79u.st).length, notyet = rest.length - att;
+          if (att) {
+            const ja = notyet ? F("{a}社は確かめられず（理由は各行に書いています）、{b}社はまだ確かめていません（「要確認」のまま）。", { a: att, b: notyet }) : F("{a}社は確かめられませんでした（理由は各行に書いています・「要確認」のまま）。", { a: att });
+            const en = notyet ? F("{a} could not be checked (reason on each row) and {b} are not checked yet (still “to be confirmed”).", { a: att, b: notyet }) : F("{a} could not be checked (reason on each row; still “to be confirmed”).", { a: att });
+            h = h.replace(/(\d+)社はまだ確かめていません（「要確認」のまま）。/, ja).replace(/(\d+) companies not checked yet \(still “to be confirmed”\)\./, en);
+            h = h.replace(/確かめ直す（まだの (\d+)社）/, (m0, k) => F("確かめ直す（{k}社）", { k })).replace(/Check again \((\d+) left\)/, (m0, k) => "Check again (" + k + ")");
+          }
+        }
+      } catch (e) { err("chkHtml2", e); }
+      return h;
+    };
+    g.__v101b2 = 1; g.__v101buyer = 1;
+    W.v79obCheckHtml = g;
+  })();
 })();

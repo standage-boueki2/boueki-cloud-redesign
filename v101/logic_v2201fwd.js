@@ -66,7 +66,7 @@ window.v101fLegStale = v101fLegStale;
    kind: "open"（どの会社も見積を出せなかった）／"own"（貴社が全部の国に回答）／"part"（一部の国だけ）／"others"（他社だけが回答・貴社は未回答）
    22.01.1：othersSel の各国に stale（荷主の画面で取り下げになる他社の見積）を足す。stale＝他社の見積が全部そう（kind は変えない＝貴社は未回答のまま） */
 function v101fOwnSt(r) {
-  const o = { kind: "open", okN: 0, ownN: 0, own: [], cos: [], othersMin: null, othersSel: [], staleN: 0, stale: false, staleValid: "", stalePol: false, staleExp: false, lanePols: [] };
+  const o = { kind: "open", okN: 0, ownN: 0, own: [], cos: [], othersMin: null, othersSel: [], staleN: 0, stale: false, staleValid: "", stalePol: false, staleExp: false, lanePols: [], ownStaleN: 0, ownStale: false, ownSt: { exp: false, pol: false, valid: "", lanePols: [] } };
   try {
     if (!r) return o;
     if (r.quote) { o.kind = "own"; o.okN = o.ownN = 1; o.own.push({ l: null, o: { quote: r.quote, co: v101fMe() } }); return o; }
@@ -76,7 +76,12 @@ function v101fOwnSt(r) {
     const me = v101fMe(), cos = new Set();
     ok.forEach((l) => {
       const ow = v101fOwnOffer(l);
-      if (ow) o.own.push({ l, o: ow });
+      if (ow) {
+        /* 22.01.2（w3 W2）：貴社の見積の国にも同じ決まり（荷主の画面で取り下げになるか）。仮押さえ中の国は取り下げにならない */
+        const ST = v101fLegStale(r, l);
+        o.own.push({ l, o: ow, stale: ST.stale, ST });
+        if (ST.stale) { o.ownStaleN++; const X = o.ownSt; if (ST.exp) X.exp = true; if (ST.pol) X.pol = true; if (ST.valid && (!X.valid || ST.valid > X.valid)) X.valid = ST.valid; if (ST.lanePol && X.lanePols.indexOf(ST.lanePol) < 0) X.lanePols.push(ST.lanePol); }
+      }
       (Array.isArray(l.offers) ? l.offers : []).forEach((x) => { if (x && x.co && x.co !== me) cos.add(x.co); });
       if (!ow) {
         const sel = (l.offers || []).find((x) => x && x.co === (l.sel || l.co)) || null;
@@ -91,6 +96,7 @@ function v101fOwnSt(r) {
     o.cos = [...cos];
     o.kind = !o.ownN ? "others" : o.ownN < o.okN ? "part" : "own";
     o.stale = o.kind === "others" && o.othersSel.length > 0 && o.staleN === o.othersSel.length;
+    o.ownStale = o.ownN > 0 && o.ownStaleN === o.ownN;
   } catch (e) { v101fErr("ownst", e); }
   return o;
 }
@@ -115,6 +121,13 @@ function v101fStLabel(r) {
       } else {
         out.sub = v101fM(`他社 ${O.cos.length}社が回答済み・荷主が検討中`, `${O.cos.length} other forwarder(s) answered; shipper is reviewing`, `其他 ${O.cos.length} 家已回复・货主研究中`, `${O.cos.length} otra(s) respondieron`);
       }
+    } else if ((O.kind === "own" || O.kind === "part") && O.ownStale && /回答済み|AI回答/.test(st)) {
+      /* 22.01.2（w3 W2）：貴社の見積が全部、荷主の画面の決まり（21.82 v82fBad）で取り下げになる＝期限切れ・依頼と違う仕出港のレートで組んだ見積。
+         「回答済み（荷主が検討中）」と書かない（他社の見積の N2 と同じ決まり）。荷主の画面では、依頼の仕出港発の有効なレートで組み直す（無ければレーン未登録） */
+      const why = v101fOwnStaleWhy(O, r);
+      out.txt = v101fM(`取り下げ（貴社の見積は${O.ownSt.exp && O.ownSt.pol ? "期限切れ・仕出港違い" : O.ownSt.exp ? "期限切れ" : "仕出港違い"}）`, `Withdrawn (your quote ${O.ownSt.exp ? "expired" : "from another port"})`, `已撤回（贵司报价${O.ownSt.exp ? "已过期" : "起运港不同"}）`, `Retirada (su cotización ${O.ownSt.exp ? "vencida" : "de otro puerto"})`);
+      out.sub = v101fM(`貴社の見積は${why}のレートで組んだもの・荷主の画面では取り下げ（${(r && r.pol) || "依頼の仕出港"}発の有効なレートで組み直し・無ければレーン未登録）`, `Your quote uses ${O.ownSt.exp ? "an expired rate" : "a rate from another port"}; withdrawn on the shipper's screen`);
+      out.ownStale = 1;
     } else if (O.kind === "part" && /回答済み/.test(st)) {
       out.txt = v101fM(`回答済み（貴社 ${O.ownN}/${O.okN}か国）・荷主が検討中`, `Answered (${O.ownN}/${O.okN} countries by you); shipper reviewing`, `已回复（贵司 ${O.ownN}/${O.okN} 国）`, `Respondida (${O.ownN}/${O.okN} países)`);
       out.sub = v101fM(`ほかの ${O.okN - O.ownN}か国は他社だけが回答（貴社のレートなし）`, `The other ${O.okN - O.ownN} only by other forwarders`, `其余 ${O.okN - O.ownN} 国仅其他公司回复`, `Las otras ${O.okN - O.ownN} solo por otras`);
@@ -133,6 +146,11 @@ function v101fStaleWhy(O, r) {
   } catch (e) { return v101fM("期限切れ", "expired"); }
 }
 window.v101fStaleWhy = v101fStaleWhy;
+/* 22.01.2：貴社の見積の取り下げの理由（期限切れ〔日付〕・横浜港発〔依頼は神戸港発〕） */
+function v101fOwnStaleWhy(O, r) {
+  try { const X = O.ownSt || {}; return v101fStaleWhy({ staleExp: X.exp, stalePol: X.pol, staleValid: X.valid, lanePols: X.lanePols || [] }, r); } catch (e) { return v101fM("期限切れ", "expired"); }
+}
+window.v101fOwnStaleWhy = v101fOwnStaleWhy;
 /* 見積合計の欄（貴社の金額を先に・他社の金額は「他社」と書く） */
 function v101fCellParts(r) {
   const O = v101fOwnSt(r);
@@ -143,6 +161,8 @@ function v101fCellParts(r) {
       const T = O.own.map((x) => +((x.o && x.o.quote && x.o.quote.total) || 0)).filter((x) => x >= 0);
       const mn = T.length ? Math.min(...T) : 0;
       P.own = O.okN > 1 || O.ownN > 1 ? v101fM(`貴社 ${O.ownN}/${O.okN}か国 ${v101fY(mn)}〜`, `Yours ${O.ownN}/${O.okN}: from ${v101fY(mn)}`) : v101fM(`貴社 ${v101fY(mn)}`, `Yours ${v101fY(mn)}`);
+      /* 22.01.2（w3 W2）：貴社の見積が荷主の画面で取り下げになる（期限切れ・仕出港違い）ときは、金額のそばにもそう書く */
+      if (O.ownStale) { P.own += v101fM("（取り下げ）", " (withdrawn)", "（已撤回）", " (retirada)"); P.ownStale = 1; }
       /* 選択中が他社の国 */
       const oth = O.own.filter((x) => x.l && (x.l.sel || x.l.co) && (x.l.sel || x.l.co) !== v101fMe()).map((x) => { const s = (x.l.offers || []).find((y) => y && y.co === (x.l.sel || x.l.co)); return s && s.quote ? { co: s.co, total: +s.quote.total } : null; }).filter(Boolean);
       if (oth.length) { P.other = v101fM(`選択中は他社 ${oth.length > 1 ? v101fY(Math.min(...oth.map((x) => x.total))) + "〜" : v101fY(oth[0].total)}`, `Selected: another forwarder ${v101fY(oth[0].total)}`); P.otherShort = P.other; }
@@ -162,10 +182,10 @@ window.v101fCellParts = v101fCellParts;
 /* 数え方を1つに（ホーム・受信箱のチップ・内訳）：AI回答＝貴社のレートで AI が見積を出した依頼／他社だけ＝貴社は未回答／レーン未登録＝どの会社も見積を出せなかった */
 function v101fCounts() {
   const R = v101fReqs();
-  const out = { all: R.length, own: 0, part: 0, others: 0, open: 0, othersStale: 0, ids: { own: [], others: [], open: [], othersStale: [] } };
+  const out = { all: R.length, own: 0, part: 0, others: 0, open: 0, othersStale: 0, ownStale: 0, ids: { own: [], others: [], open: [], othersStale: [], ownStale: [] } };
   R.forEach((r) => {
     const O = v101fOwnSt(r);
-    if (O.kind === "own" || O.kind === "part") { out.own++; out.ids.own.push(r.id); if (O.kind === "part") out.part++; }
+    if (O.kind === "own" || O.kind === "part") { out.own++; out.ids.own.push(r.id); if (O.kind === "part") out.part++; if (O.ownStale) { out.ownStale++; out.ids.ownStale.push(r.id); } }
     else if (O.kind === "others") { out.others++; out.ids.others.push(r.id); if (O.stale) { out.othersStale++; out.ids.othersStale.push(r.id); } }
     else { out.open++; out.ids.open.push(r.id); }
   });
@@ -205,13 +225,14 @@ function v101fOwnKinds(r, l, ow) {
 /* AI自動回答率（21.95 v95miscAutoRate）と理由（21.99 v99fAutoWhy）を、貴社のレートで答えた依頼で数える */
 function v101fAutoRate(reqs) {
   const R = reqs || v101fReqs();
-  const out = { recv: R.length, auto: 0, clean: 0, warn: 0, rate: null, rateAll: null, others: 0, othersStale: 0, open: 0, exp: 0, port: 0, both: 0, ports: {}, own: 1 };
+  const out = { recv: R.length, auto: 0, clean: 0, warn: 0, rate: null, rateAll: null, others: 0, othersStale: 0, open: 0, exp: 0, port: 0, both: 0, ports: {}, own: 1, ownStale: 0 };
   try {
     R.forEach((r) => {
       const O = v101fOwnSt(r);
       if (O.kind === "open") { out.open++; return; }
       if (O.kind === "others") { out.others++; if (O.stale) out.othersStale++; return; }
       out.auto++;
+      if (O.ownStale) out.ownStale++;
       let e = false, p = false;
       O.own.forEach((x) => { const k = v101fOwnKinds(r, x.l, x.o); if (k.exp) e = true; if (k.port) { p = true; } });
       if (e) out.exp++;
@@ -513,6 +534,9 @@ function v101fCtxAdd(s) {
   try {
     const C = v101fCounts(), A = v101fAutoRate();
     const others = v101fReqs().filter((r) => v101fOwnSt(r).kind === "others").map((r) => { const O = v101fOwnSt(r); return `・${r.id}（${r.pol || ""}→${r.cty || ""}・${r.mode || ""}）：貴社は未回答（貴社のレートなし）。届いている見積は他社だけ（${O.cos.join("・")}${O.othersMin != null ? "・他社の最安 " + v101fY(O.othersMin) : ""}）。${O.stale ? `他社の見積は${v101fStaleWhy(O, r)}で、荷主の画面では取り下げ（レーン未登録）。荷主はこの見積を検討していない` : "荷主が検討しているのは他社の見積"}`; });
+    /* 22.01.2（w3 W2）：貴社の見積の取り下げ */
+    const ownSt = v101fReqs().filter((r) => v101fOwnSt(r).ownStale).map((r) => { const O = v101fOwnSt(r); return `・${r.id}（${r.pol || ""}→${r.cty || ""}）：貴社の見積は${v101fOwnStaleWhy(O, r)}のレートで組んだもの。荷主の画面では取り下げ（${r.pol || ""}発の有効なレートで組み直し・無ければレーン未登録）。「荷主が検討中」ではない`; });
+    if (ownSt.length) s += `\n## 貴社の見積の取り下げ（v22.01.2）\n貴社の見積 ${ownSt.length}件は、期限切れ・依頼と違う仕出港のレートで組んだため、荷主の画面では取り下げになる（荷主の画面と同じ決まり）。期限切れのレートを入れ直す・依頼の仕出港発のレートを登録すると組み直される。\n${ownSt.slice(0, 30).join("\n")}`;
     s += `\n## 貴社の回答状況（v22.01）\n受信 ${C.all}件のうち、貴社のレートで AI が見積を出した依頼 ${C.own}件・他社だけが見積を出した依頼（貴社は未回答）${C.others}件（うち他社の見積も期限切れなどで荷主の画面では取り下げ ${C.othersStale}件）・どの会社も見積を出せなかった依頼 ${C.open}件。AI自動回答率は貴社の見積で数える：そのまま出せる ${A.clean} / ${A.recv}件＝${A.rate}%（期限切れの貴社のレートで組んだ見積 ${A.exp}件・依頼と違う仕出港のレートで組んだ見積 ${A.port}件）。「回答済み」と聞かれたら、貴社が回答したかどうかを分けて答える。他社の金額を貴社の見積として答えない。見積は区間のレート（仕出港→仕向け・形態）で答えるしくみで、この依頼だけの金額（スポット見積）を出す機能はいまの版にない（できると答えない。区間のレートを登録・直すと、同じ区間のほかの依頼にも使われる）。\n${others.join("\n")}`;
     /* 容積の出どころ（B/L のある案件） */
     const C2 = typeof v33Cases === "function" ? (v33Cases() || []) : [];
@@ -551,7 +575,7 @@ function v101fBrainFix(o) {
     let a = o.a, n = 0;
     v101fReqs().forEach((r) => {
       const L = v101fStLabel(r);
-      if (L.kind !== "others" && L.kind !== "part") return;
+      if (L.kind !== "others" && L.kind !== "part" && !L.ownStale) return;
       if (L.txt === L.base) return;
       const re = new RegExp("(" + r.id + "(?:(?!RQ-[A-Za-z0-9]{5,8})[\\s\\S]){0,260}?)" + L.base.replace(/[()（）]/g, (c) => "\\" + c));
       if (re.test(a)) { a = a.replace(re, (m, pre) => pre + L.txt + (L.sub ? `（${L.sub}）` : "")); n++; }
@@ -575,7 +599,7 @@ if (typeof fwdBrain === "function" && !window.__v101fBrain) {
    N4 B/L と荷主の共有を、容積だけでなく総重量・箱数・数量でも比べる（v101fBlCmp）。
    N5 「B/L の容積で反映する」の対象を B/L の仕向地の国の区間に（v97fVolAuto を包む。B/L は1回の出荷＝仕向地は1つ。ほかの国の見積は、この B/L の出荷ではない）。
    N3 荷主の「物流会社に見積を依頼（相見積）」の確かめの窓に、送る中身と同じ容積・箱数・総重量を出す（v101fShipPlan。見せ方は rd_v101fwd.js）。 */
-V101FWD.v = "22.01.1";
+V101FWD.v = "22.01.2";
 function v101fNumOf(s) {
   if (s == null || s === "") return null;
   if (typeof s === "number") return isFinite(s) ? s : null;

@@ -239,10 +239,30 @@
   /* 22.01.1 S5：商流（直接／間接）は相手ごとに TEN.v101route[相手の id] に控える（下書きが無くても決められる・送らない）。
      下書きがある相手は、下書きの商流にも同じ値を入れる（STEP06 の「商流」・下書きの窓・商流の窓で同じ値） */
   function rStore(t, ro) { t = t || ten(); if (!t) return {}; if (!t.v101route || typeof t.v101route !== "object") { if (ro) return {}; t.v101route = {}; } return t.v101route; }
+  // 22.01.2（w3 S5）：相手に連絡して案件ができている相手は、案件の商流（土台 v75tc の cases[相手].route＝やりとりの窓の「商流」と同じ所）が正
+  function caseOf(t, pid) { try { const C = t && t.v75tc && t.v75tc.cases; return C && C[pid] ? C[pid] : null; } catch (e) { return null; } }
+  function hasCase(t, pid) { try { const th = t && t.dmThreads ? t.dmThreads[pid] : null; return !!(th && Array.isArray(th.msgs) && th.msgs.length); } catch (e) { return false; } }
+  V.caseOf = caseOf; V.hasCase = hasCase;
+  // 送ったオファー（商社手数料を含めた価格）がある案件は、ここでは商流を変えない（やりとりの窓の「商流を選び直す」で）
+  V.routeLocked = (t, pid) => { const c = caseOf(t || ten(), pid); return !!(c && c.offer && c.offer.sentAt); };
   function rSet(t, pid, route, noSave) {
     try {
       t = t || ten(); if (!t || !pid) return false;
       const v = route === "direct" || route === "indirect" ? route : "";
+      if (hasCase(t, pid) && t === ten() && typeof v75tcCase === "function") { // eslint-disable-line no-undef
+        if (V.routeLocked(t, pid)) return false;
+        const c = v75tcCase(pid, true); // eslint-disable-line no-undef
+        const cur = (c && c.route && c.route.k) || "";
+        if (c && cur !== v) {
+          // 土台のやりとりの窓の「直接貿易で進める／間接貿易で進める」「商流を選び直す」と同じ形で入れる（手数料を含めたオファーは、やりとりの窓で作る）
+          let who = ""; try { who = typeof v75tcWho === "function" ? v75tcWho() : ""; } catch (e) { who = ""; } // eslint-disable-line no-undef
+          if (v) c.route = { k: v, at: Date.now(), by: who, why: v === "indirect" ? "国内の取引で完結・代金の回収は商社" : "自社が輸出者・利益を最大に" };
+          else { c.route = null; c.routeAsk = null; }
+          c.offer = null;
+          try { if (typeof v75tcLog === "function") v75tcLog(c, v ? "商流を決定：" + (v === "direct" ? "直接貿易" : "間接貿易") + "（STEP 06 の商流の窓）" : "商流を選び直す（STEP 06 の商流の窓）"); } catch (e) { /* 記録だけ */ } // eslint-disable-line no-undef
+          try { if (typeof v75tcSave === "function") v75tcSave(); } catch (e) { /* 下で保存 */ } // eslint-disable-line no-undef
+        }
+      }
       const R = rStore(t);
       if (v) R[pid] = v; else delete R[pid];
       const Q = qStore(t, true); if (Q[pid]) Q[pid].route = v;
@@ -251,7 +271,7 @@
     } catch (e) { err("rSet", e); return false; }
   }
   V.rStore = rStore; V.rSet = rSet;
-  V.routeOf = (t, pid) => { t = t || ten(); const Q = qStore(t, true); const R = rStore(t, true); return (Q[pid] && Q[pid].route) || R[pid] || ""; };
+  V.routeOf = (t, pid) => { t = t || ten(); const c = caseOf(t, pid); if (c && c.route && c.route.k) return c.route.k; const Q = qStore(t, true); const R = rStore(t, true); return (Q[pid] && Q[pid].route) || R[pid] || ""; };
   function qDel(t, pid) { try { t = t || ten(); const Q = qStore(t, true); if (Q[pid]) { delete Q[pid]; save(); return true; } } catch (e) { err("qDel", e); } return false; }
   V.qSave = qSave; V.qDel = qDel;
   /* 22.01.1 N12：空の所の印は、AI バイヤー開拓の文面の署名（buyer の v101sigText・22.01 の決め L3 の推奨 a）と同じ【…を入れてください】の形（画面の言語で）。
@@ -372,7 +392,10 @@
        ・受注する → 「受注する」の窓（受注とは何か・いまの状態・受注したら「商談を記録する」で状況を「取引中」に） */
     const best = (() => { let b = null, bo = -2, bt = 0; TH.forEach((th) => { const o = ordOf(th), at = +th.statusAt || 0; if (o > bo || (o === bo && at > bt)) { b = th; bo = o; bt = at; } }); return b; })();
     const caseKey = (th) => { try { const TS = typeof TENS !== "undefined" && Array.isArray(TENS) ? TENS : []; return TS.indexOf(t) + "|" + th.id; } catch (e) { return "-1|" + th.id; } }; // eslint-disable-line no-undef
-    const rGo = best ? { k: "case", key: caseKey(best), find: ["商流", "見積", "やりとり"] } : { k: "deal", find: ["見積を出す相手と下書き", "バイヤー一覧"], act: "v101dealRoute" };
+    /* 22.01.2（w3 S5）：案件がある商品でも「商流を決める」の窓を開く（前は案件の画面へ移ったが、案件の画面に「商流」の欄は無く〔やりとりの窓の中の
+       カードで、見積の時期だけ出る〕、移った先で「見積の出し方」が光るだけだった）。案件のある相手の商流は、窓から案件の商流（v75tc）にそのまま入れる */
+    const rGo = { k: "deal", find: ["見積を出す相手と下書き", "バイヤー一覧"], act: "v101dealRoute" };
+    void best; void caseKey;
     const wGo = { k: "deal", find: ["見積を出す相手と下書き", "商談の記録", "バイヤー一覧"], act: "v101dealWon" };
     const ST = (s) => "〔" + s + "〕";
     const it = [
@@ -517,7 +540,17 @@
            ・「まだ分からない」（hear の TEN.v101dimLater）を選んだ商品は、「次は」を先の手順へ（この手順は済みにしない＝はじめの設定の数は変えない）
            ・現在地バーの STEP 01「寸法・重量」の抜けの行き先も、同じ欄に（前は AI のヒアリング＝寸法を2回聞かれる）
            足りないのが寸法・重量のほかにもあるときは、今まで通り（「商品を登録（足りない情報を埋める）」・AI のヒアリング）。 */
-  // 登録した商品の足りない項目（scoreOf＝STEP 01・商品情報の充足度と同じ数え方）。「まだ分からない」を選んだ寸法・重量は rest から外す
+  /* 22.01.2（w1-2・w2-14）：「止めている項目」の決め方を、画面や入り直しで変わらないものに。
+       ・必須（重み 5）の足りない項目があれば、それだけを「次」に出す（任意の項目は、必須がそろってから）。
+         前は「任意で、まだ何も答えていない項目」も入れていたので、ログインし直して「飛ばした項目」の控え（v92r5c・この PC の保存）が消えると
+         「認証・規格」なども並び、画面ごと・時点ごとに言葉が変わった（w2-14）。
+       ・寸法・重量と「パレット・コンテナ入数」は、同じ書類の画面で入れる物流の情報として1つにまとめる：寸法・重量が止めているとき、
+         入数もまだ（「不明」と答えた分を含む）なら一緒に「寸法・重量・入数を入れる」（w1-2：A は寸法と入数の両方を「不明」と答えて、
+         「足りない情報を入れる（「寸法・重量」「パレット・コンテナ入数」）」→ 問いの無い商品情報の画面に移っていた）。
+       ・任意の項目を「わからない」と答えて飛ばした分・「—」と答えた分は、答えた事実（未確認）として「次」に入れない（22.01.1 と同じ）。
+       ・「まだ分からない」：寸法は hear の TEN.v101dimLater、入数だけのときは TEN.v101ctnLater（寸法が入ると hear が dimLater を消すため別の印）。 */
+  const LOGI = ["dimRows", "ctn"];
+  function skipOf(t) { try { const code = (typeof SES !== "undefined" && SES && SES.code) || ""; const o = JSON.parse(localStorage.getItem("bc20_v92r5c_skip_" + code) || "{}") || {}; const a = o[String(t.uid || t.item || "")]; return Array.isArray(a) ? a : []; } catch (e) { return []; } } // eslint-disable-line no-undef
   function gapOf(t) {
     try {
       t = t || ten();
@@ -525,27 +558,29 @@
       const sc = typeof scoreOf === "function" ? scoreOf(t) : null; // eslint-disable-line no-undef
       const ms = (sc && Array.isArray(sc.missing) ? sc.missing : []).filter((x) => x && x.k);
       if (!ms.length) return null;
-      const later = !!t.v101dimLater;
-      /* 止めている項目：必須（重み 5）か、まだ何も答えていない任意の項目。任意の項目で「わからない」などと答えた分（産地・製造国など）は、
-         答えた事実（未確認）として「次」に数えない（土台も、任意の項目は飛ばした・「—」と答えたら済みにする）。
-         例：F・G・H は「寸法・重量」（必須・不明）と「産地・製造国」（任意・わからない）→ 止めているのは寸法・重量だけ */
-      // 答えた：値がある・ヒアリングで「わからない」などと答えて後回しにした（土台 v92r5c の飛ばした項目の控え）・「—」と答えた（v92r9b）
-      const skip = (() => { try { const code = (typeof SES !== "undefined" && SES && SES.code) || ""; const o = JSON.parse(localStorage.getItem("bc20_v92r5c_skip_" + code) || "{}") || {}; const a = o[String(t.uid || t.item || "")]; return Array.isArray(a) ? a : []; } catch (e) { return []; } })(); // eslint-disable-line no-undef
-      const answered = (k) => { const v = t[k]; if (Array.isArray(v) ? v.length > 0 : !!String(v == null ? "" : v).trim()) return true; return skip.indexOf(k) >= 0 || !!(t.v92r9bDash && t.v92r9bDash[k]); };
-      const block = ms.filter((x) => (+x.w || 0) >= 5 || !answered(x.k));
-      const B = block.length ? block : ms;
-      const dimsOnly = B.every((x) => x.k === "dimRows");
+      const skip = skipOf(t);
+      const passed = (k) => skip.indexOf(k) >= 0 || !!(t.v92r9bDash && t.v92r9bDash[k]); // 任意の項目を飛ばした・「—」と答えた
+      const req = ms.filter((x) => (+x.w || 0) >= 5);
+      const opt = ms.filter((x) => (+x.w || 0) < 5 && !passed(x.k));
+      let B = req.length ? req.slice() : opt.slice();
+      if (B.some((x) => x.k === "dimRows")) { const c = opt.find((x) => x.k === "ctn"); if (c && B.indexOf(c) < 0) B.push(c); }
+      if (!B.length) B = ms.slice();
+      const deferred = { dimRows: !!t.v101dimLater, ctn: !!(t.v101ctnLater || t.v101dimLater) };
+      const logiAll = B.filter((x) => LOGI.indexOf(x.k) >= 0).map((x) => x.k);
+      const dimsOnly = logiAll.length === B.length; // 止めているのが寸法・重量と入数だけ（名前は前のまま：寸法の手順）
+      const rest = B.filter((x) => !deferred[x.k]);
+      const later = dimsOnly && !rest.length;
+      // 名前は、まだ「まだ分からない」にしていない分で（入数だけ「まだ分からない」なら「寸法・重量を入れる」）。全部あとでなら、あとでにした分で
+      const logi = later ? logiAll : rest.filter((x) => LOGI.indexOf(x.k) >= 0).map((x) => x.k);
       const nm = (x) => { const n = String(x.n || x.k); try { const d = typeof I18N !== "undefined" && I18N && I18N.dict ? I18N.dict[lang()] : null; return (lang() !== "ja" && d && d[n]) || n; } catch (e) { return n; } }; // eslint-disable-line no-undef
-      const rest = B.filter((x) => !(later && x.k === "dimRows"));
-      const also = ms.filter((x) => B.indexOf(x) < 0).map(nm); // 答えた未確認の任意の項目（理由に添える）
-      return { later, dimsOnly, keys: ms.map((x) => x.k), names: rest.map(nm), also, dimsIn: ms.some((x) => x.k === "dimRows") };
+      const also = ms.filter((x) => B.indexOf(x) < 0 && passed(x.k)).map(nm); // 答えた未確認の任意の項目（理由に添える）
+      return { later, dimsOnly, logi, keys: ms.map((x) => x.k), block: B.map((x) => x.k), names: rest.map(nm), also, dimsIn: ms.some((x) => x.k === "dimRows") };
     } catch (e) { err("gapOf", e); return null; }
   }
   V.gapOf = gapOf;
-  function dimsGap(t) { const g = gapOf(t); return g && g.dimsOnly ? { later: g.later, also: g.also } : null; }
+  function dimsGap(t) { const g = gapOf(t); return g && g.dimsOnly ? g : null; }
   V.dimsGap = dimsGap;
-  /* 足りない項目が寸法・重量のほかにもある商品（例：F・G・H は寸法と産地・製造国を「わからない」と答えた）も、「次は 商品を登録」と言わない：
-     「足りない情報を入れる（「寸法・重量」「産地・製造国」）」と実際の抜けを言う。行き先は今まで通り（AI の質問＝商品情報を登録）。
+  /* 必須などがほかにも足りない商品：「次は 商品を登録」と言わず「足りない情報を入れる（「〇〇」「△△」）」。行き先は今まで通り（AI の質問）。
      項目名は「」で1つずつ囲む（項目名の中の「・」と区切りがまざらない＝No.612 と同じ） */
   const MISS = {
     t: (g) => { const L = g.names.slice(0, 3).map((x) => "「" + x + "」").join(""); const more = g.names.length > 3 ? F(M("ほか {n}項目", " +{n} more"), { n: g.names.length - 3 }) : ""; return F(M("足りない情報を入れる（{x}{m}）", "Fill in missing info ({x}{m})", "填写缺少的信息（{x}{m}）", "Completar lo que falta ({x}{m})"), { x: L, m: more }); },
@@ -556,18 +591,22 @@
   };
   V.MISS = MISS;
   const alsoTxt = (G) => (G && G.also && G.also.length ? F(M("（{x} は「わからない」などと答えた未確認の項目です。分かったら商品情報で入れてください）", " ({x}: answered as unknown — not confirmed.)"), { x: G.also.map((x) => "「" + x + "」").join("") }) : "");
+  // 寸法・重量と入数の手順の名前（止めている項目に合わせる）
+  const logiKind = (G) => { const L = (G && G.logi) || ["dimRows"]; return L.indexOf("dimRows") >= 0 && L.indexOf("ctn") >= 0 ? "both" : L.indexOf("ctn") >= 0 ? "ctn" : "dims"; };
   const DIMS = {
-    t: () => M("寸法・重量を入れる", "Enter dimensions/weight", "填写尺寸・重量", "Introducir medidas y peso"),
-    later: () => M("寸法・重量（未確認・あとで入れる）", "Dimensions/weight (not confirmed — later)", "尺寸・重量（未确认・稍后填写）", "Medidas y peso (sin confirmar — después)"),
+    t: (G) => ({ both: () => M("寸法・重量・入数を入れる", "Enter dimensions, weight and load quantities", "填写尺寸・重量・装载数", "Introducir medidas, peso y cantidades por palé"), ctn: () => M("パレット・コンテナ入数を入れる", "Enter pallet/container load quantities", "填写托盘・集装箱装载数", "Introducir la carga por palé/contenedor"), dims: () => M("寸法・重量を入れる", "Enter dimensions/weight", "填写尺寸・重量", "Introducir medidas y peso") })[logiKind(G)](),
+    later: (G) => ({ both: () => M("寸法・重量・入数（未確認・あとで入れる）", "Dimensions, weight and load (not confirmed — later)", "尺寸・重量・装载数（未确认・稍后填写）", "Medidas, peso y carga (sin confirmar — después)"), ctn: () => M("パレット・コンテナ入数（未確認・あとで入れる）", "Pallet/container load (not confirmed — later)", "托盘・集装箱装载数（未确认・稍后填写）", "Carga por palé (sin confirmar — después)"), dims: () => M("寸法・重量（未確認・あとで入れる）", "Dimensions/weight (not confirmed — later)", "尺寸・重量（未确认・稍后填写）", "Medidas y peso (sin confirmar — después)") })[logiKind(G)](),
     sub: () => M("書類の画面で入れる・まだ分からないなら先へ進める", "on the Documents screen — if not known yet, you can move on", "在单据页面填写・还不知道可先继续", "en Documentos; si aún no lo sabe, puede seguir"),
-    why: () => M("商品は登録済みです。足りないのは寸法・重量だけです（「不明」と答えた分は値にせず「未確認」として控えています）。「書類をつくる」の画面の欄に数字を入れるか、まだ分からないなら「まだ分からない」を押すと、寸法の要らない見積書・請求書を先に作れて、次の手順へ進めます。",
-      "Your product is registered; only the dimensions/weight are missing (answers like “unknown” are kept as “not confirmed”). Enter them on the Documents screen, or press “Not known yet” to make quotations/invoices first and move on.",
-      "商品已登记，只缺尺寸・重量（“不明”等回答记为“未确认”）。请在“制作单据”页面填写数字；还不知道时按“还不知道”，可先制作报价单・发票并继续下一步。",
-      "El producto está registrado; solo faltan medidas y peso. Introdúzcalos en Documentos o pulse «Aún no lo sé» para seguir."),
-    whyLater: () => M("「まだ分からない」を選んだので、寸法・重量は未確認のまま次の手順へ進めています（この手順は済みにしていません）。梱包明細・船積依頼書（S/I）・運賃の見積の前に、「書類をつくる」の画面で入れてください。",
-      "You chose “Not known yet”, so you can move on with dimensions/weight not confirmed (this step is not marked done). Enter them on the Documents screen before the packing list, S/I and freight quotes.",
-      "您选择了“还不知道”，尺寸・重量以“未确认”继续（此步骤未标记完成）。制作装箱单・托运单・运费报价前，请在“制作单据”页面填写。",
-      "Eligió «Aún no lo sé»: puede seguir con medidas sin confirmar (este paso no se marca como hecho)."),
+    why: (G) => { const k = logiKind(G); const what = k === "both" ? M("寸法・重量と「パレット・コンテナ入数」", "dimensions/weight and the pallet/container load") : k === "ctn" ? M("「パレット・コンテナ入数」", "the pallet/container load") : M("寸法・重量", "dimensions/weight");
+      return F(M("商品は登録済みです。足りないのは {w} だけです（「不明」と答えた分は値にせず「未確認」として控えています）。「書類をつくる」の画面の欄に数字を入れるか、まだ分からないなら「まだ分からない」を押すと、寸法の要らない見積書・請求書を先に作れて、次の手順へ進めます。",
+        "Your product is registered; only {w} is missing (answers like “unknown” are kept as “not confirmed”). Enter it on the Documents screen, or press “Not known yet” to move on.",
+        "商品已登记，只缺{w}（“不明”等回答记为“未确认”）。请在“制作单据”页面填写；还不知道时按“还不知道”即可继续。",
+        "El producto está registrado; solo falta {w}. Introdúzcalo en Documentos o pulse «Aún no lo sé» para seguir."), { w: what }); },
+    whyLater: (G) => { const k = logiKind(G); const what = k === "both" ? M("寸法・重量と入数", "dimensions, weight and load") : k === "ctn" ? M("パレット・コンテナ入数", "the pallet/container load") : M("寸法・重量", "dimensions/weight");
+      return F(M("「まだ分からない」を選んだので、{w} は未確認のまま次の手順へ進めています（この手順は済みにしていません）。梱包明細・船積依頼書（S/I）・運賃の見積の前に、「書類をつくる」の画面で入れてください。",
+        "You chose “Not known yet”, so you can move on with {w} not confirmed (this step is not marked done). Enter it on the Documents screen before the packing list, S/I and freight quotes.",
+        "您选择了“还不知道”，{w}以“未确认”继续（此步骤未标记完成）。制作装箱单・托运单・运费报价前，请在“制作单据”页面填写。",
+        "Eligió «Aún no lo sé»: puede seguir con {w} sin confirmar (este paso no se marca como hecho)."), { w: what }); },
   };
   V.DIMS = DIMS;
   // はじめの設定（ux32Setup の行）：名前・理由・添え書き。「まだ分からない」なら、この行を一覧の後ろへ（「次」は先の手順。済みにはしない）
@@ -584,8 +623,8 @@
         if (!G.dimsOnly) { const r0 = S[fi]; if (G.names.length) { r0[1] = MISS.t(G); r0[5] = MISS.why(G); r0[6] = MISS.sub(); r0.v101miss = 1; } return S; }
         const g = { later: G.later };
         const r = S[fi];
-        r[1] = g.later ? DIMS.later() : DIMS.t();
-        r[5] = (g.later ? DIMS.whyLater() : DIMS.why()) + alsoTxt(G);
+        r[1] = g.later ? DIMS.later(G) : DIMS.t(G);
+        r[5] = (g.later ? DIMS.whyLater(G) : DIMS.why(G)) + alsoTxt(G);
         r[6] = g.later ? "" : DIMS.sub();
         r.v101dims = g.later ? "later" : "dims";
         if (g.later && fi < S.length - 1) { S.splice(fi, 1); S.push(r); }
@@ -608,9 +647,10 @@
     r.v101dims = g.later ? "later" : "dims";
     r.id = "v101dims"; // 前の層は id が "fill" なら行き先を「商品情報を登録」に決め打ちする → 別の id にして、行き先（key）を使わせる
     r.key = "v101:dims";
-    r.t = g.later ? DIMS.later() : DIMS.t();
+    r.t = g.later ? DIMS.later(G) : DIMS.t(G);
     r.sub = g.later ? "" : DIMS.sub();
-    r.why = (g.later ? DIMS.whyLater() : DIMS.why()) + alsoTxt(G);
+    r.why = (g.later ? DIMS.whyLater(G) : DIMS.why(G)) + alsoTxt(G);
+    r.v101logi = (G.logi || []).join(",");
     if (g.later) {
       S.steps.forEach((x) => { x.now = false; });
       const i = S.steps.findIndex((x) => x !== r && !x.done);
@@ -641,7 +681,7 @@
   function fix1(s1, t) {
     try {
       if (!s1 || !Array.isArray(s1.it) || !t || !t.item) return s1;
-      s1.it.forEach((x) => { if (x && !x.ok && /^寸法・重量/.test(String(x.t || "")) && !(x.go && x.go.v101)) x.go = { k: "ops:doc", find: ["寸法・重量を入れる", "書類を自動でつくる"], act: "v101dealDims", v101: 1 }; });
+      s1.it.forEach((x) => { if (x && !x.ok && /^(寸法・重量|パレット・コンテナ入数)/.test(String(x.t || "")) && !(x.go && x.go.v101)) x.go = { k: "ops:doc", find: ["寸法・重量を入れる", "書類を自動でつくる"], act: "v101dealDims", v101: 1 }; }); // 22.01.2：入数も同じ欄の近くへ
     } catch (e) { err("fix1", e); }
     return s1;
   }

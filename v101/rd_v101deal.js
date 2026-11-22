@@ -374,12 +374,15 @@
     if (!P.length) { toast(M("商流は相手ごとに決めます。先に、見積を出す相手を決めてください（送りません）", "The trade route is decided per buyer. Choose the buyer first (nothing is sent).")); pickWin(false); return; }
     const rows = P.map((p, i) => {
       const r = V.routeOf(t, p.id);
-      return `<li class="v101d-rl"><span class="v101d-rln"><b data-noi18n>${E(p.name)}</b><small data-noi18n>${E([p.cty, p.sent ? M("送信済み", "contacted") : M("送る前", "not sent")].filter(Boolean).join("・"))}</small></span>`
-        + `<span class="v101d-rr" role="radiogroup" aria-label="${E(p.name + M(" の商流", " — trade route"))}">${ROUTES().map(([v, lb]) => `<label><input type="radio" name="v101drR${i}" value="${v}" data-v101-deal-rp="${E(p.id)}"${r === v ? " checked" : ""}> ${E(lb)}</label>`).join("")}</span></li>`;
+      // 22.01.2（w3 S5）：案件がある相手は、案件の商流（やりとりの窓の「商流」と同じ所）に入れる。オファーを送った案件は、ここでは変えない
+      const cs = V.hasCase && V.hasCase(t, p.id), lk = V.routeLocked && V.routeLocked(t, p.id);
+      const note = cs ? (lk ? M("案件の商流・オファーを送ったので、変えるときはやりとりの窓の「商流を選び直す」で", "deal route — offer sent; change it in the conversation") : M("案件の商流（やりとりの窓の「商流」と同じ）", "deal route (same as in the conversation)")) : "";
+      return `<li class="v101d-rl"><span class="v101d-rln"><b data-noi18n>${E(p.name)}</b><small data-noi18n>${E([p.cty, p.sent ? M("送信済み", "contacted") : M("送る前", "not sent"), note].filter(Boolean).join("・"))}</small></span>`
+        + `<span class="v101d-rr" role="radiogroup" aria-label="${E(p.name + M(" の商流", " — trade route"))}">${ROUTES().map(([v, lb]) => `<label><input type="radio" name="v101drR${i}" value="${v}" data-v101-deal-rp="${E(p.id)}"${r === v ? " checked" : ""}${lk ? " disabled" : ""}> ${E(lb)}</label>`).join("")}</span></li>`;
     }).join("");
     const html = `<div class="v101d-win" data-v101-deal-win="route" data-noi18n>
       <h3>${E(M("商流（直接貿易／間接貿易）を決める（送りません）", "Decide the trade route (direct / indirect) — nothing is sent", "决定商流（直接贸易／间接贸易・不发送）", "Decidir la ruta comercial (no se envía)"))}</h3>
-      <p class="nn">${E(M("商流は、相手ごとに決めます。直接貿易＝貴社が輸出者になり、相手に直接売る（書類・代金のやりとりは相手と）。間接貿易＝国内の商社などを通して売る（書類・代金のやりとりは商社と）。まだ相手に送っていないので、決めた商流はここに控えます（相手には何も届きません）。見積・条件の下書きがある相手は、下書きの商流も同じにします。相手に連絡して案件ができたあとは、案件の画面の「商流」で決めます。",
+      <p class="nn">${E(M("商流は、相手ごとに決めます。直接貿易＝貴社が輸出者になり、相手に直接売る（書類・代金のやりとりは相手と）。間接貿易＝国内の商社などを通して売る（書類・代金のやりとりは商社と）。まだ相手に送っていない相手の商流はここに控えます。相手に連絡して案件ができている相手は、案件の商流（やりとりの窓の「商流」と同じ所）に入れます。どちらも相手には何も届きません。見積・条件の下書きがある相手は、下書きの商流も同じにします。",
         "Decide the route per buyer. Direct: you export and sell to the buyer. Indirect: you sell through a domestic trading company. Nothing is sent; the choice is kept here (and in the quote draft, if any)."))}</p>
       <ul class="v101d-rlist">${rows}</ul>
       <div class="rw v101d-btns"><button type="button" class="btn" data-v101-deal-rsave="1">${E(M("商流を保存（送りません）", "Save the route (nothing is sent)"))}</button><button type="button" class="btn g" data-v101-deal-toq="1">${E(M("見積・条件の下書きへ", "Go to the quote draft"))}</button><button type="button" class="btn g" data-v101-deal-x="1">${E(M("閉じる", "Close"))}</button></div>
@@ -390,7 +393,7 @@
       if (sv) sv.addEventListener("click", () => {
         const tt = ten(); const got = {};
         $$("input[data-v101-deal-rp]", pn).forEach((x) => { if (x.checked) got[x.getAttribute("data-v101-deal-rp")] = x.value; });
-        Object.keys(got).forEach((pid) => V.rSet(tt, pid, got[pid], true));
+        Object.keys(got).forEach((pid) => { if (!(V.routeLocked && V.routeLocked(tt, pid))) V.rSet(tt, pid, got[pid], true); });
         V.save();
         const P2 = V.partners(tt);
         const sum = P2.map((p) => p.name + "：" + routeNm(V.routeOf(tt, p.id))).join("／");
@@ -441,12 +444,89 @@
   }
 
   /* ══════ 22.01.1 S1：「次は 寸法・重量を入れる」の行き先＝書類をつくるの寸法・重量の欄（入れる所に移る） ══════ */
+  /* 22.01.2（w1-2）：「パレット・コンテナ入数」の欄（hear の寸法・重量の欄のすぐ下に足す・入数だけのときは窓で）。
+     「不明」などは値にしない（hear の決まりと同じ）。「まだ分からない」は入数だけの印 TEN.v101ctnLater（寸法の「まだ分からない」は hear の印のまま） */
+  const UNKW = /不明|わから|分から|判ら|未定|未確認|記載(?:が|は)?(?:な|無)|資料に(?:な|無)|unknown|n\/a|tbd|tbc/i;
+  const gapNow = () => { try { return V.gapOf(ten()); } catch (e) { return null; } };
+  const needOf = (k) => { const g = gapNow(); return !!(g && g.block && g.block.indexOf(k) >= 0); };
+  function ctnHtml(inWin) {
+    const t = ten() || {};
+    const was = t.v101hunk && t.v101hunk.ctn && t.v101hunk.ctn.v ? t.v101hunk.ctn.v : "";
+    return `<div class="v101d-ctn" data-v101-deal-ctn="1" role="group" aria-label="${E(M("パレット・コンテナ入数を入れる", "Enter pallet/container load", "填写托盘・集装箱装载数", "Introducir la carga por palé"))}" data-noi18n>
+      ${inWin ? "" : `<p class="v101d-ctnh"><b>${E(M("パレット・コンテナ入数を入れる", "Enter pallet/container load", "填写托盘・集装箱装载数", "Introducir la carga por palé"))}</b></p>`}
+      <p class="v101d-src">${E(M("1パレットに外装（カートン）が何箱載るか、コンテナに何パレット入るか（分かる所だけ）。運賃の見積・FCL／LCL の判断に使います。", "How many cartons per pallet and pallets per container (what you know). Used for freight quotes and FCL/LCL.", "每托盘装几箱、每个集装箱装几托盘（填写已知部分）。用于运费报价和整箱/拼箱判断。", "Cajas por palé y palés por contenedor (lo que sepa)."))}</p>
+      ${was ? `<p class="v101dim-was">${E(F(M("前に「{v}」と答えた分は、入数として登録せず「未確認」として控えています。", "Your earlier answer “{v}” is kept as “not confirmed”."), { v: was }))}</p>` : ""}
+      <label class="v101d-ctnf"><span>${E(M("パレット・コンテナ入数", "Pallet/container load", "托盘・集装箱装载数", "Carga por palé/contenedor"))}</span><input type="text" autocomplete="off" data-v101-deal-ctnv="1" value="" placeholder="${E(M("例：外装40ケース／パレット、20ftで18パレット", "e.g. 40 cartons per pallet, 18 pallets per 20ft"))}" aria-label="${E(M("パレット・コンテナ入数", "Pallet/container load"))}"></label>
+      <p class="v101d-ctnmsg" role="status" aria-live="polite"></p>
+      <div class="rw v101d-btns"><button type="button" class="btn" data-v101-deal-ctnsave="1">${E(M("入数を登録する", "Register the load", "登记装载数", "Registrar"))}</button><button type="button" class="btn g" data-v101-deal-ctnlater="1">${E(M("まだ分からない（入数は未確認のまま先へ進む）", "Not known yet (move on, not confirmed)", "还不知道（以“未确认”继续）", "Aún no lo sé (seguir sin confirmar)"))}</button></div>
+    </div>`;
+  }
+  function ctnSave(box) {
+    const t = ten(); if (!t || !box) return;
+    const i = $("[data-v101-deal-ctnv]", box), msg = $(".v101d-ctnmsg", box);
+    const v = String((i && i.value) || "").trim();
+    const say = (x, bad) => { if (msg) { msg.textContent = x; msg.classList.toggle("bad", !!bad); } };
+    if (!v || !/\d/.test(v) || UNKW.test(v)) { say(M("数字で入れてください（例：外装40ケース／パレット）。分からないときは空のまま「まだ分からない」を押してください。", "Enter figures (e.g. 40 cartons per pallet). If unknown, press “Not known yet”."), true); try { i.focus(); } catch (e) { /* 無視 */ } return; }
+    let ok = false;
+    try { if (typeof W.applyAnswer === "function") ok = !!W.applyAnswer(t, "ctn", v); } catch (e) { ok = false; }
+    if (!ok || !String(t.ctn || "").trim()) t.ctn = v;
+    delete t.v101ctnLater;
+    try { if (t.v101hunk) delete t.v101hunk.ctn; } catch (e) { /* 無視 */ }
+    V.save();
+    try { if (typeof syncTenant === "function") syncTenant(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+    const m = M("✓ パレット・コンテナ入数を登録しました：", "✓ Registered: ") + String(t.ctn);
+    say(m, false); toast(m);
+    if (box.closest("#pn") && !$(".v101dim", document.getElementById("pn"))) closeWin();
+    try { if (typeof render === "function") render(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+    after();
+  }
+  function ctnLater(box) {
+    const t = ten(); if (!t) return;
+    t.v101ctnLater = { at: Date.now() };
+    V.save();
+    try { if (typeof syncTenant === "function") syncTenant(); } catch (e) { /* 無視 */ } // eslint-disable-line no-undef
+    const m = M("パレット・コンテナ入数は「未確認」のまま進めます（運賃の見積・FCL／LCL の判断の前に入れてください）。", "Continuing with the pallet/container load “not confirmed”.");
+    const msg = box && $(".v101d-ctnmsg", box); if (msg) msg.textContent = m;
+    toast(m);
+    if (box && box.closest("#pn") && !$(".v101dim", document.getElementById("pn"))) closeWin();
+    after();
+  }
+  document.addEventListener("click", (e) => {
+    const tg = e.target; if (!tg || !tg.closest) return;
+    const sv = tg.closest("[data-v101-deal-ctnsave]"); if (sv) { e.preventDefault(); e.stopPropagation(); ctnSave(sv.closest("[data-v101-deal-ctn]")); return; }
+    const lt = tg.closest("[data-v101-deal-ctnlater]"); if (lt) { e.preventDefault(); e.stopPropagation(); ctnLater(lt.closest("[data-v101-deal-ctn]")); }
+  }, true);
+  document.addEventListener("keydown", (e) => { try { if (e.key === "Enter" && e.target && e.target.matches && e.target.matches("[data-v101-deal-ctnv]")) { e.preventDefault(); ctnSave(e.target.closest("[data-v101-deal-ctn]")); } } catch (x) { /* 無視 */ } }, true);
+  // 寸法・重量の欄（書類の画面・hear の窓）のすぐ下に、入数の欄を足す（入数がまだのときだけ）
+  function paintCtn() {
+    try {
+      const need = needOf("ctn");
+      $$(".v101dim").forEach((f) => {
+        const nx = f.nextElementSibling && f.nextElementSibling.matches && f.nextElementSibling.matches("[data-v101-deal-ctn]") ? f.nextElementSibling : null;
+        if (!need) { if (nx) nx.remove(); return; }
+        if (nx || !vis(f)) return;
+        const tmp = document.createElement("div"); tmp.innerHTML = ctnHtml(false); f.after(tmp.firstElementChild);
+      });
+    } catch (e) { err("paintCtn", e); }
+  }
+  V.paintCtn = paintCtn;
+  function ctnWin() {
+    openWin(M("パレット・コンテナ入数を入れる", "Enter pallet/container load"), `<div class="v101d-win" data-v101-deal-win="ctn" data-noi18n><h3>${E(M("パレット・コンテナ入数を入れる", "Enter pallet/container load", "填写托盘・集装箱装载数", "Introducir la carga por palé"))}</h3>${ctnHtml(true)}<div class="rw v101d-btns"><button type="button" class="btn g" data-v101-deal-x="1">${E(M("閉じる", "Close"))}</button></div></div>`, (pn) => {
+      $$("[data-v101-deal-x]", pn).forEach((b) => b.addEventListener("click", closeWin));
+      const i = $("[data-v101-deal-ctnv]", pn); if (i) setTimeout(() => { try { i.focus(); } catch (e) { /* 無視 */ } }, 80);
+    });
+  }
+  /* 「次は 寸法・重量（・入数）を入れる」の行き先＝書類をつくるの寸法・重量の欄（入れる所に移る）。入数だけなら入数の窓 */
   function goDims() {
     try {
+      const g = gapNow();
+      const dimsNeed = !g || !g.block || g.block.indexOf("dimRows") >= 0 || g.block.indexOf("ctn") < 0;
       const fx = (tries) => {
+        if (!dimsNeed) { ctnWin(); return; }
         const w = document.getElementById("well");
         const f = w ? $$(".v101dim", w).find(vis) : null;
         if (f) {
+          paintCtn();
           try { f.scrollIntoView({ block: "center" }); } catch (x) { f.scrollIntoView(); }
           f.classList.add("v101d-hit"); setTimeout(() => f.classList.remove("v101d-hit"), 3000);
           const i = $('input[data-f="cl"]', f) || $('input[data-f="ul"]', f) || $("input", f);
@@ -455,15 +535,56 @@
         }
         if (tries < 10) { setTimeout(() => fx(tries + 1), 300); return; }
         // 欄が画面に無い（寸法の要らない書類を先に作った・hear の層が無い）：寸法・重量を入れる窓か、土台の表
-        if (typeof W.v101hearDimDialog === "function" && W.v101hearDimDialog("")) return;
+        if (typeof W.v101hearDimDialog === "function" && W.v101hearDimDialog("")) { setTimeout(paintCtn, 120); return; }
         const b = $$("[data-v101dim-open], [data-onclick*=\"openTableEdit('dim')\"]").find(vis);
         if (b) { try { b.scrollIntoView({ block: "center" }); } catch (x) { /* 無視 */ } b.classList.add("v101d-hit"); setTimeout(() => b.classList.remove("v101d-hit"), 3000); try { b.focus(); } catch (x) { /* 無視 */ } return; }
         try { if (typeof openTableEdit === "function") openTableEdit("dim"); } catch (x) { /* 無視 */ } // eslint-disable-line no-undef
       };
-      toast(M("寸法・重量は「書類をつくる」の画面の欄で入れます（数字だけ）。まだ分からないときは「まだ分からない」を押すと、先へ進めます", "Enter the dimensions/weight on the Documents screen. If not known yet, press “Not known yet” to move on.", "请在“制作单据”页面填写尺寸・重量。还不知道时按“还不知道”即可继续。", "Introduzca medidas y peso en Documentos. Si aún no lo sabe, pulse «Aún no lo sé»."));
+      const both = g && g.block && g.block.indexOf("ctn") >= 0 && dimsNeed;
+      toast(!dimsNeed ? M("パレット・コンテナ入数を入れます（分かる所だけ）。まだ分からないときは「まだ分からない」で先へ進めます", "Enter the pallet/container load. If not known yet, press “Not known yet”.")
+        : both ? M("寸法・重量と入数は「書類をつくる」の画面の欄で入れます（数字だけ）。まだ分からないときは「まだ分からない」を押すと、先へ進めます", "Enter dimensions, weight and load on the Documents screen. If not known yet, press “Not known yet”.")
+          : M("寸法・重量は「書類をつくる」の画面の欄で入れます（数字だけ）。まだ分からないときは「まだ分からない」を押すと、先へ進めます", "Enter the dimensions/weight on the Documents screen. If not known yet, press “Not known yet” to move on.", "请在“制作单据”页面填写尺寸・重量。还不知道时按“还不知道”即可继续。", "Introduzca medidas y peso en Documentos. Si aún no lo sabe, pulse «Aún no lo sé»."));
       if (curKey() !== "ops:doc") { RD.goKey("ops:doc"); setTimeout(() => fx(0), 700); } else fx(0);
     } catch (e) { err("goDims", e); }
   }
+
+  /* 22.01.2（w2-14）：商品情報・商品情報を登録の画面の右上の「次は」も、ほかの画面（見出し・ホーム・AI商社マン・はじめの設定の帯）と
+     同じ言葉・同じ行き先に（前は「必須の項目を入れる（あと1件）」「足りない情報に答える（残り 2項目）」と別の言葉で、行き先も問いの無い画面だった）。
+     はじめの設定の1つ目が「次」で、deal がその名前を実際の抜けにしているときだけ。ほかの層の書き換えは v92i の印で止める（外したら戻す） */
+  function unifyNext() {
+    try {
+      const k = curKey();
+      if (k !== "item" && k !== "up") return;
+      const nb = $("[data-rdhero] .k-next"); if (!nb) return;
+      const bb = $("b", nb); if (!bb) return;
+      let S = null; try { S = typeof W.v92coreSteps === "function" ? W.v92coreSteps() : null; } catch (e) { S = null; }
+      const r = S && S.has && S.next ? S.next : null;
+      // 本番ではヒアリングのあとも FILL.cur（今の問い）が残るので、ヒアリングの途中かどうかでは分けない（どの時点でも同じ言葉・同じ行き先）
+      const mine = !!(r && !r.done && (r.v101dims || r.v101miss));
+      if (!mine) {
+        if (nb.hasAttribute("data-v101-deal-go")) { nb.removeAttribute("data-v101-deal-go"); if (nb.hasAttribute("data-v101-deal-v92i")) { delete nb.dataset.v92i; nb.removeAttribute("data-v101-deal-v92i"); } }
+        return;
+      }
+      if (!nb.dataset.v92i) { nb.dataset.v92i = "1"; nb.setAttribute("data-v101-deal-v92i", "1"); }
+      const go = r.v101dims ? "dims" : "fill";
+      if (nb.getAttribute("data-v101-deal-go") !== go) nb.setAttribute("data-v101-deal-go", go);
+      if (nb.hasAttribute("data-kbc")) nb.removeAttribute("data-kbc");
+      if (nb.hasAttribute("data-v92iact")) nb.removeAttribute("data-v92iact");
+      if (bb.textContent !== r.t) bb.textContent = r.t;
+      if (bb.getAttribute("data-noi18n") == null) bb.setAttribute("data-noi18n", "1");
+      const title = M("次の手順：", "Next: ") + r.t + (r.sub ? M("（", " (") + r.sub + M("）", ")") : "");
+      if (nb.title !== title) nb.title = title;
+    } catch (e) { err("unifyNext", e); }
+  }
+  V.unifyNext = unifyNext;
+  // 前の層（r4c・r5c・r6a・v95 info）より先に受ける（window の捕まえる段階）
+  window.addEventListener("click", (e) => {
+    const b = e.target && e.target.closest ? e.target.closest(".k-next[data-v101-deal-go]") : null;
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    if (b.getAttribute("data-v101-deal-go") === "dims") { RD.goKey("v101:dims"); return; }
+    try { if (curKey() !== "up") RD.goKey("up"); setTimeout(() => { try { if (typeof W.v92upHearGo === "function") W.v92upHearGo(); } catch (x) { /* 無視 */ } }, 700); } catch (x) { err("goFill", x); }
+  }, true);
   const gk0 = RD.goKey;
   if (typeof gk0 === "function" && !gk0.__v101deal) {
     RD.goKey = function (k) { if (k === "v101:dims") { goDims(); return; } return gk0.apply(this, arguments); };
@@ -655,6 +776,6 @@
 
   /* いつ描くか：画面を描いたあと（RD.after）・#well の中が変わったとき（上の見張り） */
   const a0 = RD.after;
-  RD.after = function () { const r = a0.apply(this, arguments); try { paintDb(); paintDeal(); paintHome(); } catch (e) { err("after", e); } try { setTimeout(() => { paintDb(); paintDeal(); paintHome(); decoBar(); }, 50); } catch (e) { err("after2", e); } return r; };
-  setInterval(() => { if (document.hidden) return; const k = curKey(); if (k === "db") paintDb(); else if (k === "deal") paintDeal(); else if (k === "dash:home") paintHome(); }, 1500);
+  RD.after = function () { const r = a0.apply(this, arguments); try { paintDb(); paintDeal(); paintHome(); unifyNext(); paintCtn(); } catch (e) { err("after", e); } try { setTimeout(() => { paintDb(); paintDeal(); paintHome(); decoBar(); unifyNext(); paintCtn(); }, 50); } catch (e) { err("after2", e); } return r; };
+  setInterval(() => { if (document.hidden) return; const k = curKey(); if (k === "db") paintDb(); else if (k === "deal") paintDeal(); else if (k === "dash:home") paintHome(); else if (k === "item" || k === "up") unifyNext(); if ($(".v101dim")) paintCtn(); }, 1500);
 })();

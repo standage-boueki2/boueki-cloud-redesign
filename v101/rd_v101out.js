@@ -77,6 +77,7 @@
       let h = __vd101.apply(this, arguments);
       try {
         h = String(h);
+        try { if (typeof V.offBan === "function") h = V.offBan(h); if (typeof V.offFix === "function") h = V.offFix(h); } catch (e) { err("offBan", e); } // 22.01.2（w1-8・w2-3）AI につながらないときの案内を理由どおりに
         const add = (h.indexOf('id="v101outEd"') < 0 ? editBox() : "") + (h.indexOf('id="v101outGate"') < 0 ? gateBox() : "");
         if (add) {
           const k = h.indexOf('<div class="dk3-dl">');
@@ -169,7 +170,11 @@
         const lis = ul ? [...ul.querySelectorAll("li")] : [];
         if (lis.length) {
           let en = [];
-          if (plan) {
+          const rec = D3.v101cover && D3.v101cover[lg]; // 22.01.2：資料を組んだときの表紙のバッジ（fact の層の直しの後）＝資料の表紙と同じ
+          if (rec && Array.isArray(rec.b) && rec.b.length) {
+            rec.b.forEach((t0) => { const t = plainT(t0); if (t && en.indexOf(t) < 0) en.push(t); });
+            en = en.filter((t) => !/[぀-ヿ一-鿿]/.test(t) || /^zh/.test(lg)).slice(0, Math.max(1, lis.length));
+          } else if (plan) {
             // 資料の表紙に出るバッジ（根拠の確かめで外した文を除いた控え）だけ＝見本と資料の表紙が同じ言葉になる
             ((plan.hero && plan.hero.badges) || []).forEach((b) => { const t = plainT(b && b.t); if (t && en.indexOf(t) < 0) en.push(t); });
             en = en.filter((t) => !/[぀-ヿ一-鿿]/.test(t) || /^zh/.test(lg)).slice(0, Math.max(1, lis.length));

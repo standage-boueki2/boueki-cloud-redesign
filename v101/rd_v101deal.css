@@ -117,3 +117,12 @@ html.rd #rddbsel .v101d-chip { white-space: normal; text-overflow: clip; overflo
 .v101d-cpst { font-size: 13px; font-weight: 700; color: var(--ink-2, #4a5563); overflow-wrap: anywhere; min-width: 0; }
 .v101d-cpst.ok { color: var(--good, #1a7f37); }
 .v101d-cptmp { position: fixed; left: -9999px; top: 0; opacity: 0; }
+/* 22.01.2（w1-2）：パレット・コンテナ入数の欄（寸法・重量の欄のすぐ下・入数だけのときは窓） */
+.v101d-ctn { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--line, #d7dde5); border-radius: 10px; background: var(--surface, #fff); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.v101d-ctnh { margin: 0 0 4px; }
+.v101d-ctnf { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--ink-2, #4a5563); max-width: 520px; }
+.v101d-ctnf > span { font-weight: 700; }
+.v101d-ctnf input { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid var(--line, #d7dde5); border-radius: 8px; background: var(--surface, #fff); color: var(--ink, #1f2328); width: 100%; box-sizing: border-box; min-height: 36px; }
+.v101d-ctnmsg { margin: 4px 0 0; font-weight: 700; color: var(--good, #1a7f37); }
+.v101d-ctnmsg.bad { color: var(--crit, #c62828); }
+.v101d-ctnmsg:empty { display: none; }

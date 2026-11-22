@@ -263,6 +263,7 @@
       well.querySelectorAll("b").forEach((b) => {
         const m = String(b.textContent || "").trim().match(/^足りないのは(\d+)項目$/);
         if (!m || b.childElementCount) return;
+        try { if (b.parentElement) plainTerms(b.parentElement); } catch (e) { /* 無視 */ } // 22.01.2 w1-9：読み上げで項目名・用語（リードタイム・関税率）が抜けないよう、要約の中の用語の印を外す
         const N = +m[1];
         const L = miss.slice(0, 4);
         if (!L.length || N !== miss.length || L.length < 2) return;
@@ -294,6 +295,8 @@
         // 「商品情報を登録」の「残り N項目（a・b など）」「全体 c/d：あと a・b など」（同じ数え方 v92prodFill の missKeys と名前 v92prodNm）
         needM = K && Array.isArray(K.missKeys) ? K.missKeys.map((k) => (k === "hs" && K.hsGuess ? "HSコード（推定・要確認）" : (typeof W.v92prodNm === "function" ? String(W.v92prodNm(k, t)) : k))) : [];
       } catch (e) { optM = []; needM = []; }
+      // 一覧の文の中の用語の印を先に外す（読み上げで抜けないように）
+      well.querySelectorAll(".k-v90optl span, li.ng, .rd-empty").forEach((el) => { if (/任意の項目で未登録 \d+件|任意 あと\d+件|残り \d+項目|：あと /.test(el.textContent || "")) plainTerms(el); });
       textNodes(well).forEach((nd) => {
         const v = String(nd.nodeValue || "");
         if (/任意の項目で未登録 \d+件：/.test(v)) { if (rejoin(nd, opt, "")) n++; }
@@ -305,6 +308,51 @@
     } catch (e) { err("listJa", e); return 0; }
   }
   V.fixListsJa = fixListsJa;
+
+  /* ════════════ 22.01.2（w1-3）商品情報の出どころ：📎で取り込んだ資料を「手入力（資料なし）」と書かない ════════════ */
+  V.wrap("vItem", (o) => function () {
+    let h = String(o.apply(this, arguments));
+    try {
+      const t = ten();
+      if (!t || !userT(t) || !/^手入力/.test(String(t.file || "").trim())) return h;
+      const files = typeof V.fileNames === "function" ? V.fileNames(t) : [];
+      if (!files.length) return h;
+      const S = t.v101srcOf || {};
+      const lst = files.join(M("、", ", ", "、", ", "));
+      const btn = `<button type="button" class="btn g" data-v101srcs="1" style="padding:2px 9px;font-size:11px;margin-left:6px">${E(M("取り込んだ資料の一覧", "Imported files", "已导入的资料", "Archivos importados"))}</button>`;
+      const head = `<span class="src" data-v101src="${files.length}" data-noi18n>📄 ${E(M(`取り込んだ資料（${files.length}件）：${lst}（ヒアリングの答えと合わせて登録）`, `Imported files (${files.length}): ${lst} (registered together with your interview answers)`, `已导入的资料（${files.length}件）：${lst}（与问答的回答一起登记）`, `Archivos importados (${files.length}): ${lst} (registrados junto con sus respuestas)`))}${btn}</span>`;
+      h = h.replace(/<span class="src">(?:📄|✍) [^<]*?<\/span>/, head);
+      // 成分・材質表の下：どの資料から入ったか（分からなければ「資料とヒアリングの答えから」）
+      const cf = S.compRows ? M(`${S.compRows} から取り込み`, `Imported from ${S.compRows}`, `从 ${S.compRows} 导入`, `Importado de ${S.compRows}`) : M(`取り込んだ資料（${lst}）とヒアリングの答えから`, `From the imported files (${lst}) and your interview answers`, `来自已导入的资料（${lst}）和问答的回答`, `De los archivos importados (${lst}) y sus respuestas`);
+      h = h.replace(/(<p class="nn" style="margin-top:8px")>(?:手入力（資料なし） から取り込み|手入力で登録|Imported from 手入力（資料なし）)(<\/p>)/, (m0, a, b) => `${a} data-v101src="comp" data-noi18n>${E(cf)}${b}`);
+      V.n.srcShow = (V.n.srcShow || 0) + 1;
+    } catch (e) { err("srcShow", e); }
+    return h;
+  });
+  document.addEventListener("click", (ev) => {
+    try {
+      const b = ev.target && ev.target.closest ? ev.target.closest("[data-v101srcs]") : null;
+      if (!b) return;
+      ev.preventDefault(); ev.stopPropagation();
+      if (W.RDX && typeof W.RDX.goKey === "function") W.RDX.goKey("srcs"); else if (typeof W.go === "function") W.go("srcs");
+    } catch (e) { err("srcsGo", e); }
+  }, true);
+
+  /* ════════════ 22.01.2（w1-9）読み上げ：一覧の項目名が用語の印（span.tm・abbr.k-term）の中に入ると、読み上げの文字から抜ける ════════════
+     この層が直す一覧（要約の「足りないのは」・任意の項目・残りの項目）だけ、用語の印を外して普通の文字にし、data-noterm で付け直されないようにする */
+  function plainTerms(el) {
+    try {
+      if (!el || !el.querySelectorAll) return 0;
+      let n = 0;
+      el.querySelectorAll(".tm, .v54term, abbr.k-term").forEach((x) => { if (x.closest(".k-termdemo")) return; x.replaceWith(document.createTextNode(x.textContent || "")); n++; });
+      if (!el.hasAttribute("data-noterm")) el.setAttribute("data-noterm", "");
+      // 刷新版の用語の印（termScan）は data-noterm を見ないので、その「付けない」一覧（.k-termhint）にも入れる（外す→付け直す→外す…の繰り返しにしない）
+      if (!el.classList.contains("k-termhint") && !(el.closest && el.closest(".rd-hero"))) { el.classList.add("k-termhint"); el.setAttribute("data-v101plain", "1"); }
+      if (n) { el.normalize(); V.n.plainTerm = (V.n.plainTerm || 0) + n; }
+      return n;
+    } catch (e) { err("plainTerms", e); return 0; }
+  }
+  V.plainTerms = plainTerms;
 
   V.wrap("render", (o) => function () { const r = o.apply(this, arguments); try { setTimeout(paintItem, 0); setTimeout(fixListsJa, 0); setTimeout(fixListsJa, 400); } catch (e) { /* 無視 */ } return r; });
   try { const mo = new MutationObserver(() => { if (!V.__pi) { V.__pi = 1; setTimeout(() => { V.__pi = 0; paintItem(); fixListsJa(); }, 120); } }); const st = () => { const w = document.getElementById("well"); if (w) mo.observe(w, { childList: true, subtree: true }); else setTimeout(st, 500); }; st(); } catch (e) { err("mo", e); }

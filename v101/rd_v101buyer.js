@@ -50,7 +50,8 @@
       // リストを作った後も「まだリストを作っていません」や全部の行の数のままにならないよう、表の社数で（土台の fixDb と同じ文）
       if (p && run && Array.isArray(run.leads)) {
         const c = V.obCount(run);
-        const want = M("最新のリスト：" + c.shown + "件（この下に出ています）", "Latest list: " + c.shown + " (shown below)", "最新名单：" + c.shown + " 家（显示在下方）", "Última lista: " + c.shown + " (abajo)");
+        // 22.01.2（2回目）w2-3：0社のときは「0件（この下に出ています）」と言わない
+        const want = !c.shown && c.total === 0 ? M("最新のリスト：まだ作れていません（0社・下の知らせを見てください）", "Latest list: not made yet (0 companies; see the notice below)", "最新名单：尚未生成（0 家・请看下方提示）", "Última lista: aún no creada (0 empresas; vea el aviso abajo)") : M("最新のリスト：" + c.shown + "件（この下に出ています）", "Latest list: " + c.shown + " (shown below)", "最新名单：" + c.shown + " 家（显示在下方）", "Última lista: " + c.shown + " (abajo)");
         if (p.textContent !== want) { p.setAttribute("data-noi18n", "1"); p.textContent = want; p.style.color = ""; }
       }
       const t = cntNote(run);
@@ -113,6 +114,8 @@
         }
       });
       let out = T.innerHTML;
+      // 22.01.2（2回目）w2-3：AI につながらなかった知らせ（22.00 の層）の「0時以降」を、一時的な失敗なら「少し待ってから」に。0社の見出し
+      try { if (V.offFix) out = V.offFix(out, run); if (!(run.leads || []).length) out = out.replace(/：0社（([^）]+) 作成）/, (m0, d) => "：" + F(M("0社（{d} に作ろうとしましたが、作れていません）", "0 companies (tried at {d}; not made)"), { d })); } catch (e) { err("offTable", e); }
       // 表の見出しの下：件数の注記
       const note = cntNote(run);
       if (note) out = out.replace(/(<div class="v71bar">[\s\S]*?<\/div>)/, `$1<p class="v101b-cnt v101b-cnt2" data-v101-buyer-cnt2="1" data-noi18n="1">${E(note)}</p>`);
@@ -149,7 +152,9 @@
           .forEach(([a, b]) => { h = h.split('placeholder="' + E(a) + '"').join('placeholder="' + E(b) + '"'); });
         let R = {}; try { R = V.regInfo(); } catch (e) { R = {}; }
         const got = [R.addr ? M("住所", "address") : "", R.tel ? M("電話", "phone") : "", R.web ? M("Web", "website") : "", R.mail ? M("メール", "email") : ""].filter(Boolean);
-        const note = M("未入力の項目は、文面の署名に【…を入れてください】と目立つ形で残ります（仮の値は入れません）。", "Missing items stay in the signature as 【… please fill in】 (no dummy values are inserted).") + (got.length ? F(M("登録済みの会社情報から入れた項目：{x}", " Filled from your registered company info: {x}"), { x: got.join("・") }) : "");
+        let note = M("未入力の項目は、文面の署名に【…を入れてください】と目立つ形で残ります（仮の値は入れません）。", "Missing items stay in the signature as 【… please fill in】 (no dummy values are inserted).") + (got.length ? F(M("登録済みの会社情報から入れた項目：{x}", " Filled from your registered company info: {x}"), { x: got.join("・") }) : "");
+        // 22.01.2 S3：名前が英字でないときは、署名に入れていないことを知らせる
+        try { const s0 = (fn("v79obSig") ? W.v79obSig() : {}) || {}; const nm = String(s0.name || "").trim(); if (nm && V.latinName && !V.latinName(nm)) note += F(M(" 名前「{n}」は英字ではないため、署名には入れず【差出人の名前（英字）を入れてください】と出します。「お名前」にローマ字（例：Taro Yamada）で入れてください。", " The name “{n}” is not in Latin letters, so the signature shows 【Sender name (Latin letters) — please fill in】 instead. Enter your name in Latin letters (e.g. Taro Yamada)."), { n: nm }); } catch (e) { err("sigNoteName", e); }
         h = h.replace(/(<pre class="v79pre")/, `<p class="nn v101b-signote" data-v101-buyer-signote="1" data-noi18n>${E(note)}</p>$1`);
       } catch (e) { err("sigHtml", e); }
       return h;
@@ -209,23 +214,38 @@
     let box = ta.parentNode.querySelector(":scope > .v101b-unk");
     const left = V.unkScan(ta.value);
     const mm = kind === "ob" ? msgOf(ta).m : null;
-    const fixed = (mm && Array.isArray(mm.v101unk) ? mm.v101unk : (ta.__v101unk || [])).map((x) => x.k).filter((k, i, a) => a.indexOf(k) === i);
-    if (!left.length && !fixed.length) { if (box) box.remove(); return null; }
+    const fixedAll = (mm && Array.isArray(mm.v101unk) ? mm.v101unk : (ta.__v101unk || []));
+    const fixed = fixedAll.map((x) => x.k).filter((k, i, a) => a.indexOf(k) === i && k !== "term");
+    const fixedTerm = fixedAll.filter((x) => x.k === "term").map((x) => x.m).filter((m, i, a) => a.indexOf(m) === i);
+    // 22.01.2（2回目）w2-1：登録と違う名前（原材料・材質・品番）は、「不明」の断定とは別の文で知らせる
+    const leftU = left.filter((x) => x.k !== "term"), leftT = left.filter((x) => x.k === "term");
+    if (!left.length && !fixed.length && !fixedTerm.length) { if (box) box.remove(); return null; }
     let t = "", role = "status";
+    const termTxt = (m) => F(M("文面に、登録と違う名前があります：「{m}」。原材料・材質・品番は、登録の名前にそろえてください。", "The text uses a name that differs from your registration: “{m}”. Use the registered name for ingredients, materials and part numbers.", "邮件中有与登记不同的名称：“{m}”。原材料・材质・品号请与登记的名称一致。", "El texto usa un nombre distinto del registrado: «{m}». Use el nombre registrado para ingredientes, materiales y referencias."), { m });
+    const termFixed = (list) => F(M("原材料・材質・品番の言い方を、登録の名前にそろえました（{x}）。", "Ingredient, material and part-number names were aligned with your registration ({x}).", "已将原材料・材质・品号的说法与登记的名称一致（{x}）。", "Se alinearon los nombres de ingredientes, materiales y referencias con su registro ({x})."), { x: list.slice(0, 3).map((m) => "「" + m + "」").join("・") });
     if (left.length) {
       role = "alert";
-      t = F(M("文面に、「不明」と答えた事柄の断定があります：{x}（「{m}」）。確かめるまで断定せず、「待確認／to be confirmed」と書いてください（答えが分かったら、商品情報の追加ヒアリングで入れると文面にも使えます）。", "The text states something you answered as “unknown”: {x} (“{m}”). Until it is confirmed, write “to be confirmed” instead (once you know, add it in the product's follow-up questions).", "邮件中有您回答为“不明”的事项的断定：{x}（“{m}”）。确认前请勿断定，请写“待确认”（确认后可在商品信息的追加询问中填写）。", "El texto afirma algo que respondió como «desconocido»: {x} («{m}»). Hasta confirmarlo, escriba «por confirmar»."), { x: left.map((x) => topN(x.k, x.lab)).join("・"), m: left[0].m });
+      const a = [];
+      if (leftU.length) a.push(F(M("文面に、「不明」と答えた事柄の断定があります：{x}（「{m}」）。確かめるまで断定せず、「待確認／to be confirmed」と書いてください（答えが分かったら、商品情報の追加ヒアリングで入れると文面にも使えます）。", "The text states something you answered as “unknown”: {x} (“{m}”). Until it is confirmed, write “to be confirmed” instead (once you know, add it in the product's follow-up questions).", "邮件中有您回答为“不明”的事项的断定：{x}（“{m}”）。确认前请勿断定，请写“待确认”（确认后可在商品信息的追加询问中填写）。", "El texto afirma algo que respondió como «desconocido»: {x} («{m}»). Hasta confirmarlo, escriba «por confirmar»."), { x: leftU.map((x) => topN(x.k, x.lab)).join("・"), m: leftU[0].m }));
+      if (leftT.length) a.push(termTxt(String(leftT[0].m).replace(/→.*$/, "")));
+      t = a.join(" ");
     } else {
-      t = F(M("「不明」と答えた事柄（{x}）は、文面で断定せず「待確認／to be confirmed」の形にしました（AI の案から外した言い回しがあります）。答えが分かったら、商品情報の追加ヒアリングで入れると文面にも使えます。", "Items you answered as “unknown” ({x}) are not stated as fact; they are written as “to be confirmed” (some wording from the AI draft was removed). Once you know, add them in the product's follow-up questions.", "您回答为“不明”的事项（{x}）在邮件中不作断定，写为“待确认”（已删除 AI 草稿中的相关措辞）。确认后可在商品信息的追加询问中填写。", "Lo que respondió como «desconocido» ({x}) no se afirma: se escribe «por confirmar» (se quitó parte del texto de la IA)."), { x: fixed.map((k) => topN(k)).join("・") });
+      const a = [];
+      if (fixed.length) a.push(F(M("「不明」と答えた事柄（{x}）は、文面で断定せず「待確認／to be confirmed」の形にしました（AI の案から外した言い回しがあります）。答えが分かったら、商品情報の追加ヒアリングで入れると文面にも使えます。", "Items you answered as “unknown” ({x}) are not stated as fact; they are written as “to be confirmed” (some wording from the AI draft was removed). Once you know, add them in the product's follow-up questions.", "您回答为“不明”的事项（{x}）在邮件中不作断定，写为“待确认”（已删除 AI 草稿中的相关措辞）。确认后可在商品信息的追加询问中填写。", "Lo que respondió como «desconocido» ({x}) no se afirma: se escribe «por confirmar» (se quitó parte del texto de la IA)."), { x: fixed.map((k) => topN(k)).join("・") }));
+      if (fixedTerm.length) a.push(termFixed(fixedTerm));
+      t = a.join(" ");
     }
     if (!box) { box = document.createElement("div"); box.className = "v101b-unk"; box.setAttribute("data-noi18n", "1"); ta.parentNode.insertBefore(box, ta); }
     box.setAttribute("role", role); box.setAttribute("data-v101-buyer-unk", left.length ? "left" : "fixed");
-    if (box.dataset.sig !== t) { box.dataset.sig = t; box.innerHTML = `<b>${E(left.length ? M("⚠ 断定に注意", "⚠ Unconfirmed claim", "⚠ 注意断定", "⚠ Afirmación sin confirmar") : M("ℹ 断定していません", "ℹ Not stated as fact", "ℹ 未作断定", "ℹ No se afirma"))}</b><span>${E(t)}</span>`; }
+    const head = left.length ? (leftU.length ? M("⚠ 断定に注意", "⚠ Unconfirmed claim", "⚠ 注意断定", "⚠ Afirmación sin confirmar") : M("⚠ 登録と違う名前", "⚠ Name differs from registration", "⚠ 与登记不同的名称", "⚠ Nombre distinto del registro"))
+      : (fixed.length ? M("ℹ 断定していません", "ℹ Not stated as fact", "ℹ 未作断定", "ℹ No se afirma") : M("ℹ 登録の名前にそろえました", "ℹ Aligned with registration", "ℹ 已与登记一致", "ℹ Alineado con el registro"));
+    if (box.dataset.sig !== t + head) { box.dataset.sig = t + head; box.innerHTML = `<b>${E(head)}</b><span>${E(t)}</span>`; }
     return box;
   }
   V.unkBox = unkBox;
   function sweepPh() {
     quietMailWarn();
+    try { if ($("#v71obBody")) editable(); } catch (e) { err("sweepEdit", e); }
     try {
       const a = $("#v71obBody");
       if (a) {
@@ -362,12 +382,39 @@
     } catch (e) { err("regSteps", e); }
   }
 
+  /* 22.01.2（2回目）w2-5：見出しは「本文（直せます）」なのに、21.85 の層（v84 のカード）が件名・本文を読み取り専用にしていて、
+     「直す」を押すまでクリックして打っても入らなかった → 開いたらすぐ直せるようにする（「直す」はそのまま＝本文へ移るボタン）。
+     打った文はその場で文面に控え（フォローに切り替えても消えない）、「⚠ 断定に注意」などの確かめもすぐ効く */
+  let saveT = 0;
+  function editable() {
+    ["v71obSubj", "v71obBody"].forEach((id) => {
+      const x = document.getElementById(id);
+      if (!x) return;
+      if (x.hasAttribute("readonly")) { x.removeAttribute("readonly"); x.classList.remove("v84ro"); V.n.editOpen = (V.n.editOpen || 0) + 1; }
+      if (!x.dataset.v101save) {
+        x.dataset.v101save = "1";
+        x.addEventListener("input", () => {
+          try {
+            const ta = document.getElementById("v71obBody"), su = document.getElementById("v71obSubj");
+            const o = ta ? msgOf(ta) : null;
+            if (!o || !o.m) return;
+            if (ta) o.m.body = ta.value;
+            if (su) o.m.subj = su.value;
+            o.m.v101typed = 1;
+            clearTimeout(saveT); saveT = setTimeout(() => { try { if (fn("v71obSave")) W.v71obSave(); } catch (e) { /* 無視 */ } }, 800);
+          } catch (e) { err("editSave", e); }
+        });
+      }
+    });
+  }
+  V.editable = editable;
   // 文面の窓を開いたら、すぐ知らせを出す（見張りの時機に任せない）
   if (fn("v71obOpen") && !W.v71obOpen.__v101buyerRd) {
     const __op = W.v71obOpen;
     const g = async function () {
       const r = await __op.apply(this, arguments);
-      try { [0, 200, 700, 1500].forEach((ms) => setTimeout(() => { try { sweepPh(); } catch (e) { /* 無視 */ } }, ms)); } catch (e) { err("openSweep", e); }
+      try { editable(); } catch (e) { err("openEdit", e); }
+      try { [0, 200, 700, 1500].forEach((ms) => setTimeout(() => { try { editable(); sweepPh(); } catch (e) { /* 無視 */ } }, ms)); } catch (e) { err("openSweep", e); }
       return r;
     };
     g.__v101buyerRd = 1; g.__v101buyer = 1;
@@ -379,6 +426,8 @@
     const k = curKey();
     if (k === "db" || $("#v71ob")) { fixSummary(); fixHist(); }
     if (k === "ops:reg") fixRegSteps();
+    // 22.01.2 R4：前に作った規制の表（D.regs）に人の食品の手続きが残っていたら外して描き直す（ペットフードの商品だけ）
+    if (/^ops:(reg|doc)$/.test(k) && V.petFixD) { try { if (V.petFixD() > 0 && typeof render === "function") render(); } catch (e) { err("petRender", e); } } // eslint-disable-line no-undef
     sweepPh();
   }
   V.rdApply = apply;
@@ -396,4 +445,14 @@
   let mt = 0;
   try { new MutationObserver(() => { clearTimeout(mt); mt = setTimeout(() => { try { if ($("#v71obBody") || $("#dmB") || $("#dmR")) sweepPh(); if ($("#rO .v95reg-next")) fixRegSteps(); } catch (e) { /* 無視 */ } }, 250); }).observe(document.body, { childList: true, subtree: true }); } catch (e) { err("mo", e); }
   setInterval(() => { try { if (!document.hidden) apply(); } catch (e) { /* 無視 */ } }, 2500);
+  // 22.01.2（2回目）w2-9：確かめている間の経過の時間（目安と比べられるように）
+  setInterval(() => {
+    try {
+      $$("[data-v101-buyer-elapsed]").forEach((x) => {
+        const s = Math.max(0, Math.round((Date.now() - (+x.getAttribute("data-v101-buyer-elapsed") || Date.now())) / 1000));
+        const t = F(M("（経過 {m}分{s}秒）", " (elapsed {m}:{s})", "（已用 {m}分{s}秒）", " (transcurrido {m}:{s})"), { m: Math.floor(s / 60), s: String(s % 60).padStart(2, "0") });
+        if (x.textContent !== t) x.textContent = t;
+      });
+    } catch (e) { /* 無視 */ }
+  }, 1000);
 })();
